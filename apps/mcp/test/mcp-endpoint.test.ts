@@ -94,6 +94,15 @@ describe('McpEndpoint', () => {
     expect(result.content[0]?.text).toContain('http://app.test/a/a1')
   })
 
+  it('renames the artifact along with the new version when update carries a title', async () => {
+    const fakeApp = new FakeApp(Response.json({ artifactId: 'a1', version: 4, url: 'http://app.test/a/a1' }))
+
+    const result = await callTool(mcpEndpoint(fakeApp), 'update', { artifactId: 'a1', baseVersion: 3, title: 'Q3 plan', files: [{ path: 'index.html', content: 'v4' }] })
+
+    expect(fakeApp.calls[0]).toMatchObject({ method: 'PUT', url: 'http://app.test/api/artifacts/a1', body: { baseVersion: 3, title: 'Q3 plan' } })
+    expect(result.isError).toBeUndefined()
+  })
+
   it('turns a version conflict into merge instructions rather than a failure', async () => {
     const fakeApp = new FakeApp(Response.json({ error: 'conflict', currentVersion: 4, latestFiles: [{ path: 'index.html', content: 'latest' }] }, { status: 409 }))
 

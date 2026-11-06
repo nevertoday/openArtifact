@@ -45,10 +45,16 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'update',
-    description: 'Publish a new version of an artifact. Pass baseVersion = the version you read. If someone published in between, the result is a conflict with the latest files: merge your change into them and update again with baseVersion = currentVersion. Use force only when the person explicitly asks to overwrite.',
+    description: 'Publish a new version of an artifact. Pass baseVersion = the version you read. If someone published in between, the result is a conflict with the latest files: merge your change into them and update again with baseVersion = currentVersion. Use force only when the person explicitly asks to overwrite. Pass title only to rename the artifact.',
     inputSchema: {
       type: 'object',
-      properties: { artifactId: ARTIFACT_ID, baseVersion: { type: 'integer', minimum: 1 }, files: FILES_SCHEMA, force: { type: 'boolean', default: false } },
+      properties: {
+        artifactId: ARTIFACT_ID,
+        baseVersion: { type: 'integer', minimum: 1 },
+        files: FILES_SCHEMA,
+        title: { type: 'string', description: 'Optional new name, at most 200 characters. Leave it out to keep the current one.' },
+        force: { type: 'boolean', default: false },
+      },
       required: ['artifactId', 'files'],
     },
   },
@@ -123,8 +129,8 @@ export class AgentTools {
   }
 
   async #update(toolArguments: Record<string, unknown>): Promise<ToolResult> {
-    const { artifactId, baseVersion, files, force } = toolArguments
-    const updated = await this.#appClient.call('PUT', `/api/artifacts/${AgentTools.#segment(artifactId)}`, { baseVersion, files, force })
+    const { artifactId, baseVersion, files, title, force } = toolArguments
+    const updated = await this.#appClient.call('PUT', `/api/artifacts/${AgentTools.#segment(artifactId)}`, { baseVersion, files, title, force })
     if (updated.status === 409) return AgentTools.#text(`Conflict: someone published in between. Merge your change into latestFiles and call update again with baseVersion = currentVersion.\n\n${JSON.stringify(updated.body, null, 2)}`)
     return AgentTools.#result(updated, 'Published a new version:')
   }

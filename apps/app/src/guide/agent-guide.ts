@@ -63,6 +63,11 @@ export class AgentGuide {
 2. \`update\` with \`baseVersion\` set to that version.
 3. On a conflict (HTTP 409), someone published in between: merge your change into \`latestFiles\` from the response and update again with \`baseVersion = currentVersion\`.
 4. Pass \`force: true\` only when the person explicitly asks to overwrite.
+5. To rename, pass \`title\` with the update. Leave it out to keep the current title.
+
+### Removing
+- Remove an artifact only when the person asks. MCP has no tool for it: use the HTTP API below, or ask the person to choose 删除 on the artifact's page. It disappears for everyone at once and can be restored for 30 days; then it is deleted for good.
+- You may remove and restore only what your person may: their own artifacts, or any artifact when they are a workspace admin. If an admin took it down, only an admin can restore it.
 
 ### Comments addressed to you
 1. \`list_comments\` with \`filter: "for_agent"\` returns unresolved comments people marked 给 agent.
@@ -84,7 +89,8 @@ Collection names and ids: letters, digits, \`-\`, \`_\`; at most 64 characters. 
 ### HTTP API
 - \`POST ${api}/artifacts\` \`{ title, visibility?, files: [{ path, content, encoding?: "utf8"|"base64", contentType? }] }\`
 - \`GET ${api}/artifacts\`, \`GET ${api}/artifacts/{id}\`
-- \`PUT ${api}/artifacts/{id}\` \`{ baseVersion, files }\`
+- \`PUT ${api}/artifacts/{id}\` \`{ baseVersion, files, title? }\`; \`PATCH ${api}/artifacts/{id}\` \`{ title }\` renames without a new version
+- \`DELETE ${api}/artifacts/{id}\` removes it; \`GET ${api}/artifacts?removed=true\` lists what you can restore; \`POST ${api}/artifacts/{id}/restore\` brings it back
 - \`GET ${api}/artifacts/{id}/comments?filter=for_agent\`, \`POST ${api}/artifacts/{id}/comments\` \`{ body, parentId }\`, \`PATCH ${api}/comments/{commentId}\` \`{ resolved: true }\`
 `
   }
