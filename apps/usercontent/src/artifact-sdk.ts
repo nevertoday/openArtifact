@@ -18,7 +18,7 @@ export const SDK_PATH = '/_sdk/open-artifact.js'
  *   open-artifact:anchor-cancelled  the person pressed Escape while picking
  *   open-artifact:pin-selected    { commentId }
  *   open-artifact:anchor-measured { selector, rect, scroll }  rect is null when the selector matches nothing
- *   open-artifact:frame-scrolled  { scroll, viewport }  at most once per animation frame
+ *   open-artifact:frame-scrolled  { scroll, viewport }  at most every 50 ms
  *
  * x and y are fractions of the page's width and height. A rect { top, left, width, height } is relative to the
  * frame's viewport; scroll { x, y } is the frame's scroll offset; viewport { width, height } its size.
@@ -92,6 +92,7 @@ export class ArtifactSdk {
   // Elements the SDK adds to the page carry this attribute, so they are never picked or measured as page content.
   const SDK_UI = 'data-open-artifact-ui'
   const PIN_COLOR = '#1d5bd8'
+  const SCROLL_REPORT_MS = 50
   const SHOWN_VERSION = (() => {
     const versionInPath = /\\/v(\\d+)\\//.exec(location.pathname)
     return versionInPath ? Number(versionInPath[1]) : null
@@ -99,7 +100,8 @@ export class ArtifactSdk {
 
   const pageGeometry = {
     tracking: false,
-    frameRequested: false,
+    reportPending: false,
+    scrolledSinceReport: false,
     pageSize() {
       const root = document.documentElement
       return { width: Math.max(root.scrollWidth, root.clientWidth), height: Math.max(root.scrollHeight, root.clientHeight) }
@@ -129,14 +131,21 @@ export class ArtifactSdk {
       this.tracking = enabled
       if (enabled) this.reportScroll()
     },
+    // The first scroll is reported at once, then at most every SCROLL_REPORT_MS; the last position is always sent.
     reportScroll() {
-      if (!this.tracking || this.frameRequested) return
-      this.frameRequested = true
-      requestAnimationFrame(() => {
-        this.frameRequested = false
-        if (!this.tracking) return
-        tellParent({ type: 'open-artifact:frame-scrolled', scroll: this.scroll(), viewport: { width: window.innerWidth, height: window.innerHeight } })
-      })
+      if (!this.tracking) return
+      if (this.reportPending) {
+        this.scrolledSinceReport = true
+        return
+      }
+      tellParent({ type: 'open-artifact:frame-scrolled', scroll: this.scroll(), viewport: { width: window.innerWidth, height: window.innerHeight } })
+      this.reportPending = true
+      setTimeout(() => {
+        this.reportPending = false
+        if (!this.scrolledSinceReport) return
+        this.scrolledSinceReport = false
+        this.reportScroll()
+      }, SCROLL_REPORT_MS)
     },
   }
   window.addEventListener('scroll', () => pageGeometry.reportScroll(), { passive: true })
@@ -221,11 +230,16 @@ export class ArtifactSdk {
     },
   }
   window.addEventListener('resize', () => commentPins.renderSoon())
-  // Images loading, fonts swapping and scripts adding content move elements; pins follow them.
+  // Images loading, fonts swapping and scripts adding content move elements; pins follow them. The root is watched
+  // as well as body, because a child's margin can collapse through body and move content without resizing it.
   if (typeof ResizeObserver === 'function') {
-    const observeBody = () => new ResizeObserver(() => commentPins.renderSoon()).observe(document.body)
-    if (document.body) observeBody()
-    else document.addEventListener('DOMContentLoaded', observeBody)
+    const observePage = () => {
+      const pageObserver = new ResizeObserver(() => commentPins.renderSoon())
+      pageObserver.observe(document.documentElement)
+      pageObserver.observe(document.body)
+    }
+    if (document.body) observePage()
+    else document.addEventListener('DOMContentLoaded', observePage)
   }
 
   // While picking, a transparent sheet over the page catches the click so the page itself does not react,
