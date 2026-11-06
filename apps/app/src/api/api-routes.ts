@@ -2,6 +2,7 @@ import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { ArtifactApi } from './artifact-api.ts'
 import { CommentApi } from './comment-api.ts'
+import { NotificationApi } from './notification-api.ts'
 import { SharedDataApi } from './shared-data-api.ts'
 import { SharingApi } from './sharing-api.ts'
 import { TokenApi } from './token-api.ts'
@@ -18,6 +19,7 @@ interface ApiRoute {
 class Apis {
   readonly artifacts: ArtifactApi
   readonly comments: CommentApi
+  readonly notifications: NotificationApi
   readonly sharing: SharingApi
   readonly tokens: TokenApi
   readonly sharedData: SharedDataApi
@@ -26,6 +28,7 @@ class Apis {
   constructor(context: ApiContext) {
     this.artifacts = new ArtifactApi(context)
     this.comments = new CommentApi(context)
+    this.notifications = new NotificationApi(context)
     this.sharing = new SharingApi(context)
     this.tokens = new TokenApi(context)
     this.sharedData = new SharedDataApi(context)
@@ -69,6 +72,9 @@ const API_ROUTES: ApiRoute[] = [
   ),
   route('GET', '/api/artifacts/:artifactId/comments', (apis, request, params) => apis.comments.list(request, param(params, 'artifactId'))),
   route('POST', '/api/artifacts/:artifactId/comments', (apis, request, params) => apis.comments.add(request, param(params, 'artifactId'))),
+  route('GET', '/api/notifications', (apis, request) => apis.notifications.list(request)),
+  route('POST', '/api/notifications/read-all', apis => apis.notifications.markAllRead()),
+  route('POST', '/api/notifications/:notificationId/read', (apis, _request, params) => apis.notifications.markRead(param(params, 'notificationId'))),
   route('PATCH', '/api/comments/:commentId', (apis, request, params) => apis.comments.setResolved(request, param(params, 'commentId'))),
   route('GET', '/api/artifacts/:artifactId/sharing', (apis, request, params) => apis.sharing.read(request, param(params, 'artifactId'))),
   route('PUT', '/api/artifacts/:artifactId/sharing', (apis, request, params) => apis.sharing.update(request, param(params, 'artifactId'))),

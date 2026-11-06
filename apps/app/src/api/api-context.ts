@@ -3,6 +3,7 @@ import type { Mailer } from '../auth/mailer.ts'
 import type { OpenArtifactAuth } from '../auth/open-artifact-auth.ts'
 import type { Identity, RequestIdentity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
+import { Notifier } from '../notifications/notifier.ts'
 import type { People } from '../people.ts'
 import type { Repositories } from '@open-artifact/core'
 
@@ -22,7 +23,7 @@ export class ApiContext {
   readonly gate: ArtifactGate
   readonly requestIdentity: RequestIdentity
   readonly people: People
-  readonly mailer: Mailer
+  readonly notifier: Notifier
   readonly auth: OpenArtifactAuth
   readonly appOrigin: string
 
@@ -31,7 +32,7 @@ export class ApiContext {
     this.gate = fields.gate
     this.requestIdentity = fields.requestIdentity
     this.people = fields.people
-    this.mailer = fields.mailer
+    this.notifier = new Notifier(fields.repositories, fields.mailer, artifactId => this.viewerUrl(artifactId))
     this.auth = fields.auth
     this.appOrigin = fields.appOrigin
   }

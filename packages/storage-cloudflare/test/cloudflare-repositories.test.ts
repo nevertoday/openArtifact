@@ -147,27 +147,37 @@ describe('artifact access, comments and shared data', () => {
     expect(await accessRepository.listGrants(artifactId)).toEqual([])
   })
 
-  it('threads comments, counts the ones waiting for an agent, and resolves them', async () => {
+  it('threads comments, lists the open threads of a workspace, and resolves them', async () => {
     const commentRepository = new CloudflareCommentRepository(env.DB)
     const { artifactId } = await createArtifactIn(workspaceId, authorId)
 
-    const agentRequest = await commentRepository.add({ artifactId, parentId: null, authorId: reviewerId, body: 'Add the R2 write to the diagram', forAgent: true, postedVia: null, anchor: { x: 0.25, y: 0.5 } })
+    const agentRequest = await commentRepository.add({ artifactId, parentId: null, authorId: reviewerId, body: 'Add the R2 write to the diagram', forAgent: true, postedVia: null, anchor: { x: 0.25, y: 0.5, version: 1, selector: 'main > h2', textQuote: 'Storage' } })
     await commentRepository.add({ artifactId, parentId: agentRequest.commentId, authorId, body: 'Done in v2', forAgent: false, postedVia: 'Claude Code', anchor: null })
-    const waitingBefore = await commentRepository.countWaitingForAgent(workspaceId)
+    const openBefore = await commentRepository.listInOpenThreads(workspaceId)
     await commentRepository.setResolved(agentRequest.commentId, authorId)
-    const waitingAfter = await commentRepository.countWaitingForAgent(workspaceId)
+    const openAfter = await commentRepository.listInOpenThreads(workspaceId)
 
     const thread = await commentRepository.listForArtifact(artifactId)
     expect(thread.map(comment => [comment.body, comment.parentId === agentRequest.commentId, comment.postedVia])).toEqual([
       ['Add the R2 write to the diagram', false, null],
       ['Done in v2', true, 'Claude Code'],
     ])
-    expect(waitingBefore.get(artifactId)).toBe(1)
-    expect(waitingAfter.get(artifactId)).toBeUndefined()
-    expect(await commentRepository.find(agentRequest.commentId)).toMatchObject({ resolvedBy: authorId, forAgent: true, anchor: { x: 0.25, y: 0.5 } })
+    expect(openBefore.filter(comment => comment.artifactId === artifactId).map(comment => comment.body)).toEqual(['Add the R2 write to the diagram', 'Done in v2'])
+    expect(openAfter.filter(comment => comment.artifactId === artifactId)).toEqual([])
+    expect(await commentRepository.find(agentRequest.commentId)).toMatchObject({ resolvedBy: authorId, forAgent: true, anchor: { x: 0.25, y: 0.5, version: 1, selector: 'main > h2', textQuote: 'Storage' } })
 
     await commentRepository.setResolved(agentRequest.commentId, null)
     expect(await commentRepository.find(agentRequest.commentId)).toMatchObject({ resolvedAt: null, resolvedBy: null })
+  })
+
+  it('reads an anchor saved before versions and elements were recorded', async () => {
+    const commentRepository = new CloudflareCommentRepository(env.DB)
+    const { artifactId } = await createArtifactIn(workspaceId, authorId)
+    await env.DB.prepare('INSERT INTO comments (id, artifact_id, author_id, body, anchor, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind('old-pinned-comment', artifactId, reviewerId, 'old pin', JSON.stringify({ x: 0.1, y: 0.2 }), Date.now())
+      .run()
+
+    expect((await commentRepository.find('old-pinned-comment'))?.anchor).toEqual({ x: 0.1, y: 0.2, version: null, selector: null, textQuote: null })
   })
 
   it('keeps shared documents per collection with who created and last changed them', async () => {

@@ -1,5 +1,4 @@
 import type { ArtifactComment, CommentAnchor } from '@open-artifact/core'
-import type { Identity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { JsonBody } from './json-body.ts'
@@ -29,22 +28,21 @@ export class CommentApi {
     const identity = await this.#context.requireIdentity()
     const openedArtifact = await this.#context.gate.require(artifactId, identity, request, 'canComment', 'comment on this artifact')
     const requestBody = await JsonBody.of(request)
-    const parentId = requestBody.optionalText('parentId', 64)
-    const parentComment = parentId === null ? null : await this.#context.repositories.comments.find(parentId)
-    const parentOnOtherArtifact = parentId !== null && parentComment?.artifactId !== artifactId
-    if (parentOnOtherArtifact) throw HttpError.badRequest('parentId must be a comment on this artifact')
-    // Threads are one level deep: a reply to a reply joins the thread of the comment it answers.
-    const threadRootId = parentComment?.parentId ?? parentId
+    const threadRoot = await this.#threadRootOf(requestBody.optionalText('parentId', 64), artifactId)
+    const resolveRequested = requestBody.boolean('resolve', false)
+    if (resolveRequested && threadRoot === null) throw HttpError.badRequest('resolve applies to a reply; pass parentId, or resolve with PATCH /api/comments/{commentId}')
     const addedComment = await this.#context.repositories.comments.add({
       artifactId,
-      parentId: threadRootId,
+      parentId: threadRoot?.commentId ?? null,
       authorId: identity.userId,
       body: requestBody.text('body', MAX_COMMENT_LENGTH),
-      forAgent: parentId === null && requestBody.boolean('forAgent', false),
+      forAgent: threadRoot === null && requestBody.boolean('forAgent', false),
       postedVia: identity.agentClient,
-      anchor: parentId === null ? CommentApi.#anchorOf(requestBody) : null,
+      anchor: threadRoot === null ? CommentApi.#anchorOf(requestBody, openedArtifact.summary.version) : null,
     })
-    await this.#notify(identity, openedArtifact.summary.title, openedArtifact.summary.authorId, addedComment, parentComment)
+    const resolvesThread = resolveRequested && threadRoot?.resolvedAt === null
+    if (resolvesThread) await this.#context.repositories.comments.setResolved(addedComment.parentId as string, identity.userId)
+    await this.#context.notifier.notify(identity, openedArtifact.summary, { kind: 'comment_added', comment: addedComment, resolvesThread })
     const names = await this.#context.people.namesOf([identity.userId])
     return Response.json({ comment: CommentApi.#commentJson(addedComment, names) }, { status: 201 })
   }
@@ -53,49 +51,34 @@ export class CommentApi {
     const identity = await this.#context.requireIdentity()
     const comment = await this.#context.repositories.comments.find(commentId)
     if (!comment) throw HttpError.notFound(`comment ${commentId}`)
-    await this.#context.gate.require(comment.artifactId, identity, request, 'canComment', 'resolve comments on this artifact')
+    const openedArtifact = await this.#context.gate.require(comment.artifactId, identity, request, 'canComment', 'resolve comments on this artifact')
     const requestBody = await JsonBody.of(request)
     const resolved = requestBody.boolean('resolved', true)
     await this.#context.repositories.comments.setResolved(commentId, resolved ? identity.userId : null)
+    const resolvesOpenThread = resolved && comment.parentId === null && comment.resolvedAt === null
+    if (resolvesOpenThread) await this.#context.notifier.notify(identity, openedArtifact.summary, { kind: 'thread_resolved', threadRoot: comment })
     return Response.json({ commentId, resolved })
   }
 
-  // The artifact's author hears about new comments, and a comment's author hears about replies to it.
-  // The comment is already saved, so a mail failure is logged and never turns the request into an error.
-  async #notify(commenter: Identity, artifactTitle: string, artifactAuthorId: string, addedComment: ArtifactComment, parentComment: ArtifactComment | null): Promise<void> {
-    const recipientIds = new Set([artifactAuthorId, parentComment?.authorId].filter((userId): userId is string => Boolean(userId)))
-    recipientIds.delete(commenter.userId)
-    const recipients = await this.#context.repositories.users.profilesOf([...recipientIds])
-    const commentKind = CommentApi.#commentKindOf(addedComment, parentComment)
-    const viewerUrl = this.#context.viewerUrl(addedComment.artifactId)
-    const deliveries = await Promise.allSettled(
-      [...recipients.values()].map(recipient =>
-        this.#context.mailer.send({
-          to: recipient.email,
-          subject: `${commenter.name} 在「${artifactTitle}」${commentKind}`,
-          text: `${commenter.name}：\n\n${addedComment.body}\n\n打开查看：${viewerUrl}`,
-        }),
-      ),
-    )
-    for (const failedDelivery of deliveries.filter(delivery => delivery.status === 'rejected')) {
-      console.error(new Error(`comment ${addedComment.commentId} notification could not be sent`, { cause: failedDelivery.reason }))
-    }
+  // Threads are one level deep: a reply to a reply joins the thread of the comment it answers.
+  async #threadRootOf(parentId: string | null, artifactId: string): Promise<ArtifactComment | null> {
+    if (parentId === null) return null
+    const parentComment = await this.#context.repositories.comments.find(parentId)
+    if (parentComment?.artifactId !== artifactId) throw HttpError.badRequest('parentId must be a comment on this artifact')
+    if (parentComment.parentId === null) return parentComment
+    const threadRoot = await this.#context.repositories.comments.find(parentComment.parentId)
+    if (!threadRoot) throw new Error(`comment ${parentId} belongs to the missing thread ${parentComment.parentId}`)
+    return threadRoot
   }
 
   // Only a top-level comment points at the page; x and y are fractions of the page's width and height.
-  static #anchorOf(requestBody: JsonBody): CommentAnchor | null {
+  static #anchorOf(requestBody: JsonBody, currentVersion: number): CommentAnchor | null {
     const anchor = requestBody.raw('anchor')
     if (anchor === undefined || anchor === null) return null
     const { x, y } = (typeof anchor === 'object' ? anchor : {}) as Record<string, unknown>
     const isFraction = (value: unknown): value is number => typeof value === 'number' && value >= 0 && value <= 1
     if (!isFraction(x) || !isFraction(y)) throw HttpError.badRequest('anchor must be { x, y } with both between 0 and 1')
-    return { x: Math.round(x * 10_000) / 10_000, y: Math.round(y * 10_000) / 10_000 }
-  }
-
-  static #commentKindOf(addedComment: ArtifactComment, parentComment: ArtifactComment | null): string {
-    if (parentComment) return '回复了评论'
-    if (addedComment.forAgent) return '留了一条给 agent 的评论'
-    return '发表了评论'
+    return { x: Math.round(x * 10_000) / 10_000, y: Math.round(y * 10_000) / 10_000, version: currentVersion, selector: null, textQuote: null }
   }
 
   static #filterOf(request: Request): CommentFilter {

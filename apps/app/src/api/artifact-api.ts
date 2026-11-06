@@ -74,7 +74,7 @@ export class ArtifactApi {
     })
     const renamesWithVersion = publishResult.status === 'published' && newTitle !== null
     if (renamesWithVersion) await this.#rename(identity, openedArtifact.summary, newTitle)
-    return this.#publishResponse(artifactId, publishResult)
+    return this.#publishResponse(identity, openedArtifact, publishResult)
   }
 
   async rename(request: Request, artifactId: string): Promise<Response> {
@@ -141,7 +141,7 @@ export class ArtifactApi {
    */
   async restoreVersion(request: Request, artifactId: string, version: number): Promise<Response> {
     const identity = await this.#context.requireIdentity()
-    await this.#context.gate.require(artifactId, identity, request, 'canEdit', 'restore a version of this artifact')
+    const openedArtifact = await this.#context.gate.require(artifactId, identity, request, 'canEdit', 'restore a version of this artifact')
     const requestBody = await JsonBody.of(request)
     const baseVersion = requestBody.positiveInteger('baseVersion', BASE_VERSION_HINT)
     const olderVersion = await this.#context.repositories.artifacts.readVersion(artifactId, version)
@@ -153,7 +153,7 @@ export class ArtifactApi {
       note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
       files: olderVersion.files,
     })
-    return this.#publishResponse(artifactId, publishResult)
+    return this.#publishResponse(identity, openedArtifact, publishResult)
   }
 
   static #originJson(origin: VersionOrigin): { origin: VersionOrigin['kind']; restoredFrom: number | null } {
@@ -165,9 +165,11 @@ export class ArtifactApi {
     }
   }
 
-  async #publishResponse(artifactId: string, publishResult: PublishResult): Promise<Response> {
+  async #publishResponse(publisher: Identity, openedArtifact: OpenedArtifact, publishResult: PublishResult): Promise<Response> {
+    const artifactId = openedArtifact.summary.artifactId
     switch (publishResult.status) {
       case 'published':
+        await this.#context.notifier.notify(publisher, openedArtifact.summary, { kind: 'version_published' })
         return Response.json({ artifactId, version: publishResult.version, url: this.#context.viewerUrl(artifactId) })
       case 'conflict':
         return this.#conflict(artifactId, publishResult.currentVersion)

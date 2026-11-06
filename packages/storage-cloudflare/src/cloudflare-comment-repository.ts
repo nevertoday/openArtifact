@@ -1,6 +1,7 @@
-import type { ArtifactComment, CommentRepository, NewComment } from '@open-artifact/core'
+import type { ArtifactComment, CommentAnchor, CommentRepository, NewComment } from '@open-artifact/core'
 
 const COMMENT_COLUMNS = 'id, artifact_id, parent_id, author_id, body, for_agent, posted_via, anchor, resolved_at, resolved_by, created_at'
+const JOINED_COMMENT_COLUMNS = COMMENT_COLUMNS.split(', ').map(column => `comments.${column}`).join(', ')
 
 interface CommentRow {
   id: string
@@ -76,6 +77,21 @@ export class CloudflareCommentRepository implements CommentRepository {
     return new Map(countRows.map(countRow => [countRow.artifact_id, countRow.waiting]))
   }
 
+  async listInOpenThreads(workspaceId: string): Promise<ArtifactComment[]> {
+    const { results: commentRows } = await this.#db
+      .prepare(
+        `SELECT ${JOINED_COMMENT_COLUMNS}
+         FROM comments
+         JOIN artifacts ON artifacts.id = comments.artifact_id
+         JOIN comments AS thread_root ON thread_root.id = COALESCE(comments.parent_id, comments.id)
+         WHERE artifacts.workspace_id = ? AND thread_root.resolved_at IS NULL
+         ORDER BY comments.created_at, comments.rowid`,
+      )
+      .bind(workspaceId)
+      .all<CommentRow>()
+    return commentRows.map(CloudflareCommentRepository.#commentOf)
+  }
+
   static #commentOf(commentRow: CommentRow): ArtifactComment {
     return {
       commentId: commentRow.id,
@@ -85,10 +101,16 @@ export class CloudflareCommentRepository implements CommentRepository {
       body: commentRow.body,
       forAgent: commentRow.for_agent === 1,
       postedVia: commentRow.posted_via,
-      anchor: commentRow.anchor === null ? null : JSON.parse(commentRow.anchor),
+      anchor: commentRow.anchor === null ? null : CloudflareCommentRepository.#anchorOf(commentRow.anchor),
       resolvedAt: commentRow.resolved_at,
       resolvedBy: commentRow.resolved_by,
       createdAt: commentRow.created_at,
     }
+  }
+
+  // Anchors saved before the version and element were recorded hold only x and y.
+  static #anchorOf(anchorJson: string): CommentAnchor {
+    const storedAnchor = JSON.parse(anchorJson) as Partial<CommentAnchor> & Pick<CommentAnchor, 'x' | 'y'>
+    return { x: storedAnchor.x, y: storedAnchor.y, version: storedAnchor.version ?? null, selector: storedAnchor.selector ?? null, textQuote: storedAnchor.textQuote ?? null }
   }
 }

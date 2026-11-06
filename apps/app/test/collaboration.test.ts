@@ -187,7 +187,7 @@ describe('the comment loop with an agent', () => {
       ['已在 v2 补上', false],
     ])
     expect(app.mailer.lastTo('lin@example.com')?.subject).toBe('zhou 在「Design doc」发表了评论')
-    expect(app.mailer.lastTo('zhou@example.com')?.subject).toBe('lin 在「Design doc」回复了评论')
+    expect(app.mailer.sent.filter(email => email.to === 'zhou@example.com').map(email => email.subject)).toContain('Claude Code（代 lin）在「Design doc」回复了评论')
   })
 
   it('keeps the comment loop working when notification mail cannot be sent', async () => {
@@ -228,7 +228,7 @@ describe('the comment loop with an agent', () => {
     const offPage = await app.request(commentsPath, { method: 'POST', cookie: reviewerCookie, body: { body: 'x', anchor: { x: 1.5, y: 0.2 } } })
     const reply = await app.json<{ comment: CommentJson & { anchor: unknown } }>(commentsPath, { method: 'POST', cookie: authorCookie, body: { body: '改了', parentId: pinned.body.comment.commentId, anchor: { x: 0.1, y: 0.1 } } })
 
-    expect(pinned.body.comment.anchor).toEqual({ x: 0.1235, y: 0.5 })
+    expect(pinned.body.comment.anchor).toEqual({ x: 0.1235, y: 0.5, version: 1, selector: null, textQuote: null })
     expect(offPage.status).toBe(400)
     expect(reply.body.comment.anchor).toBeNull()
   })
