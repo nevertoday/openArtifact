@@ -15,7 +15,7 @@ export class SharedDataApi {
   }
 
   async listCollections(request: Request, artifactId: string): Promise<Response> {
-    await this.#context.gate.require(artifactId, await this.#context.identity(), request, 'canView', 'view this artifact')
+    await this.#context.gate.require(artifactId, await this.#context.identity(), request, 'canBrowseSharedData', 'browse the data of this artifact')
     return Response.json({ collections: await this.#context.repositories.sharedData.listCollections(artifactId) })
   }
 

@@ -22,6 +22,8 @@ export class NotificationText {
         return `${actorLabel}发布了「${artifactTitle}」的新版本`
       case 'shared_with_me':
         return `${actorLabel}把「${artifactTitle}」分享给了你`
+      case 'public_link_opened':
+        return `${actorLabel}把「${artifactTitle}」设为公开链接`
     }
   }
 

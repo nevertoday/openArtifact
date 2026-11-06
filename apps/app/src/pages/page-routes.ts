@@ -79,6 +79,8 @@ export class PageRoutes {
     const requestedVersion = Number(new URL(request.url).searchParams.get('v') ?? openedArtifact.summary.version)
     const versionExists = Number.isInteger(requestedVersion) && requestedVersion >= 1 && requestedVersion <= openedArtifact.summary.version
     const shownVersion = versionExists ? requestedVersion : openedArtifact.summary.version
+    const showsOlderVersion = shownVersion !== openedArtifact.summary.version
+    if (showsOlderVersion && !openedArtifact.permissions.canSeeVersions) return this.#refusal(request, artifactId, identity, false)
     const now = Date.now()
     const signedPrefix = await this.#settings.usercontentSignature.signedPrefix(artifactId, shownVersion, now + SIGNED_URL_LIFETIME_MS)
     const authorNames = await this.#context.people.namesOf([openedArtifact.summary.authorId])

@@ -87,13 +87,18 @@ describe('removing an artifact', () => {
     expect(memberRestore.status).toBe(403)
   })
 
-  it('lets an agent remove and restore its person\'s artifact with a token', async () => {
+  it('lets an agent with a full token remove and restore its person\'s artifact', async () => {
+    const fullToken = await app.createToken(authorCookie, 'full')
     const published = await app.publish({ token: authorToken }, 'Agent draft')
 
-    const removal = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'DELETE', token: authorToken })
-    const restore = await app.request(`/api/artifacts/${published.artifactId}/restore`, { method: 'POST', token: authorToken })
+    const publishTokenRemoval = await app.json<{ error: string }>(`/api/artifacts/${published.artifactId}`, { method: 'DELETE', token: authorToken })
+    const removal = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'DELETE', token: fullToken })
+    const publishTokenRestore = await app.request(`/api/artifacts/${published.artifactId}/restore`, { method: 'POST', token: authorToken })
+    const restore = await app.request(`/api/artifacts/${published.artifactId}/restore`, { method: 'POST', token: fullToken })
 
-    expect([removal.status, restore.status]).toEqual([200, 200])
+    expect(publishTokenRemoval.status).toBe(403)
+    expect(publishTokenRemoval.body.error).toContain('this token may only publish')
+    expect([removal.status, publishTokenRestore.status, restore.status]).toEqual([200, 403, 200])
   })
 
   it('answers 404 for an artifact that was already removed', async () => {
@@ -151,8 +156,8 @@ describe('an admin taking an artifact down', () => {
 describe('renaming an artifact', () => {
   it('lets the author and an editor rename it, and refuses a commenter', async () => {
     const published = await app.publish({ token: authorToken }, 'Draft title', '<h1>x</h1>', 'specified')
-    await app.request(`/api/artifacts/${published.artifactId}/grants`, { method: 'PUT', cookie: authorCookie, body: { email: 'admin@example.com', role: 'editor' } })
-    await app.request(`/api/artifacts/${published.artifactId}/grants`, { method: 'PUT', cookie: authorCookie, body: { email: 'member@example.com', role: 'commenter' } })
+    await app.grant(authorCookie, published.artifactId, 'admin@example.com', 'editor')
+    await app.grant(authorCookie, published.artifactId, 'member@example.com', 'commenter')
 
     const authorRename = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PATCH', token: authorToken, body: { title: '  Q3 plan  ' } })
     const editorRename = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PATCH', cookie: adminCookie, body: { title: 'Q3 plan, final' } })
@@ -225,7 +230,7 @@ describe('purging removed artifacts', () => {
   it('deletes an artifact 30 days after removal with everything stored for it, keeps its audit trail, and can run again', async () => {
     const expired = await app.publish({ token: authorToken }, 'Expired page', '<h1>old</h1>', 'specified')
     await app.request(`/api/artifacts/${expired.artifactId}`, { method: 'PUT', token: authorToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: 'v2' }, { path: 'app.css', content: 'h1{}' }] } })
-    await app.request(`/api/artifacts/${expired.artifactId}/grants`, { method: 'PUT', cookie: authorCookie, body: { email: 'member@example.com', role: 'commenter' } })
+    await app.grant(authorCookie, expired.artifactId, 'member@example.com', 'commenter')
     await app.request(`/api/artifacts/${expired.artifactId}/comments`, { method: 'POST', cookie: memberCookie, body: { body: 'old news' } })
     await app.request(`/api/artifacts/${expired.artifactId}/data/votes/member`, { method: 'PUT', cookie: memberCookie, body: { data: { choice: 'a' } } })
     const recent = await app.publish({ token: authorToken }, 'Recently removed')

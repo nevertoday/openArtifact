@@ -1,4 +1,4 @@
-import { ArtifactAccess, type ArtifactPermissions, type ArtifactSummary, type ArtifactViewer, type SigningKey } from '@open-artifact/core'
+import { ArtifactAccess, type ArtifactPermission, type ArtifactPermissions, type ArtifactSummary, type ArtifactViewer, type SigningKey } from '@open-artifact/core'
 import type { Identity } from '../auth/request-identity.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { HttpError } from '../http-error.ts'
@@ -7,9 +7,9 @@ import type { Repositories } from '@open-artifact/core'
 export interface OpenedArtifact {
   summary: ArtifactSummary
   permissions: ArtifactPermissions
+  /** What the requester's person may do but the token they sent may not. */
+  withheldByTokenScope: ArtifactPermission[]
 }
-
-type Permission = Exclude<keyof ArtifactPermissions, 'needsPublicLinkPassword'>
 
 /** Every route asks this gate what the requester may do with an artifact; nothing else applies access rules. */
 export class ArtifactGate {
@@ -40,11 +40,20 @@ export class ArtifactGate {
    * Throws the error the requester should see: 404 hides artifacts they may not view, 401/403 explain the rest.
    * A permission that needs no view, such as an admin removing a private artifact, passes on its own.
    */
-  async require(artifactId: string, identity: Identity | null, request: Request, permission: Permission, action: string): Promise<OpenedArtifact> {
+  async require(artifactId: string, identity: Identity | null, request: Request, permission: ArtifactPermission, action: string): Promise<OpenedArtifact> {
     const openedArtifact = await this.open(artifactId, identity, request)
     if (openedArtifact?.permissions[permission]) return openedArtifact
     const viewable = openedArtifact?.permissions.canView ?? false
-    if (!viewable) throw HttpError.notFound(`artifact ${artifactId}`)
+    const withheldByToken = openedArtifact?.withheldByTokenScope.includes(permission) ?? false
+    if (!openedArtifact || !(viewable || withheldByToken)) throw HttpError.notFound(`artifact ${artifactId}`)
+    ArtifactGate.demand(openedArtifact, identity, permission, action)
+    return openedArtifact
+  }
+
+  /** For a permission on an artifact already opened: throws the 401 or 403 the requester should see. */
+  static demand(openedArtifact: OpenedArtifact, identity: Identity | null, permission: ArtifactPermission, action: string): void {
+    if (openedArtifact.permissions[permission]) return
+    if (openedArtifact.withheldByTokenScope.includes(permission)) throw HttpError.outsideTokenScope(action)
     throw identity ? HttpError.forbidden(action) : HttpError.unauthorized()
   }
 
@@ -77,9 +86,9 @@ export class ArtifactGate {
   async #opened(summary: ArtifactSummary, identity: Identity | null, grantRole: ArtifactViewer['grantRole'], publicLinkUnlocked: boolean): Promise<OpenedArtifact> {
     const membership = identity?.memberships.find(candidate => candidate.workspace.workspaceId === summary.workspaceId) ?? null
     const workspace = membership?.workspace ?? (await this.#repositories.workspaces.findWorkspace(summary.workspaceId))
-    const viewer: ArtifactViewer = { userId: identity?.userId ?? null, workspaceRole: membership?.role ?? null, grantRole, publicLinkUnlocked }
+    const viewer: ArtifactViewer = { userId: identity?.userId ?? null, workspaceRole: membership?.role ?? null, grantRole, publicLinkUnlocked, tokenScope: identity?.tokenScope ?? null }
     const access = new ArtifactAccess(summary, workspace?.publicLinksEnabled ?? false, this.#now)
-    return { summary, permissions: access.permissionsFor(viewer) }
+    return { summary, permissions: access.permissionsFor(viewer), withheldByTokenScope: access.withheldByTokenScope(viewer) }
   }
 
   async #publicLinkUnlocked(summary: ArtifactSummary, request: Request): Promise<boolean> {

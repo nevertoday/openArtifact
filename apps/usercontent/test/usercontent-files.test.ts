@@ -25,6 +25,7 @@ describe('UsercontentFiles', () => {
       authorId: 'user-author',
       title: 'Report',
       visibility: 'workspace',
+      publicLinkExpiresAt: null,
       publishedVia: null,
       note: null,
       files: [

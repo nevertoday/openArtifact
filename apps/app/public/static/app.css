@@ -63,6 +63,7 @@
 /* Settings */
 .token-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--gap-items); }
 .token-form__name { flex: 1 1 220px; }
+.token-form__scope { flex-basis: 100%; }
 .token-created { --stack-gap: var(--space-2); min-width: 0; flex: 1; }
 .profile-form { max-width: 400px; }
 .member-reason { margin: var(--space-1) 0 0; }

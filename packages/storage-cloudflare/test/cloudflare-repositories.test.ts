@@ -34,6 +34,7 @@ async function createArtifactIn(workspaceId: string, authorId: string) {
     authorId,
     title: 'Signup sheet',
     visibility: 'workspace',
+    publicLinkExpiresAt: null,
     publishedVia: null,
     note: null,
     files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('<h1>Sign up</h1>') }],
@@ -134,16 +135,28 @@ describe('artifact access, comments and shared data', () => {
     const accessRepository = new CloudflareArtifactAccessRepository(env.DB)
     const { artifactId } = await createArtifactIn(workspaceId, authorId)
 
-    await accessRepository.updateSharing(artifactId, { visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true })
-    await accessRepository.setGrant({ artifactId, userId: reviewerId, role: 'commenter' })
-    await accessRepository.setGrant({ artifactId, userId: reviewerId, role: 'editor' })
+    const publicSharing = { visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true } as const
+    await accessRepository.saveSharing(artifactId, publicSharing, [{ userId: reviewerId, role: 'commenter' }])
+    await accessRepository.saveSharing(artifactId, publicSharing, [{ userId: reviewerId, role: 'editor' }])
 
     const summary = await artifactRepository.findSummary(artifactId)
-    expect(summary?.sharing).toEqual({ visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true })
+    expect(summary?.sharing).toEqual({ visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true })
     expect(await accessRepository.listGrants(artifactId)).toEqual([{ artifactId, userId: reviewerId, role: 'editor' }])
     expect((await accessRepository.listGrantsOfUser(reviewerId)).map(grant => grant.artifactId)).toContain(artifactId)
 
-    await accessRepository.removeGrant(artifactId, reviewerId)
+    await accessRepository.saveSharing(artifactId, publicSharing, [])
+    expect(await accessRepository.listGrants(artifactId)).toEqual([])
+  })
+
+  it('saves neither the sharing nor the people when one part of the save fails', async () => {
+    const accessRepository = new CloudflareArtifactAccessRepository(env.DB)
+    const { artifactId } = await createArtifactIn(workspaceId, authorId)
+    const privateSharing = { visibility: 'private', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false } as const
+
+    const duplicatePerson = accessRepository.saveSharing(artifactId, { ...privateSharing, visibility: 'specified' }, [{ userId: reviewerId, role: 'viewer' }, { userId: reviewerId, role: 'editor' }])
+
+    await expect(duplicatePerson).rejects.toThrow()
+    expect((await artifactRepository.findSummary(artifactId))?.sharing.visibility).toBe('workspace')
     expect(await accessRepository.listGrants(artifactId)).toEqual([])
   })
 
@@ -201,8 +214,8 @@ describe('artifact access, comments and shared data', () => {
   it('accepts a token only while it is neither revoked nor expired', async () => {
     const tokenRepository = new CloudflareAccessTokenRepository(env.DB)
     const now = Date.now()
-    const activeToken = await tokenRepository.create({ userId: authorId, workspaceId, name: 'Claude Code', tokenHash: 'hash-active', expiresAt: now + 60_000 })
-    await tokenRepository.create({ userId: authorId, workspaceId, name: 'Old CI', tokenHash: 'hash-expired', expiresAt: now - 1 })
+    const activeToken = await tokenRepository.create({ userId: authorId, workspaceId, name: 'Claude Code', tokenHash: 'hash-active', expiresAt: now + 60_000, scope: 'publish' })
+    await tokenRepository.create({ userId: authorId, workspaceId, name: 'Old CI', tokenHash: 'hash-expired', expiresAt: now - 1, scope: 'full' })
 
     const usedToken = await tokenRepository.useActiveToken('hash-active', now)
     const expiredToken = await tokenRepository.useActiveToken('hash-expired', now)
@@ -215,5 +228,17 @@ describe('artifact access, comments and shared data', () => {
     expect(revokedByOwner).toBe(true)
     expect(await tokenRepository.useActiveToken('hash-active', now)).toBeNull()
     expect((await tokenRepository.listForUser(authorId)).map(token => token.name)).toEqual(expect.arrayContaining(['Claude Code', 'Old CI']))
+  })
+
+  it('keeps each token\'s scope, and gives tokens made before scopes existed full access', async () => {
+    const tokenRepository = new CloudflareAccessTokenRepository(env.DB)
+    const now = Date.now()
+    await tokenRepository.create({ userId: authorId, workspaceId, name: 'Publisher', tokenHash: 'hash-publish', expiresAt: null, scope: 'publish' })
+    await env.DB.prepare('INSERT INTO personal_access_tokens (id, user_id, workspace_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind('token-before-scopes', authorId, workspaceId, 'Older laptop', 'hash-before-scopes', now)
+      .run()
+
+    expect(await tokenRepository.useActiveToken('hash-publish', now)).toMatchObject({ name: 'Publisher', scope: 'publish' })
+    expect(await tokenRepository.useActiveToken('hash-before-scopes', now)).toMatchObject({ name: 'Older laptop', scope: 'full' })
   })
 })

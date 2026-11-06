@@ -73,7 +73,7 @@ ${PageShell.jsonData('settings-config', { accessTokens: model.accessTokens })}`
 
   static #agentsSection(model: SettingsModel): SafeHtml {
     const clients = SettingsPage.#mcpSnippets(model.mcpUrl)
-    return html`${SettingsPage.#pageHeader('Agent 接入', `让 Claude Code、Codex、Cursor、Gemini CLI 等 agent 以你的身份发布和修改 artifact。agent 的权限和你在 ${model.identity.membership.workspace.name} 里的权限相同。`)}
+    return html`${SettingsPage.#pageHeader('Agent 接入', `让 Claude Code、Codex、Cursor、Gemini CLI 等 agent 以你的身份在 ${model.identity.membership.workspace.name} 里发布和修改 artifact。agent 能做什么，由 token 的权限决定。`)}
 <div class="xxd-settings">
 <section class="xxd-stack" aria-labelledby="mcp-title">
   <div class="xxd-text-pair">
@@ -98,6 +98,11 @@ ${PageShell.jsonData('settings-config', { accessTokens: model.accessTokens })}`
     </div>
     <label class="xxd-select"><span class="xxd-sr-only">有效期</span><select id="token-expiry" name="expiresInDays"><option value="90">90 天</option><option value="30">30 天</option><option value="365">1 年</option><option value="never">永不过期</option></select></label>
     <button type="submit" class="xxd-btn" data-variant="primary">新建 token</button>
+    <fieldset class="xxd-choices token-form__scope">
+      <legend class="xxd-label">权限</legend>
+      <label class="xxd-choice" for="token-scope-publish"><input type="radio" class="xxd-radio" name="scope" id="token-scope-publish" value="publish" checked><span>仅发布<small>发布、更新和读取 artifact，处理评论和共享数据；不能修改谁能看到它。</small></span></label>
+      <label class="xxd-choice" for="token-scope-full"><input type="radio" class="xxd-radio" name="scope" id="token-scope-full" value="full"><span>完全权限<small>和你在网页上能做的一样，也能修改分享设置，比如设为公开链接。</small></span></label>
+    </fieldset>
   </form>
   <div class="xxd-banner" data-tone="warning" id="token-reveal" role="status" hidden>
     ${PageShell.icon('TriangleAlert')}
@@ -194,14 +199,15 @@ ${model.administration ? SettingsPage.#auditSection(model.administration, model.
 
   // Metadata only: a private artifact shows its title but no link, since an admin may not open it.
   static #contentSection(administration: WorkspaceAdministration, identity: Identity, now: number): SafeHtml {
-    const row = ({ summary, permissions }: OpenedArtifact) => {
+    const row = (openedArtifact: OpenedArtifact) => {
+      const { summary, permissions } = openedArtifact
       const titleCell = permissions.canView ? html`<a class="xxd-link" href="/a/${encodeURIComponent(summary.artifactId)}">${summary.title}</a>` : summary.title
       return html`<tr>
     <td>${titleCell}</td>
     <td><span class="xxd-text" data-variant="secondary">${administration.names.get(summary.authorId)}</span></td>
     <td>${SettingsPage.#contentState(summary, administration.names, now)}</td>
     <td><span class="xxd-text" data-variant="secondary">${ArtifactLabels.updatedAgo(summary.updatedAt, now)}</span></td>
-    <td class="xxd-table__actions">${SettingsPage.#contentAction({ summary, permissions }, identity)}</td>
+    <td class="xxd-table__actions">${SettingsPage.#contentAction(openedArtifact, identity)}</td>
   </tr>`
     }
     return html`<section class="xxd-stack" aria-labelledby="content-title">

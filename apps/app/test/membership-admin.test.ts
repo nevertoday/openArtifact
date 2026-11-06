@@ -91,7 +91,8 @@ describe('removing a member', () => {
     const leaverToken = await app.createToken(leaverCookie)
     const authorCookie = await app.signIn('author@example.com')
     const specified = await app.publish({ cookie: authorCookie }, 'Need to know', '<h1>x</h1>', 'specified')
-    await app.request(`/api/artifacts/${specified.artifactId}/grants`, { method: 'PUT', cookie: authorCookie, body: { email: 'leaver@example.com', role: 'viewer' } })
+    await app.grant(authorCookie, specified.artifactId, 'leaver@example.com', 'viewer')
+    const grantsBefore = await app.json<{ grants: { userId: string }[] }>(`/api/artifacts/${specified.artifactId}/sharing`, { cookie: authorCookie })
 
     const removal = await app.request(`/api/workspace/members/${leaverId}`, { method: 'DELETE', cookie: adminCookie })
     const sessionAfter = await app.json<{ error: string }>('/api/me', { cookie: leaverCookie })
@@ -100,6 +101,7 @@ describe('removing a member', () => {
     const grantsAfter = await app.json<{ grants: { userId: string }[] }>(`/api/artifacts/${specified.artifactId}/sharing`, { cookie: authorCookie })
     const leaverTokens = await app.repositories.accessTokens.listForUser(leaverId)
 
+    expect(grantsBefore.body.grants.map(grant => grant.userId)).toContain(leaverId)
     expect(removal.status).toBe(204)
     expect(sessionAfter.status).toBe(403)
     expect(sessionAfter.body.error).toContain('removed from this workspace')

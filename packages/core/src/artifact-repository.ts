@@ -13,6 +13,8 @@ export interface ArtifactSharing {
   publicLinkExpiresAt: number | null
   publicLinkPasswordHash: string | null
   anonymousWriteEnabled: boolean
+  /** Visitors of the public link may read the comments; otherwise they see the page alone. */
+  publicLinkShowsComments: boolean
 }
 
 /** How a version came to be: new files, or the files of an earlier version published again. */
@@ -35,6 +37,8 @@ export interface NewArtifact extends Omit<Publication, 'origin'> {
   workspaceId: string
   title: string
   visibility: ArtifactVisibility
+  /** null for a link that never expires; it matters only while the visibility is public_link. */
+  publicLinkExpiresAt: number | null
 }
 
 export interface CreatedArtifact {

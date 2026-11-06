@@ -98,9 +98,19 @@ export class TestApp {
     return sessionCookie
   }
 
-  async createToken(cookie: string, name = 'Claude Code · laptop'): Promise<string> {
-    const { body } = await this.json<{ token: string }>('/api/tokens', { method: 'POST', cookie, body: { name, expiresInDays: 30 } })
+  async createToken(cookie: string, scope: 'publish' | 'full' = 'publish', name = 'Claude Code · laptop'): Promise<string> {
+    const { body } = await this.json<{ token: string }>('/api/tokens', { method: 'POST', cookie, body: { name, expiresInDays: 30, scope } })
     return body.token
+  }
+
+  /** Adds or changes one person's grant the way the share dialog saves it: the whole grant list in one request. */
+  async grant(cookie: string, artifactId: string, email: string, role: 'viewer' | 'commenter' | 'editor'): Promise<Response> {
+    const sharingPath = `/api/artifacts/${encodeURIComponent(artifactId)}/sharing`
+    const person = await this.json<{ userId: string }>(`${sharingPath}/people?email=${encodeURIComponent(email)}`, { cookie })
+    if (person.status !== 200) throw new Error(`no person to grant: ${person.status} ${JSON.stringify(person.body)}`)
+    const sharing = await this.json<{ grants: { userId: string; role: string }[] }>(sharingPath, { cookie })
+    const otherGrants = sharing.body.grants.filter(grant => grant.userId !== person.body.userId).map(grant => ({ userId: grant.userId, role: grant.role }))
+    return this.request(sharingPath, { method: 'PUT', cookie, body: { grants: [...otherGrants, { userId: person.body.userId, role }] } })
   }
 
   async publish(caller: Caller, title: string, page = '<h1>hello</h1>', visibility?: string): Promise<{ artifactId: string; version: number; url: string }> {

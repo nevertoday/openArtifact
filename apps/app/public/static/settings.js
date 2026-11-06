@@ -1,6 +1,7 @@
 import { api, confirmArtifactRemoval, element, readJsonData, removalWord, removeArtifact, restoreArtifact, timeAgo } from './common.js'
 
 const settingsConfig = readJsonData('settings-config')
+const TOKEN_SCOPE_LABELS = { publish: '仅发布', full: '完全权限' }
 
 function secondaryText(text) {
   return element('span', { className: 'xxd-text', 'data-variant': 'secondary' }, text)
@@ -18,7 +19,7 @@ class TokenTable {
       return
     }
     this.container.replaceChildren(element('div', { className: 'xxd-table-wrap' }, element('table', { className: 'xxd-table' },
-      element('thead', {}, element('tr', {}, element('th', {}, '名称'), element('th', {}, '最近使用'), element('th', {}, '过期'), element('th', {}, '状态'), element('th', { className: 'xxd-table__actions' }, element('span', { className: 'xxd-sr-only' }, '操作')))),
+      element('thead', {}, element('tr', {}, element('th', {}, '名称'), element('th', {}, '权限'), element('th', {}, '最近使用'), element('th', {}, '过期'), element('th', {}, '状态'), element('th', { className: 'xxd-table__actions' }, element('span', { className: 'xxd-sr-only' }, '操作')))),
       element('tbody', {}, accessTokens.map(accessToken => this.#row(accessToken))),
     )))
   }
@@ -32,6 +33,7 @@ class TokenTable {
     const state = TokenTable.#stateOf(accessToken)
     return element('tr', {},
       element('td', {}, accessToken.name),
+      element('td', {}, secondaryText(TOKEN_SCOPE_LABELS[accessToken.scope])),
       element('td', {}, secondaryText(accessToken.lastUsedAt ? timeAgo(accessToken.lastUsedAt) : '从未')),
       element('td', {}, secondaryText(accessToken.expiresAt ? new Date(accessToken.expiresAt).toLocaleDateString('zh-CN') : '永不')),
       element('td', {}, element('span', { className: 'xxd-badge', 'data-appearance': 'dot', 'data-tone': state.tone }, state.label)),
@@ -75,7 +77,7 @@ function wireTokenCreation(tokenTable) {
     const formData = new FormData(createForm)
     const expiryChoice = formData.get('expiresInDays')
     try {
-      const createdToken = await api('/api/tokens', { method: 'POST', body: { name: formData.get('name'), expiresInDays: expiryChoice === 'never' ? null : Number(expiryChoice) } })
+      const createdToken = await api('/api/tokens', { method: 'POST', body: { name: formData.get('name'), scope: formData.get('scope'), expiresInDays: expiryChoice === 'never' ? null : Number(expiryChoice) } })
       reveal.querySelector('[data-token-reveal-title]').textContent = `「${createdToken.name}」已创建。这个 token 只显示这一次，请现在复制。`
       reveal.querySelector('[data-token-value]').textContent = createdToken.token
       reveal.hidden = false

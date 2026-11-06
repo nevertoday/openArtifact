@@ -37,6 +37,7 @@ describe('CloudflareArtifactRepository', () => {
       authorId,
       title: 'Design doc',
       visibility: 'workspace',
+      publicLinkExpiresAt: null,
       publishedVia: 'Claude Code',
       note: null,
       files: [htmlPage('draft'), { path: 'assets/app.css', contentType: 'text/css', body: new TextEncoder().encode('h1{}') }],
@@ -126,7 +127,7 @@ describe('CloudflareArtifactRepository', () => {
     const newerDocPosition = workspaceArtifacts.findIndex(summary => summary.artifactId === newerDoc.artifactId)
     expect(olderDocPosition).toBeLessThan(newerDocPosition)
     expect(olderDocSummary).toMatchObject({ title: 'Design doc', authorId, version: 2, workspaceId, publishedVia: null })
-    expect(olderDocSummary?.sharing).toEqual({ visibility: 'workspace', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false })
+    expect(olderDocSummary?.sharing).toEqual({ visibility: 'workspace', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false })
   })
 
   it('keeps every version with who published it and through which agent', async () => {

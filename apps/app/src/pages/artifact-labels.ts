@@ -3,7 +3,7 @@ import type { ArtifactVisibility, WorkspaceRole } from '@open-artifact/core'
 const VISIBILITY_LABELS: Record<ArtifactVisibility, string> = {
   private: '私有',
   specified: '指定的人',
-  workspace: 'Workspace 内可见',
+  workspace: '整个 workspace',
   public_link: '公开链接',
 }
 

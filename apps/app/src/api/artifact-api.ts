@@ -1,10 +1,11 @@
 import { ArtifactRemoval, type ArtifactFile, type ArtifactSummary, type ArtifactVisibility, type PublishResult, type VersionOrigin } from '@open-artifact/core'
-import type { OpenedArtifact } from '../access/artifact-gate.ts'
+import { ArtifactGate, type OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { ArtifactFileJson } from './artifact-file-json.ts'
 import { JsonBody } from './json-body.ts'
+import { PublicLinkExpiry } from './public-link-expiry.ts'
 
 const VISIBILITIES: readonly ArtifactVisibility[] = ['private', 'specified', 'workspace', 'public_link']
 const MAX_TITLE_LENGTH = 200
@@ -22,16 +23,25 @@ export class ArtifactApi {
   async create(request: Request): Promise<Response> {
     const identity = await this.#context.requireIdentity()
     const requestBody = await JsonBody.of(request)
+    const title = requestBody.text('title', MAX_TITLE_LENGTH)
+    const visibility = requestBody.oneOf('visibility', VISIBILITIES, 'workspace')
+    const publicLinkExpiry = PublicLinkExpiry.of(requestBody, identity, { visibilityBefore: null, visibilityAfter: visibility, savedExpiresAt: null }, Date.now())
     const createdArtifact = await this.#context.repositories.artifacts.create({
       workspaceId: identity.membership.workspace.workspaceId,
       authorId: identity.userId,
       publishedVia: identity.agentClient,
       note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
-      title: requestBody.text('title', MAX_TITLE_LENGTH),
-      visibility: requestBody.oneOf('visibility', VISIBILITIES, 'workspace'),
+      title,
+      visibility,
+      publicLinkExpiresAt: publicLinkExpiry.expiresAt,
       files: ArtifactFileJson.filesFrom(requestBody.raw('files')),
     })
-    return Response.json({ ...createdArtifact, url: this.#context.viewerUrl(createdArtifact.artifactId) }, { status: 201 })
+    if (publicLinkExpiry.agentDefaultExpiresAt !== null) {
+      const createdSummary = { artifactId: createdArtifact.artifactId, title, authorId: identity.userId }
+      await this.#context.notifier.notify(identity, createdSummary, { kind: 'public_link_opened_by_agent', expiresAt: publicLinkExpiry.agentDefaultExpiresAt })
+    }
+    const createdJson = { ...createdArtifact, url: this.#context.viewerUrl(createdArtifact.artifactId), visibility, publicLinkExpiresAt: publicLinkExpiry.expiresAt }
+    return Response.json(createdJson, { status: 201 })
   }
 
   /** `?removed=true` lists the removed artifacts the caller may restore instead of the ones they can view. */
@@ -49,9 +59,12 @@ export class ArtifactApi {
   }
 
   async read(request: Request, artifactId: string): Promise<Response> {
-    const openedArtifact = await this.#context.gate.require(artifactId, await this.#context.identity(), request, 'canView', 'view this artifact')
+    const identity = await this.#context.identity()
+    const openedArtifact = await this.#context.gate.require(artifactId, identity, request, 'canView', 'view this artifact')
     const requestedVersion = new URL(request.url).searchParams.get('version')
     const version = requestedVersion === null ? openedArtifact.summary.version : Number(requestedVersion)
+    const readsOlderVersion = version !== openedArtifact.summary.version
+    if (readsOlderVersion) ArtifactGate.demand(openedArtifact, identity, 'canSeeVersions', 'read older versions of this artifact')
     const versionContent = await this.#context.repositories.artifacts.readVersion(artifactId, version)
     if (!versionContent) throw HttpError.notFound(`version ${requestedVersion} of artifact ${artifactId}`)
     const names = await this.#namesOf([openedArtifact])
@@ -121,7 +134,7 @@ export class ArtifactApi {
   }
 
   async listVersions(request: Request, artifactId: string): Promise<Response> {
-    await this.#context.gate.require(artifactId, await this.#context.identity(), request, 'canView', 'view this artifact')
+    await this.#context.gate.require(artifactId, await this.#context.identity(), request, 'canSeeVersions', 'see the versions of this artifact')
     const versionHistory = await this.#context.repositories.artifacts.listVersions(artifactId)
     const authorNames = await this.#context.people.namesOf(versionHistory.map(versionRecord => versionRecord.authorId))
     const versions = versionHistory.map(versionRecord => ({

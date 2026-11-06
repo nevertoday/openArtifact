@@ -20,7 +20,7 @@ export class CommentApi {
   }
 
   async list(request: Request, artifactId: string): Promise<Response> {
-    await this.#context.gate.require(artifactId, await this.#context.identity(), request, 'canView', 'view this artifact')
+    await this.#context.gate.require(artifactId, await this.#context.identity(), request, 'canReadComments', 'read the comments on this artifact')
     const filter = CommentApi.#filterOf(request)
     const allComments = await this.#context.repositories.comments.listForArtifact(artifactId)
     const shownComments = CommentApi.#threadsMatching(allComments, filter)

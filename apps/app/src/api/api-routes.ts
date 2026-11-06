@@ -79,8 +79,7 @@ const API_ROUTES: ApiRoute[] = [
   route('PATCH', '/api/comments/:commentId', (apis, request, params) => apis.comments.setResolved(request, param(params, 'commentId'))),
   route('GET', '/api/artifacts/:artifactId/sharing', (apis, request, params) => apis.sharing.read(request, param(params, 'artifactId'))),
   route('PUT', '/api/artifacts/:artifactId/sharing', (apis, request, params) => apis.sharing.update(request, param(params, 'artifactId'))),
-  route('PUT', '/api/artifacts/:artifactId/grants', (apis, request, params) => apis.sharing.grant(request, param(params, 'artifactId'))),
-  route('DELETE', '/api/artifacts/:artifactId/grants/:userId', (apis, request, params) => apis.sharing.revokeGrant(request, param(params, 'artifactId'), param(params, 'userId'))),
+  route('GET', '/api/artifacts/:artifactId/sharing/people', (apis, request, params) => apis.sharing.findPerson(request, param(params, 'artifactId'))),
   route('GET', '/api/artifacts/:artifactId/data', (apis, request, params) => apis.sharedData.listCollections(request, param(params, 'artifactId'))),
   route('GET', '/api/artifacts/:artifactId/data/:collection', (apis, request, params) =>
     apis.sharedData.listDocuments(request, param(params, 'artifactId'), param(params, 'collection')),

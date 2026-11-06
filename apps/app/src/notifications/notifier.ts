@@ -1,4 +1,4 @@
-import { CommentThread, type ArtifactComment, type ArtifactSummary, type NewNotification, type NotificationKind, type Repositories } from '@open-artifact/core'
+import { CommentThread, type ArtifactComment, type ArtifactSummary, type GrantRole, type NewNotification, type NotificationKind, type Repositories } from '@open-artifact/core'
 import type { Mailer } from '../auth/mailer.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { NotificationText } from './notification-text.ts'
@@ -8,9 +8,16 @@ export type ArtifactEvent =
   | { kind: 'comment_added'; comment: ArtifactComment; resolvesThread: boolean }
   | { kind: 'thread_resolved'; threadRoot: ArtifactComment }
   | { kind: 'version_published' }
-  | { kind: 'artifact_shared'; sharedWithId: string }
+  | { kind: 'artifact_shared'; sharedWithId: string; role: GrantRole }
+  | { kind: 'public_link_opened_by_agent'; expiresAt: number }
+
+/** What the notifier needs to know about the artifact an event happened on. */
+export type NotifiedArtifact = Pick<ArtifactSummary, 'artifactId' | 'title' | 'authorId'>
 
 export type Actor = Pick<Identity, 'userId' | 'name' | 'agentClient'>
+
+const DAY_MS = 24 * 60 * 60 * 1000
+const ROLE_LABELS: Record<GrantRole, string> = { viewer: '可查看', commenter: '可评论', editor: '可编辑' }
 
 /**
  * Tells people what happened on artifacts they care about: always in the app, and by mail for comments.
@@ -27,10 +34,12 @@ export class Notifier {
     this.#viewerUrl = viewerUrl
   }
 
-  async notify(actor: Actor, artifact: ArtifactSummary, event: ArtifactEvent): Promise<void> {
+  async notify(actor: Actor, artifact: NotifiedArtifact, event: ArtifactEvent): Promise<void> {
     try {
       const kindByRecipient = await this.#kindByRecipient(artifact, event)
-      kindByRecipient.delete(actor.userId)
+      // An agent acts as its person, so news about what that agent did must still reach the person.
+      const tellsPersonAboutTheirAgent = event.kind === 'public_link_opened_by_agent'
+      if (!tellsPersonAboutTheirAgent) kindByRecipient.delete(actor.userId)
       const commentId = Notifier.#commentIdOf(event)
       const newNotifications: NewNotification[] = [...kindByRecipient].map(([recipientId, kind]) => ({
         recipientId,
@@ -46,7 +55,7 @@ export class Notifier {
     }
   }
 
-  async #kindByRecipient(artifact: ArtifactSummary, event: ArtifactEvent): Promise<Map<string, NotificationKind>> {
+  async #kindByRecipient(artifact: NotifiedArtifact, event: ArtifactEvent): Promise<Map<string, NotificationKind>> {
     switch (event.kind) {
       case 'comment_added':
         return this.#commentRecipients(artifact, event.comment, event.resolvesThread)
@@ -56,11 +65,13 @@ export class Notifier {
         return this.#openThreadParticipants(artifact.artifactId)
       case 'artifact_shared':
         return new Map([[event.sharedWithId, 'shared_with_me']])
+      case 'public_link_opened_by_agent':
+        return new Map([[artifact.authorId, 'public_link_opened']])
     }
   }
 
   // A more specific kind replaces a general one, so each person hears about one comment once.
-  async #commentRecipients(artifact: ArtifactSummary, comment: ArtifactComment, resolvesThread: boolean): Promise<Map<string, NotificationKind>> {
+  async #commentRecipients(artifact: NotifiedArtifact, comment: ArtifactComment, resolvesThread: boolean): Promise<Map<string, NotificationKind>> {
     const kindByRecipient = new Map<string, NotificationKind>([[artifact.authorId, 'comment_on_my_artifact']])
     if (comment.parentId === null) return kindByRecipient
     const thread = await this.#threadOf(comment)
@@ -83,38 +94,53 @@ export class Notifier {
     return new Map(participantIds.map(participantId => [participantId, 'new_version']))
   }
 
-  async #mail(actor: Actor, artifact: ArtifactSummary, event: ArtifactEvent, newNotifications: NewNotification[]): Promise<void> {
-    const quotedComment = Notifier.#quotedCommentOf(event)
-    if (quotedComment === null) return
+  async #mail(actor: Actor, artifact: NotifiedArtifact, event: ArtifactEvent, newNotifications: NewNotification[]): Promise<void> {
     const recipients = await this.#repositories.users.profilesOf(newNotifications.map(newNotification => newNotification.recipientId))
     const actorLabel = NotificationText.actorLabel(actor.name, actor.agentClient)
-    const link = NotificationText.link(this.#viewerUrl(artifact.artifactId), quotedComment.commentId)
+    const link = NotificationText.link(this.#viewerUrl(artifact.artifactId), Notifier.#commentIdOf(event))
     const mails = newNotifications.flatMap(newNotification => {
       const recipient = recipients.get(newNotification.recipientId)
-      const action = Notifier.#mailAction(newNotification.kind, quotedComment)
-      if (!recipient || action === null) return []
-      const subject = `${actorLabel}在「${artifact.title}」${action}`
-      return [{ to: recipient.email, subject, text: `${subject}\n\n${quotedComment.body}\n\n打开查看：${link}` }]
+      const mailContent = Notifier.#mailContentOf(newNotification.kind, event, actorLabel, artifact.title)
+      if (!recipient || mailContent === null) return []
+      return [{ to: recipient.email, subject: mailContent.subject, text: `${mailContent.body}\n\n打开查看：${link}` }]
     })
     const deliveries = await Promise.allSettled(mails.map(mail => this.#mailer.send(mail)))
     for (const failedDelivery of deliveries.filter(delivery => delivery.status === 'rejected')) {
-      console.error(new Error(`mail about comment ${quotedComment.commentId} could not be sent`, { cause: failedDelivery.reason }))
+      console.error(new Error(`mail about ${event.kind} on artifact ${artifact.artifactId} could not be sent`, { cause: failedDelivery.reason }))
     }
   }
 
   /** Null for kinds that stay in the app. */
-  static #mailAction(kind: NotificationKind, quotedComment: ArtifactComment): string | null {
+  static #mailContentOf(kind: NotificationKind, event: ArtifactEvent, actorLabel: string, artifactTitle: string): { subject: string; body: string } | null {
     switch (kind) {
       case 'comment_on_my_artifact':
-        return Notifier.#commentAction(quotedComment)
       case 'reply_to_my_comment':
-        return '回复了评论'
       case 'my_comment_resolved':
-        return '解决了你的评论'
+        return Notifier.#commentMailOf(kind, event, actorLabel, artifactTitle)
       case 'new_version':
-      case 'shared_with_me':
         return null
+      case 'shared_with_me': {
+        if (event.kind !== 'artifact_shared') return null
+        const subject = NotificationText.sentence(kind, actorLabel, artifactTitle)
+        return { subject, body: `${subject}，你的权限是「${ROLE_LABELS[event.role]}」。` }
+      }
+      case 'public_link_opened': {
+        if (event.kind !== 'public_link_opened_by_agent') return null
+        const daysLeft = Math.round((event.expiresAt - Date.now()) / DAY_MS)
+        const expiryDate = new Date(event.expiresAt).toISOString().slice(0, 10)
+        const subject = `${NotificationText.sentence(kind, actorLabel, artifactTitle)}，${daysLeft} 天后过期`
+        return { subject, body: `${subject}（${expiryDate}）。拿到链接的人不用登录就能打开。要改过期时间或取消公开，打开页面后点「分享」。` }
+      }
     }
+  }
+
+  // Mail about a comment quotes it: the one just written, or the one just resolved.
+  static #commentMailOf(kind: NotificationKind, event: ArtifactEvent, actorLabel: string, artifactTitle: string): { subject: string; body: string } | null {
+    const quotedComment = Notifier.#quotedCommentOf(event)
+    if (quotedComment === null) return null
+    const action = kind === 'comment_on_my_artifact' ? Notifier.#commentAction(quotedComment) : kind === 'reply_to_my_comment' ? '回复了评论' : '解决了你的评论'
+    const subject = `${actorLabel}在「${artifactTitle}」${action}`
+    return { subject, body: `${subject}\n\n${quotedComment.body}` }
   }
 
   static #commentAction(comment: ArtifactComment): string {
@@ -132,6 +158,7 @@ export class Notifier {
         return event.threadRoot
       case 'version_published':
       case 'artifact_shared':
+      case 'public_link_opened_by_agent':
         return null
     }
   }

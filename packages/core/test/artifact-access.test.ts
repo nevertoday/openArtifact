@@ -14,7 +14,7 @@ function artifactWith(sharing: Partial<ArtifactSharing>, removal: ArtifactRemova
     workspaceId: 'workspace-1',
     title: 'Design doc',
     authorId,
-    sharing: { visibility: 'workspace', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, ...sharing },
+    sharing: { visibility: 'workspace', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, ...sharing },
     version: 1,
     publishedVia: null,
     updatedAt: now,
@@ -22,11 +22,11 @@ function artifactWith(sharing: Partial<ArtifactSharing>, removal: ArtifactRemova
   }
 }
 
-const author: ArtifactViewer = { userId: authorId, workspaceRole: 'member', grantRole: null, publicLinkUnlocked: false }
-const member: ArtifactViewer = { userId: 'user-member', workspaceRole: 'member', grantRole: null, publicLinkUnlocked: false }
+const author: ArtifactViewer = { userId: authorId, workspaceRole: 'member', grantRole: null, publicLinkUnlocked: false, tokenScope: null }
+const member: ArtifactViewer = { userId: 'user-member', workspaceRole: 'member', grantRole: null, publicLinkUnlocked: false, tokenScope: null }
 const admin: ArtifactViewer = { ...member, userId: 'user-admin', workspaceRole: 'admin' }
-const outsider: ArtifactViewer = { userId: 'user-outsider', workspaceRole: null, grantRole: null, publicLinkUnlocked: false }
-const anonymous: ArtifactViewer = { userId: null, workspaceRole: null, grantRole: null, publicLinkUnlocked: true }
+const outsider: ArtifactViewer = { userId: 'user-outsider', workspaceRole: null, grantRole: null, publicLinkUnlocked: false, tokenScope: null }
+const anonymous: ArtifactViewer = { userId: null, workspaceRole: null, grantRole: null, publicLinkUnlocked: true, tokenScope: null }
 const lockedAnonymous: ArtifactViewer = { ...anonymous, publicLinkUnlocked: false }
 
 function permissions(sharing: Partial<ArtifactSharing>, viewer: ArtifactViewer, publicLinksEnabled = true) {
@@ -44,6 +44,9 @@ describe('ArtifactAccess', () => {
       canRename: true,
       canRemove: true,
       canRestore: false,
+      canReadComments: true,
+      canSeeVersions: true,
+      canBrowseSharedData: true,
       needsPublicLinkPassword: false,
     })
   })
@@ -65,10 +68,31 @@ describe('ArtifactAccess', () => {
     expect(permissions({ visibility: 'specified' }, { ...member, grantRole: 'editor' })).toMatchObject({ canEdit: true, canManageSharing: false })
   })
 
+  it('counts grants only while the artifact is shared with specified people', () => {
+    const grantedOutsider: ArtifactViewer = { ...outsider, grantRole: 'editor' }
+    const grantedMember: ArtifactViewer = { ...member, grantRole: 'editor' }
+
+    expect(permissions({ visibility: 'specified' }, grantedOutsider).canEdit).toBe(true)
+    expect(permissions({ visibility: 'workspace' }, grantedOutsider).canView).toBe(false)
+    expect(permissions({ visibility: 'workspace' }, grantedMember)).toMatchObject({ canView: true, canEdit: false })
+    expect(permissions({ visibility: 'public_link' }, grantedMember).canEdit).toBe(false)
+  })
+
   it('lets anyone open an active public link but write shared data only when the author allows it', () => {
     expect(permissions({ visibility: 'public_link' }, anonymous)).toMatchObject({ canView: true, canComment: false, canWriteSharedData: false })
     expect(permissions({ visibility: 'public_link', anonymousWriteEnabled: true }, anonymous).canWriteSharedData).toBe(true)
     expect(permissions({ visibility: 'public_link' }, member).canComment).toBe(true)
+  })
+
+  it('shows a public-link visitor the current page alone, and comments only when the author turns them on', () => {
+    expect(permissions({ visibility: 'public_link' }, anonymous)).toMatchObject({ canView: true, canReadComments: false, canSeeVersions: false, canBrowseSharedData: false })
+    expect(permissions({ visibility: 'public_link', publicLinkShowsComments: true }, anonymous)).toMatchObject({ canReadComments: true, canComment: false, canSeeVersions: false })
+    expect(permissions({ visibility: 'public_link' }, { ...outsider, publicLinkUnlocked: true })).toMatchObject({ canView: true, canReadComments: false, canSeeVersions: false })
+  })
+
+  it('keeps the whole artifact open to members and granted people when it also has a public link', () => {
+    expect(permissions({ visibility: 'public_link' }, member)).toMatchObject({ canReadComments: true, canSeeVersions: true, canBrowseSharedData: true })
+    expect(permissions({ visibility: 'specified' }, { ...outsider, grantRole: 'viewer' })).toMatchObject({ canReadComments: true, canSeeVersions: true, canBrowseSharedData: true })
   })
 
   it('asks for the password of a protected public link only when nothing else lets the viewer in', () => {
@@ -108,5 +132,21 @@ describe('ArtifactAccess', () => {
     expect(expired.permissionsFor(author).canRestore).toBe(false)
     expect(expired.permissionsFor(admin).canRestore).toBe(false)
     expect(ArtifactRemoval.purgeCutoff(now)).toBe(removedAt)
+  })
+
+  it('lets a publish token do everything its person can except change who can see the artifact or remove it', () => {
+    const authorAgent: ArtifactViewer = { ...author, tokenScope: 'publish' }
+    const access = new ArtifactAccess(artifactWith({ visibility: 'workspace' }), true, now)
+
+    expect(access.permissionsFor(authorAgent)).toMatchObject({ canView: true, canComment: true, canEdit: true, canRename: true, canWriteSharedData: true, canManageSharing: false, canRemove: false })
+    expect(access.withheldByTokenScope(authorAgent)).toEqual(['canManageSharing', 'canRemove'])
+    expect(access.permissionsFor({ ...author, tokenScope: 'full' })).toMatchObject({ canManageSharing: true, canRemove: true })
+    expect(access.withheldByTokenScope({ ...author, tokenScope: 'full' })).toEqual([])
+  })
+
+  it('withholds by token scope only what the person could otherwise do', () => {
+    const memberAgent: ArtifactViewer = { ...member, tokenScope: 'publish' }
+
+    expect(new ArtifactAccess(artifactWith({ visibility: 'workspace' }), true, now).withheldByTokenScope(memberAgent)).toEqual([])
   })
 })

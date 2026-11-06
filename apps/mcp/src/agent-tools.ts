@@ -44,7 +44,16 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {
         title: { type: 'string', description: 'Short name people will recognize, at most 200 characters.' },
         files: FILES_SCHEMA,
-        visibility: { type: 'string', enum: ['private', 'specified', 'workspace', 'public_link'], default: 'workspace' },
+        visibility: {
+          type: 'string',
+          enum: ['private', 'specified', 'workspace', 'public_link'],
+          default: 'workspace',
+          description: 'public_link lets anyone with the link open the page without signing in. It expires in 7 days unless you pass publicLinkExpiresAt.',
+        },
+        publicLinkExpiresAt: {
+          type: ['integer', 'null'],
+          description: 'Only when the person said how long the public link should stay open: a time in milliseconds, or null for never.',
+        },
         note: NOTE,
       },
       required: ['title', 'files'],
@@ -138,8 +147,8 @@ export class AgentTools {
   }
 
   async #publish(toolArguments: Record<string, unknown>): Promise<ToolResult> {
-    const { title, files, visibility, note } = toolArguments
-    const published = await this.#appClient.call('POST', '/api/artifacts', { title, files, visibility, note })
+    const { title, files, visibility, note, publicLinkExpiresAt } = toolArguments
+    const published = await this.#appClient.call('POST', '/api/artifacts', { title, files, visibility, note, publicLinkExpiresAt })
     return AgentTools.#result(published, 'Published. Share the url with the person:')
   }
 

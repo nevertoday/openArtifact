@@ -111,7 +111,7 @@ describe('home page', () => {
   it('separates what I published from what was shared with me', async () => {
     const reviewerToken = await app.createToken(reviewerCookie)
     const reviewerDoc = await app.publish({ token: reviewerToken }, 'Reviewer only', '<h1>x</h1>', 'specified')
-    await app.request(`/api/artifacts/${reviewerDoc.artifactId}/grants`, { method: 'PUT', cookie: reviewerCookie, body: { email: 'lin@example.com', role: 'commenter' } })
+    await app.grant(reviewerCookie, reviewerDoc.artifactId, 'lin@example.com', 'commenter')
 
     const mineMarkup = await pageText('/?filter=mine', authorCookie)
     const sharedMarkup = await pageText('/?filter=shared', authorCookie)
@@ -203,6 +203,15 @@ describe('settings', () => {
     expect(settingsMarkup).toContain('AGENTS.md 片段')
   })
 
+  it('offers a new token publish-only access by default, with full access as a deliberate choice', async () => {
+    const settingsMarkup = await pageText('/settings/agents', authorCookie)
+    const settingsConfig = settingsMarkup.match(/<script type="application\/json" id="settings-config">(.*?)<\/script>/s)?.[1] ?? ''
+
+    expect(settingsMarkup).toMatch(/<input type="radio" class="xxd-radio" name="scope" id="token-scope-publish" value="publish" checked>/)
+    expect(settingsMarkup).toMatch(/name="scope" id="token-scope-full" value="full">/)
+    expect(JSON.parse(settingsConfig).accessTokens[0]).toHaveProperty('scope', 'publish')
+  })
+
   it('lists members and lets only an admin change workspace settings', async () => {
     const membersMarkup = await pageText('/settings/members', reviewerCookie)
     const reviewerWorkspaceMarkup = await pageText('/settings/workspace', reviewerCookie)
@@ -217,6 +226,8 @@ describe('settings', () => {
 
     expect(llmsTxt).toContain(`${APP_ORIGIN}/api/artifacts`)
     expect(llmsTxt).toContain('window.openArtifact.db')
+    expect(llmsTxt).toContain('`publish` (the default)')
+    expect(llmsTxt).toContain('expires in 7 days')
     expect(llmsTxt).toContain('{ baseVersion, note, files, title? }')
     expect(llmsTxt).toContain(`DELETE ${APP_ORIGIN}/api/artifacts/{id}`)
     expect(llmsTxt).toContain(`POST ${APP_ORIGIN}/api/artifacts/{id}/restore`)

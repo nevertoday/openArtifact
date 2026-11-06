@@ -108,6 +108,18 @@ describe('McpEndpoint', () => {
     expect(result.tools.filter(tool => 'note' in tool.inputSchema.properties).map(tool => tool.name)).toEqual(['publish', 'update'])
   })
 
+  it('passes the public link expiry the person chose, and leaves it out otherwise', async () => {
+    const created = () => Response.json({ artifactId: 'a1', version: 1, url: 'http://app.test/a/a1' }, { status: 201 })
+    const fakeApp = new FakeApp(created(), created())
+    const endpoint = mcpEndpoint(fakeApp)
+    const files = [{ path: 'index.html', content: '<h1>Plan</h1>' }]
+
+    await callTool(endpoint, 'publish', { title: 'Plan', files, visibility: 'public_link', publicLinkExpiresAt: null })
+    await callTool(endpoint, 'publish', { title: 'Plan', files, visibility: 'public_link' })
+
+    expect(fakeApp.calls.map(call => 'publicLinkExpiresAt' in (call.body as object))).toEqual([true, false])
+  })
+
   it('renames the artifact along with the new version when update carries a title', async () => {
     const fakeApp = new FakeApp(Response.json({ artifactId: 'a1', version: 4, url: 'http://app.test/a/a1' }))
 

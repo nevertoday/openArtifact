@@ -94,6 +94,59 @@ describe('personal API tokens', () => {
     expect([strangerRevoke.status, ownerRevoke.status, afterRevoke.status]).toEqual([404, 204, 401])
   })
 
+  it('gives a new token the publish scope unless full access is chosen', async () => {
+    const cookie = await app.signIn('lin@example.com')
+
+    const defaulted = await app.json<{ scope: string }>('/api/tokens', { method: 'POST', cookie, body: { name: 'Default', expiresInDays: 30 } })
+    const full = await app.json<{ scope: string }>('/api/tokens', { method: 'POST', cookie, body: { name: 'Full', expiresInDays: 30, scope: 'full' } })
+    const unknown = await app.request('/api/tokens', { method: 'POST', cookie, body: { name: 'Admin', expiresInDays: 30, scope: 'admin' } })
+    const listed = await app.json<{ tokens: { name: string; scope: string }[] }>('/api/tokens', { cookie })
+
+    expect([defaulted.body.scope, full.body.scope, unknown.status]).toEqual(['publish', 'full', 400])
+    expect(listed.body.tokens.find(token => token.name === 'Full')?.scope).toBe('full')
+  })
+
+  it('lets a publish token publish, comment and use shared data, but not change sharing', async () => {
+    const cookie = await app.signIn('lin@example.com')
+    const publishToken = await app.createToken(cookie, 'publish')
+    const published = await app.publish({ token: publishToken }, 'Scoped work')
+    const artifactPath = `/api/artifacts/${published.artifactId}`
+
+    const update = await app.request(artifactPath, { method: 'PUT', token: publishToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: 'v2' }] } })
+    const comment = await app.request(`${artifactPath}/comments`, { method: 'POST', token: publishToken, body: { body: 'done' } })
+    const sharedData = await app.request(`${artifactPath}/data/notes/first`, { method: 'PUT', token: publishToken, body: { data: { text: 'hi' } } })
+    const readSharing = await app.json<{ error: string }>(`${artifactPath}/sharing`, { token: publishToken })
+    const changeSharing = await app.json<{ error: string }>(`${artifactPath}/sharing`, { method: 'PUT', token: publishToken, body: { visibility: 'public_link' } })
+    const listed = await app.json<{ permissions: { canManageSharing: boolean } }>(artifactPath, { token: publishToken })
+
+    expect([update.status, comment.status, sharedData.status]).toEqual([200, 201, 200])
+    expect([readSharing.status, changeSharing.status]).toEqual([403, 403])
+    expect(changeSharing.body.error).toContain('this token may only publish')
+    expect(changeSharing.body.error).toContain('full access')
+    expect(listed.body.permissions.canManageSharing).toBe(false)
+  })
+
+  it('lets a full token change sharing as its person could', async () => {
+    const cookie = await app.signIn('lin@example.com')
+    const fullToken = await app.createToken(cookie, 'full')
+    const published = await app.publish({ token: fullToken }, 'Full access work')
+
+    const changeSharing = await app.request(`/api/artifacts/${published.artifactId}/sharing`, { method: 'PUT', token: fullToken, body: { visibility: 'private' } })
+
+    expect(changeSharing.status).toBe(200)
+  })
+
+  it('tells a publish token that is not the author plainly that it lacks permission, not scope', async () => {
+    const authorCookie = await app.signIn('lin@example.com')
+    const colleagueCookie = await app.signIn('zhou@example.com')
+    const published = await app.publish({ cookie: authorCookie, origin: APP_ORIGIN }, 'Not yours')
+
+    const colleagueAttempt = await app.json<{ error: string }>(`/api/artifacts/${published.artifactId}/sharing`, { method: 'PUT', token: await app.createToken(colleagueCookie, 'publish'), body: { visibility: 'private' } })
+
+    expect(colleagueAttempt.status).toBe(403)
+    expect(colleagueAttempt.body.error).not.toContain('this token may only publish')
+  })
+
   it('rejects a token lifetime it does not offer', async () => {
     const cookie = await app.signIn('lin@example.com')
 
@@ -189,7 +242,7 @@ describe('tokens and workspaces', () => {
     const me = await app.json<{ user: { userId: string } }>('/api/me', { cookie: ownerCookie })
     await env.DB.prepare('INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?)').bind('workspace-other', 'Other team', Date.now()).run()
     await env.DB.prepare("INSERT INTO memberships (workspace_id, user_id, role, created_at) VALUES ('workspace-other', ?, 'member', ?)").bind(me.body.user.userId, Date.now()).run()
-    const otherArtifact = await app.repositories.artifacts.create({ workspaceId: 'workspace-other', authorId: 'someone-else', title: 'Other team plan', visibility: 'workspace', publishedVia: null, note: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+    const otherArtifact = await app.repositories.artifacts.create({ workspaceId: 'workspace-other', authorId: 'someone-else', title: 'Other team plan', visibility: 'workspace', publicLinkExpiresAt: null, publishedVia: null, note: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
 
     const withCookie = await app.request(`/api/artifacts/${otherArtifact.artifactId}`, { cookie: ownerCookie })
     const withToken = await app.request(`/api/artifacts/${otherArtifact.artifactId}`, { token })

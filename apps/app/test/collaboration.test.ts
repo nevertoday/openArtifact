@@ -279,8 +279,9 @@ describe('the agent inbox', () => {
     const reviewerToken = await app.createToken(reviewerCookie)
     const mine = await app.publish({ token: agentToken }, 'Inbox: mine')
     await app.request(`/api/artifacts/${mine.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
-    const editable = await app.publish({ token: reviewerToken }, 'Inbox: editable')
-    await app.request(`/api/artifacts/${editable.artifactId}/grants`, { method: 'PUT', cookie: reviewerCookie, body: { email: 'lin@example.com', role: 'editor' } })
+    const editable = await app.publish({ token: reviewerToken }, 'Inbox: editable', '<h1>hello</h1>', 'specified')
+    const agentOwner = await app.json<{ user: { userId: string } }>('/api/me', { token: agentToken })
+    await app.request(`/api/artifacts/${editable.artifactId}/sharing`, { method: 'PUT', cookie: reviewerCookie, body: { grants: [{ userId: agentOwner.body.user.userId, role: 'editor' }] } })
     const readOnly = await app.publish({ token: reviewerToken }, 'Inbox: read only')
     const comment = async (artifactId: string, body: Record<string, unknown>) =>
       (await app.json<{ comment: { commentId: string } }>(`/api/artifacts/${artifactId}/comments`, { method: 'POST', cookie: reviewerCookie, body })).body.comment.commentId
