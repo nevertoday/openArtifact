@@ -118,6 +118,7 @@
 
 /* Versions and shared data */
 .version-timeline { padding: var(--inset-md); }
+.version-note { margin-top: var(--space-1); white-space: pre-wrap; overflow-wrap: anywhere; }
 .version-actions { --cluster-gap: var(--space-1); margin-top: var(--space-1); }
 .data-collection { padding: var(--inset-md); }
 .data-collection > p { margin: 0; }

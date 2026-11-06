@@ -8,7 +8,7 @@ import { HOME_FILTERS, HomeListing, HomePage, type HomeFilter } from './home-pag
 import { LoginPage } from './login-page.ts'
 import { MessagePages } from './message-pages.ts'
 import { SETTINGS_SECTIONS, SettingsPage, type SettingsSection } from './settings-page.ts'
-import { ViewerPage, type ViewerModel } from './viewer-page.ts'
+import { ViewerPage, type OlderVersion, type ViewerModel } from './viewer-page.ts'
 
 const SIGNED_URL_LIFETIME_MS = 6 * 60 * 60 * 1000
 const UNLOCK_COOKIE_SECONDS = 30 * 24 * 60 * 60
@@ -85,10 +85,19 @@ export class PageRoutes {
       identity,
       authorName: authorNames.get(openedArtifact.summary.authorId) ?? '',
       shownVersion,
+      olderVersion: shownVersion === openedArtifact.summary.version ? null : await this.#olderVersion(artifactId, shownVersion),
       artifactUrl: `${this.#settings.usercontentOrigin}${signedPrefix}index.html`,
       usercontentOrigin: this.#settings.usercontentOrigin,
       now,
     }
+  }
+
+  async #olderVersion(artifactId: string, version: number): Promise<OlderVersion> {
+    const versionHistory = await this.#context.repositories.artifacts.listVersions(artifactId)
+    const versionRecord = versionHistory.find(candidate => candidate.version === version)
+    if (!versionRecord) throw new Error(`Version ${version} of artifact ${artifactId} is missing from its history`)
+    const authorNames = await this.#context.people.namesOf([versionRecord.authorId])
+    return { version, authorName: authorNames.get(versionRecord.authorId) ?? '', publishedAt: versionRecord.createdAt }
   }
 
   async unlock(request: Request, artifactId: string): Promise<Response> {

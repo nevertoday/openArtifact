@@ -87,17 +87,28 @@ describe('home page', () => {
 })
 
 describe('viewer page', () => {
-  it('shows an older version with a way back, and keeps viewer data out of reach of markup injection', async () => {
+  it('shows who published an older version, how to see the latest and how to overwrite with it, and keeps viewer data out of reach of markup injection', async () => {
     const published = await app.publish({ token: agentToken }, '</script><script>alert(1)</script>', '<h1>v1</h1>')
     await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
 
     const oldVersionMarkup = await pageText(`/a/${published.artifactId}?v=1`, authorCookie)
     const configJson = oldVersionMarkup.match(/<script type="application\/json" id="viewer-config">(.*?)<\/script>/s)?.[1] ?? ''
 
-    expect(oldVersionMarkup).toContain('你在看 <strong class="xxd-mono">v1</strong>')
-    expect(oldVersionMarkup).toContain('data-restore-version="1"')
+    expect(oldVersionMarkup).toContain('你在看 <strong class="xxd-mono">v1</strong>（刚刚，lin 发布），最新是 <span class="xxd-mono">v2</span>。')
+    expect(oldVersionMarkup).toContain(`<a class="xxd-link" href="/a/${published.artifactId}">看最新版</a>`)
+    expect(oldVersionMarkup).toMatch(/<button [^>]*data-overwrite-with-version="1"[^>]*>用 v1 覆盖当前<\/button>/)
     expect(JSON.parse(configJson)).toMatchObject({ shownVersion: 1, currentVersion: 2, title: '</script><script>alert(1)</script>' })
     expect(oldVersionMarkup).not.toContain('<script>alert(1)</script>')
+  })
+
+  it('offers overwriting with an older version only to people who can edit', async () => {
+    const published = await app.publish({ token: agentToken }, 'Read only for zhou', '<h1>v1</h1>')
+    await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+
+    const reviewerMarkup = await pageText(`/a/${published.artifactId}?v=1`, reviewerCookie)
+
+    expect(reviewerMarkup).toContain('看最新版')
+    expect(reviewerMarkup).not.toContain('data-overwrite-with-version')
   })
 })
 

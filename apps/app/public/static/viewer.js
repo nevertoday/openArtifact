@@ -1,4 +1,4 @@
-import { api, element, initialOf, readJsonData, timeAgo } from './common.js'
+import { ApiError, api, element, initialOf, readJsonData, timeAgo } from './common.js'
 import { SharedDataProxy } from './shared-data-proxy.js'
 
 const viewerConfig = readJsonData('viewer-config')
@@ -230,8 +230,9 @@ class CommentsPanel {
 }
 
 class VersionsPanel {
-  constructor(panel) {
+  constructor(panel, versionOverwrite) {
     this.panel = panel
+    this.versionOverwrite = versionOverwrite
   }
 
   async load() {
@@ -246,18 +247,44 @@ class VersionsPanel {
   #versionItem(versionRecord) {
     const isCurrent = versionRecord.version === viewerConfig.currentVersion
     const isShown = versionRecord.version === viewerConfig.shownVersion
-    const stateBadge = isCurrent ? element('span', { className: 'xxd-badge' }, '当前') : isShown ? element('span', { className: 'xxd-badge', 'data-tone': 'action' }, '正在查看') : null
+    const canOverwriteWithIt = viewerConfig.permissions.canEdit && !isCurrent
     return element('li', { className: 'xxd-timeline__item', 'data-highlight': isCurrent },
       element('time', { className: 'xxd-timeline__time', datetime: new Date(versionRecord.createdAt).toISOString() }, timeAgo(versionRecord.createdAt)),
       element('div', { className: 'xxd-timeline__body' },
-        element('p', { className: 'xxd-timeline__title xxd-cluster' }, element('span', { className: 'xxd-mono' }, `v${versionRecord.version}`), stateBadge),
+        element('p', { className: 'xxd-timeline__title xxd-cluster' },
+          element('span', { className: 'xxd-mono' }, `v${versionRecord.version}`),
+          VersionsPanel.#stateBadge(isCurrent, isShown),
+          VersionsPanel.#originLabel(versionRecord),
+        ),
         element('p', { className: 'xxd-timeline__text' }, `${versionRecord.author.name} · ${versionRecord.publishedVia ?? '网页'}`),
+        versionRecord.note ? element('p', { className: 'version-note' }, versionRecord.note) : null,
         element('div', { className: 'xxd-cluster version-actions' },
-          isShown ? null : element('a', { className: 'xxd-btn', 'data-size': 'xs', href: isCurrent ? '?' : `?v=${versionRecord.version}` }, '查看'),
-          viewerConfig.permissions.canEdit && !isCurrent ? element('button', { type: 'button', className: 'xxd-btn', 'data-size': 'xs', onClick: () => restoreVersion(versionRecord.version) }, '恢复为当前版本') : null,
+          isShown ? null : element('a', { className: 'xxd-btn', 'data-size': 'xs', href: VersionsPanel.#viewPath(versionRecord.version, isCurrent) }, '查看'),
+          canOverwriteWithIt ? element('button', { type: 'button', className: 'xxd-btn', 'data-size': 'xs', onClick: () => this.versionOverwrite.confirmAndOverwrite(versionRecord.version) }, '用这个版本覆盖') : null,
         ),
       ),
     )
+  }
+
+  static #stateBadge(isCurrent, isShown) {
+    if (isCurrent) return element('span', { className: 'xxd-badge' }, '当前')
+    if (isShown) return element('span', { className: 'xxd-badge', 'data-tone': 'action' }, '正在查看')
+    return null
+  }
+
+  static #originLabel(versionRecord) {
+    switch (versionRecord.origin) {
+      case 'published':
+        return null
+      case 'restored':
+        return element('span', { className: 'xxd-text', 'data-variant': 'caption' }, `恢复自 v${versionRecord.restoredFrom}`)
+      default:
+        throw new Error(`Unknown version origin ${versionRecord.origin}`)
+    }
+  }
+
+  static #viewPath(version, isCurrent) {
+    return isCurrent ? location.pathname : `${location.pathname}?v=${version}`
   }
 }
 
@@ -352,13 +379,62 @@ class PagePins {
   }
 }
 
-async function restoreVersion(version) {
-  try {
-    const { version: newVersion } = await api(`${artifactPath}/versions/${version}/restore`, { method: 'POST' })
-    Xxd.toast(`已恢复为 v${newVersion}`, { tone: 'success' })
-    location.href = location.pathname
-  } catch (error) {
-    Xxd.toast(`恢复失败：${error.message}`, { tone: 'danger' })
+/**
+ * Overwrites the current version with an older one by publishing that version's files as a new version, so
+ * every version stays in the history. Undo is the same move with the version that was replaced. The page
+ * reloads on the new version, so the result travels to it in sessionStorage.
+ */
+class VersionOverwrite {
+  static #RESULT_KEY = `open-artifact:overwrite:${viewerConfig.artifactId}`
+
+  async confirmAndOverwrite(olderVersion) {
+    const currentVersion = viewerConfig.currentVersion
+    const nextVersion = currentVersion + 1
+    const confirmed = await Xxd.confirmDialog({
+      title: `用 v${olderVersion} 覆盖当前版本？`,
+      message: `会发布 v${nextVersion}，内容和 v${olderVersion} 一样。v${currentVersion} 和更早的版本都会保留，随时可以再换回来。`,
+      cancelLabel: '取消',
+      confirmLabel: `发布 v${nextVersion}`,
+    })
+    if (confirmed) await this.#overwrite(olderVersion, currentVersion)
+  }
+
+  /** Shows the result of an overwrite made just before this page loaded, with a way to undo it. */
+  showResultOfLastOverwrite() {
+    const overwriteResult = VersionOverwrite.#takeResult()
+    if (!overwriteResult) return
+    const { publishedVersion, restoredFrom, replacedVersion } = overwriteResult
+    const stillCurrent = publishedVersion === viewerConfig.currentVersion
+    const undo = { label: '撤销', onClick: () => this.#overwrite(replacedVersion, publishedVersion) }
+    Xxd.toast(`已发布 v${publishedVersion}（恢复自 v${restoredFrom}）`, { tone: 'success', action: stillCurrent ? undo : undefined })
+  }
+
+  async #overwrite(olderVersion, baseVersion) {
+    try {
+      const { version: publishedVersion } = await api(`${artifactPath}/versions/${olderVersion}/restore`, { method: 'POST', body: { baseVersion } })
+      VersionOverwrite.#keepResult({ publishedVersion, restoredFrom: olderVersion, replacedVersion: baseVersion })
+      location.href = location.pathname
+    } catch (error) {
+      const someoneElsePublished = error instanceof ApiError && error.status === 409
+      Xxd.toast(someoneElsePublished ? '刚有人发布了新版本，刷新后再试' : `覆盖失败：${error.message}`, { tone: 'danger' })
+    }
+  }
+
+  // Storage can be blocked; the overwrite has happened either way, only the toast is lost.
+  static #keepResult(overwriteResult) {
+    try {
+      sessionStorage.setItem(VersionOverwrite.#RESULT_KEY, JSON.stringify(overwriteResult))
+    } catch {}
+  }
+
+  static #takeResult() {
+    try {
+      const storedResult = sessionStorage.getItem(VersionOverwrite.#RESULT_KEY)
+      sessionStorage.removeItem(VersionOverwrite.#RESULT_KEY)
+      return storedResult ? JSON.parse(storedResult) : null
+    } catch {
+      return null
+    }
   }
 }
 
@@ -512,7 +588,8 @@ class ShareDialog {
 
 const artifactFrame = document.getElementById('artifact-frame')
 const commentsPanel = new CommentsPanel(document.getElementById('panel-comments'))
-const versionsPanel = new VersionsPanel(document.getElementById('panel-versions'))
+const versionOverwrite = new VersionOverwrite()
+const versionsPanel = new VersionsPanel(document.getElementById('panel-versions'), versionOverwrite)
 const dataPanel = new DataPanel(document.getElementById('panel-data'))
 const viewerTabs = document.getElementById('viewer-tabs')
 viewerTabs.addEventListener('xxd:change', event => {
@@ -530,6 +607,7 @@ if (shareDialogElement) {
   const shareDialog = new ShareDialog(shareDialogElement)
   document.querySelector('[data-open-share]')?.addEventListener('click', () => shareDialog.open())
 }
-for (const restoreButton of document.querySelectorAll('[data-restore-version]')) {
-  restoreButton.addEventListener('click', () => restoreVersion(Number(restoreButton.dataset.restoreVersion)))
+for (const overwriteButton of document.querySelectorAll('[data-overwrite-with-version]')) {
+  overwriteButton.addEventListener('click', () => versionOverwrite.confirmAndOverwrite(Number(overwriteButton.dataset.overwriteWithVersion)))
 }
+versionOverwrite.showResultOfLastOverwrite()

@@ -7,12 +7,20 @@ import { PageShell } from './page-shell.ts'
 // No allow-same-origin: the artifact gets an opaque origin and cannot reach any site's cookies or storage.
 const ARTIFACT_SANDBOX = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads'
 
+export interface OlderVersion {
+  version: number
+  authorName: string
+  publishedAt: number
+}
+
 export interface ViewerModel {
   openedArtifact: OpenedArtifact
   identity: Identity | null
   authorName: string
   /** The version on screen; older than the current one when the viewer picked it from the history. */
   shownVersion: number
+  /** The shown version when it is older than the current one; null on the current version. */
+  olderVersion: OlderVersion | null
   /** Absolute URL of the shown version's entry page, signed for this viewer. */
   artifactUrl: string
   usercontentOrigin: string
@@ -22,12 +30,11 @@ export interface ViewerModel {
 export class ViewerPage {
   static render(model: ViewerModel): Response {
     const { summary, permissions } = model.openedArtifact
-    const isOldVersion = model.shownVersion !== summary.version
     const body = html`<div class="viewer-page">
 ${PageShell.topBar(model.identity, ViewerPage.#heading(model))}
 <div class="viewer-body">
   <section class="viewer-stage" aria-label="artifact 内容">
-    ${isOldVersion ? ViewerPage.#oldVersionBanner(model.shownVersion, summary.version, permissions.canEdit) : ''}
+    ${model.olderVersion ? ViewerPage.#olderVersionBanner(model, model.olderVersion) : ''}
     <div class="viewer-sandbox-note xxd-text" data-variant="caption">
       <span class="xxd-cluster">${PageShell.icon('Lock', 14)}在沙箱中运行 · <span class="xxd-mono">${new URL(model.usercontentOrigin).host}</span></span>
       <a class="xxd-link" href="${ViewerPage.#pathOf(model, '/full')}" target="_blank" rel="noopener">新标签页打开</a>
@@ -114,13 +121,16 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
 ${permissions.canManageSharing ? html`<button type="button" class="xxd-btn" data-variant="primary" data-size="sm" data-open-share>${PageShell.icon('Share2')}分享</button>` : ''}`
   }
 
-  static #oldVersionBanner(shownVersion: number, currentVersion: number, canEdit: boolean): SafeHtml {
+  static #olderVersionBanner(model: ViewerModel, olderVersion: OlderVersion): SafeHtml {
+    const { summary, permissions } = model.openedArtifact
+    const publishedAgo = ArtifactLabels.updatedAgo(olderVersion.publishedAt, model.now)
+    const overwriteButton = html`<button type="button" class="xxd-btn" data-size="sm" data-overwrite-with-version="${olderVersion.version}">用 v${olderVersion.version} 覆盖当前</button>`
     return html`<div class="xxd-banner" data-size="sm" role="status">
   ${PageShell.icon('History')}
-  <p class="xxd-banner__text">你在看 <strong class="xxd-mono">v${shownVersion}</strong>，当前版本是 <span class="xxd-mono">v${currentVersion}</span>。</p>
+  <p class="xxd-banner__text">你在看 <strong class="xxd-mono">v${olderVersion.version}</strong>（${publishedAgo}，${olderVersion.authorName} 发布），最新是 <span class="xxd-mono">v${summary.version}</span>。</p>
   <div class="xxd-banner__actions">
-    ${canEdit ? html`<button type="button" class="xxd-btn" data-size="sm" data-restore-version="${shownVersion}">恢复为当前版本</button>` : ''}
-    <a class="xxd-btn" data-size="sm" href="?">回到当前版本</a>
+    <a class="xxd-link" href="/a/${encodeURIComponent(summary.artifactId)}">看最新版</a>
+    ${permissions.canEdit ? overwriteButton : ''}
   </div>
 </div>`
   }
