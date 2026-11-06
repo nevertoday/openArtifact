@@ -1,4 +1,8 @@
+import { createScheduledController } from 'cloudflare:test'
+import { env } from 'cloudflare:workers'
 import { beforeAll, describe, expect, it } from 'vitest'
+import type { AppEnv } from '../src/env.ts'
+import worker from '../src/index.ts'
 import { TestApp } from './test-app.ts'
 
 const app = new TestApp()
@@ -189,5 +193,66 @@ describe('the audit log', () => {
       ['artifact.renamed', 'author', { from: 'Audited page', to: 'Audited page v2' }],
     ])
     expect(memberAudit.status).toBe(403)
+  })
+})
+
+describe('purging removed artifacts', () => {
+  async function storedRows(artifactId: string): Promise<(number | null)[]> {
+    const countOf = (table: string, column: string) => env.DB.prepare(`SELECT COUNT(*) AS rows_found FROM ${table} WHERE ${column} = ?`).bind(artifactId).first<number>('rows_found')
+    return Promise.all([
+      countOf('artifacts', 'id'),
+      countOf('artifact_versions', 'artifact_id'),
+      countOf('artifact_files', 'artifact_id'),
+      countOf('comments', 'artifact_id'),
+      countOf('artifact_grants', 'artifact_id'),
+      countOf('shared_documents', 'artifact_id'),
+    ])
+  }
+
+  async function storedObjectCount(artifactId: string): Promise<number> {
+    return (await env.FILES.list({ prefix: `artifacts/${artifactId}/` })).objects.length
+  }
+
+  async function removeDaysAgo(artifactId: string, days: number): Promise<void> {
+    await app.request(`/api/artifacts/${artifactId}`, { method: 'DELETE', cookie: authorCookie })
+    await env.DB.prepare('UPDATE artifacts SET removed_at = ? WHERE id = ?').bind(Date.now() - days * DAY, artifactId).run()
+  }
+
+  async function runDailyPurge(): Promise<void> {
+    await worker.scheduled(createScheduledController(), env as unknown as AppEnv)
+  }
+
+  it('deletes an artifact 30 days after removal with everything stored for it, keeps its audit trail, and can run again', async () => {
+    const expired = await app.publish({ token: authorToken }, 'Expired page', '<h1>old</h1>', 'specified')
+    await app.request(`/api/artifacts/${expired.artifactId}`, { method: 'PUT', token: authorToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: 'v2' }, { path: 'app.css', content: 'h1{}' }] } })
+    await app.request(`/api/artifacts/${expired.artifactId}/grants`, { method: 'PUT', cookie: authorCookie, body: { email: 'member@example.com', role: 'commenter' } })
+    await app.request(`/api/artifacts/${expired.artifactId}/comments`, { method: 'POST', cookie: memberCookie, body: { body: 'old news' } })
+    await app.request(`/api/artifacts/${expired.artifactId}/data/votes/member`, { method: 'PUT', cookie: memberCookie, body: { data: { choice: 'a' } } })
+    const recent = await app.publish({ token: authorToken }, 'Recently removed')
+    const storedBeforePurge = await storedRows(expired.artifactId)
+    await removeDaysAgo(expired.artifactId, 31)
+    await removeDaysAgo(recent.artifactId, 29)
+
+    await runDailyPurge()
+    await runDailyPurge()
+
+    expect(storedBeforePurge).toEqual([1, 2, 3, 1, 1, 1])
+    expect(await storedRows(expired.artifactId)).toEqual([0, 0, 0, 0, 0, 0])
+    expect(await storedObjectCount(expired.artifactId)).toBe(0)
+    expect((await auditEvents()).filter(event => event.targetId === expired.artifactId).map(event => event.action)).toEqual(['artifact.removed'])
+    expect((await storedRows(recent.artifactId))[0]).toBe(1)
+    expect(await storedObjectCount(recent.artifactId)).toBe(1)
+    const restorableTitles = (await removedArtifacts(authorCookie)).map(artifact => artifact.title)
+    expect(restorableTitles).toContain('Recently removed')
+    expect(restorableTitles).not.toContain('Expired page')
+  })
+
+  it('refuses to restore an artifact whose 30 days are over, even before the purge ran', async () => {
+    const lapsed = await app.publish({ token: authorToken }, 'Lapsed page')
+    await removeDaysAgo(lapsed.artifactId, 30)
+
+    const restore = await app.request(`/api/artifacts/${lapsed.artifactId}/restore`, { method: 'POST', cookie: authorCookie })
+
+    expect(restore.status).toBe(404)
   })
 })

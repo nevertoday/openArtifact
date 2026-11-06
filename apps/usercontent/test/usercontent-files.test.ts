@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers'
-import { SigningKey, UsercontentSignature } from '@open-artifact/core'
+import { ArtifactRemoval, SigningKey, UsercontentSignature } from '@open-artifact/core'
 import { CloudflareArtifactRepository } from '@open-artifact/storage-cloudflare'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { SDK_PATH } from '../src/artifact-sdk.ts'
@@ -91,6 +91,18 @@ describe('UsercontentFiles', () => {
     expect(sdkScript).not.toContain("'*'")
     expect(sdkScript).toContain("message.type === 'open-artifact:pins'")
     expect(sdkScript).toContain("has('preview')")
+  })
+
+  it('stops serving a removed artifact at once, even on a link signed before the removal', async () => {
+    const signedBeforeRemoval = await signedPath(2, 'index.html')
+    const servedBefore = await fetchPath(signedBeforeRemoval)
+
+    await artifactRepository.remove(artifactId, new ArtifactRemoval(Date.now(), 'user-admin', true))
+    const servedAfterRemoval = await fetchPath(signedBeforeRemoval)
+    await artifactRepository.restore(artifactId)
+    const servedAfterRestore = await fetchPath(signedBeforeRemoval)
+
+    expect([servedBefore.status, servedAfterRemoval.status, servedAfterRestore.status]).toEqual([200, 404, 200])
   })
 
   it('answers 404 for a file the version does not have, and refuses writes', async () => {

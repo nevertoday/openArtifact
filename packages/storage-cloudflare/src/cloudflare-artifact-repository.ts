@@ -118,6 +118,7 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
       .prepare(
         `SELECT artifact_files.upload_id, artifact_files.path, artifact_files.content_type
          FROM artifact_versions
+         JOIN artifacts ON artifacts.id = artifact_versions.artifact_id AND artifacts.removed_at IS NULL
          JOIN artifact_files ON artifact_files.artifact_id = artifact_versions.artifact_id AND artifact_files.upload_id = artifact_versions.upload_id
          WHERE artifact_versions.artifact_id = ? AND artifact_versions.version = ? AND artifact_files.path = ?`,
       )
@@ -171,6 +172,25 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
       .bind(artifactId)
       .run()
     return restoreUpdate.meta.changes === 1
+  }
+
+  // Files go first and the row last, so a crash leaves the artifact listed for the next run. Deleting the row
+  // cascades to its versions, file rows, comments, grants and shared data.
+  async purgeRemovedBefore(cutoff: number): Promise<void> {
+    const { results: purgedRows } = await this.#db.prepare('SELECT id FROM artifacts WHERE removed_at <= ?').bind(cutoff).all<{ id: string }>()
+    for (const { id: artifactId } of purgedRows) {
+      await this.#deleteStoredFiles(artifactId)
+      await this.#db.prepare('DELETE FROM artifacts WHERE id = ? AND removed_at <= ?').bind(artifactId, cutoff).run()
+    }
+  }
+
+  async #deleteStoredFiles(artifactId: string): Promise<void> {
+    let listing: R2Objects | null = null
+    do {
+      listing = await this.#files.list({ prefix: CloudflareArtifactRepository.#artifactPrefix(artifactId), ...(listing?.truncated ? { cursor: listing.cursor } : {}) })
+      const objectKeys = listing.objects.map(storedObject => storedObject.key)
+      if (objectKeys.length > 0) await this.#files.delete(objectKeys)
+    } while (listing.truncated)
   }
 
   async #versionRow(artifactId: string, version: number): Promise<VersionRow | null> {
@@ -267,6 +287,10 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
   }
 
   static #objectKey(artifactId: string, uploadId: string, path: string): string {
-    return `artifacts/${artifactId}/uploads/${uploadId}/${path}`
+    return `${CloudflareArtifactRepository.#artifactPrefix(artifactId)}uploads/${uploadId}/${path}`
+  }
+
+  static #artifactPrefix(artifactId: string): string {
+    return `artifacts/${artifactId}/`
   }
 }
