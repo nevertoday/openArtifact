@@ -14,9 +14,13 @@ export class ArtifactRemoval {
     this.removedAsAdmin = removedAsAdmin
   }
 
-  /** Only the author or an admin may remove an artifact, so anyone else removing it acts as admin. */
   static by(removerId: string, authorId: string, removedAt: number): ArtifactRemoval {
-    return new ArtifactRemoval(removedAt, removerId, removerId !== authorId)
+    return new ArtifactRemoval(removedAt, removerId, ArtifactRemoval.isTakedown(removerId, authorId))
+  }
+
+  /** Only the author or an admin may remove an artifact, so anyone else removing it acts as admin. */
+  static isTakedown(removerId: string, authorId: string): boolean {
+    return removerId !== authorId
   }
 
   /** Artifacts removed at or before this time are past restoring and get purged. */

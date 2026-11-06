@@ -1,4 +1,4 @@
-import { WORKSPACE_ROLES, type AuditEvent, type MembershipChange } from '@open-artifact/core'
+import { WORKSPACE_ROLES, type MembershipChange } from '@open-artifact/core'
 import { WORKSPACE_COOKIE } from '../auth/request-identity.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { HttpError } from '../http-error.ts'
@@ -81,19 +81,21 @@ export class WorkspaceApi {
   async audit(): Promise<Response> {
     const identity = await this.#context.requireWorkspaceAdmin('read the audit log')
     const auditEvents = await this.#context.repositories.auditLog.listLatest(identity.membership.workspace.workspaceId, AUDIT_PAGE_SIZE)
-    const memberIdOf = (auditEvent: AuditEvent) => (auditEvent.targetType === 'member' ? auditEvent.targetId : null)
-    const names = await this.#context.people.namesOf(auditEvents.flatMap(auditEvent => [auditEvent.actorId, memberIdOf(auditEvent)]))
+    const names = await this.#context.people.namesInAuditEvents(auditEvents)
     return Response.json({
-      events: auditEvents.map(auditEvent => ({
-        eventId: auditEvent.eventId,
-        action: auditEvent.action,
-        actor: { userId: auditEvent.actorId, name: names.get(auditEvent.actorId) },
-        targetType: auditEvent.targetType,
-        targetId: auditEvent.targetId,
-        member: auditEvent.targetType === 'member' ? { userId: auditEvent.targetId, name: names.get(auditEvent.targetId) } : null,
-        detail: auditEvent.detail,
-        createdAt: auditEvent.createdAt,
-      })),
+      events: auditEvents.map(auditEvent => {
+        const memberId = People.memberIdOf(auditEvent)
+        return {
+          eventId: auditEvent.eventId,
+          action: auditEvent.action,
+          actor: { userId: auditEvent.actorId, name: names.get(auditEvent.actorId) },
+          targetType: auditEvent.targetType,
+          targetId: auditEvent.targetId,
+          member: memberId === null ? null : { userId: memberId, name: names.get(memberId) },
+          detail: auditEvent.detail,
+          createdAt: auditEvent.createdAt,
+        }
+      }),
     })
   }
 

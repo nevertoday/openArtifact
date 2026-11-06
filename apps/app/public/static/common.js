@@ -57,6 +57,35 @@ export function timeAgo(timestamp) {
   return new Date(timestamp).toLocaleDateString('zh-CN')
 }
 
+/** 下架 is an admin removing someone else's artifact; 删除 is the author removing their own. */
+export function removalWord(takesDown) {
+  return takesDown ? '下架' : '删除'
+}
+
+/** Asks before removing an artifact; the kit puts 取消 first and the danger action last. */
+export function confirmArtifactRemoval(title, takesDown) {
+  const word = removalWord(takesDown)
+  return Xxd.confirmDialog({
+    title: `${word}「${title}」？`,
+    message: takesDown
+      ? '下架后所有人都看不到它，作者也不能自己恢复。30 天内管理员可以在「最近删除」里恢复。'
+      : '删除后所有人都看不到它。30 天内可以在「最近删除」里恢复。',
+    confirmLabel: word,
+    cancelLabel: '取消',
+    closeLabel: '关闭',
+    tone: 'danger',
+  })
+}
+
+export function removeArtifact(artifactId) {
+  return api(`/api/artifacts/${encodeURIComponent(artifactId)}`, { method: 'DELETE' })
+}
+
+/** Resolves to { artifactId, title, url } of the restored artifact. */
+export function restoreArtifact(artifactId) {
+  return api(`/api/artifacts/${encodeURIComponent(artifactId)}/restore`, { method: 'POST' })
+}
+
 export function initialOf(name) {
   return Array.from((name ?? '').trim())[0]?.toUpperCase() ?? '?'
 }

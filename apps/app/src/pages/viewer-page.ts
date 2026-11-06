@@ -1,3 +1,4 @@
+import { ArtifactRemoval } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
@@ -93,7 +94,14 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
       shownVersion: model.shownVersion,
       currentVersion: summary.version,
       usercontentOrigin: model.usercontentOrigin,
-      permissions: { canComment: permissions.canComment, canEdit: permissions.canEdit, canManageSharing: permissions.canManageSharing },
+      permissions: {
+        canComment: permissions.canComment,
+        canEdit: permissions.canEdit,
+        canManageSharing: permissions.canManageSharing,
+        canRename: permissions.canRename,
+        canRemove: permissions.canRemove,
+      },
+      removalTakesDown: ViewerPage.#removalTakesDown(model),
       viewer: model.identity ? { userId: model.identity.userId, name: model.identity.name } : null,
     }
   }
@@ -111,7 +119,25 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   <span class="viewer-heading__meta xxd-text" data-variant="caption">${model.authorName} · ${ArtifactLabels.publishedVia(summary.publishedVia)} 发布 · ${ArtifactLabels.updatedAgo(summary.updatedAt, model.now)}更新</span>
 </div>
 <span class="xxd-badge viewer-visibility" data-visibility-pill>${ArtifactLabels.visibility(summary.sharing.visibility)}</span>
-${permissions.canManageSharing ? html`<button type="button" class="xxd-btn" data-variant="primary" data-size="sm" data-open-share>${PageShell.icon('Share2')}分享</button>` : ''}`
+${permissions.canManageSharing ? html`<button type="button" class="xxd-btn" data-variant="primary" data-size="sm" data-open-share>${PageShell.icon('Share2')}分享</button>` : ''}
+${ViewerPage.#artifactMenu(model)}`
+  }
+
+  static #removalTakesDown(model: ViewerModel): boolean {
+    const viewerId = model.identity?.userId
+    return viewerId !== undefined && ArtifactRemoval.isTakedown(viewerId, model.openedArtifact.summary.authorId)
+  }
+
+  static #artifactMenu(model: ViewerModel): SafeHtml | string {
+    const { canRename, canRemove } = model.openedArtifact.permissions
+    if (!canRename && !canRemove) return ''
+    const renameItem = html`<button type="button" class="xxd-menu__item" role="menuitem" data-rename-artifact>${PageShell.icon('Pen', 14)}重命名</button>`
+    const removeItem = html`<button type="button" class="xxd-menu__item" role="menuitem" data-tone="danger" data-remove-artifact>${PageShell.icon('Trash2', 14)}${ArtifactLabels.removal(ViewerPage.#removalTakesDown(model))}</button>`
+    const separator = html`<div class="xxd-menu__sep" role="separator"></div>`
+    return html`<button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" data-xxd-menu="artifact-menu" data-artifact-menu aria-label="更多操作">${PageShell.icon('Ellipsis')}</button>
+<div class="xxd-menu" id="artifact-menu" role="menu" popover>
+  ${canRename ? renameItem : ''}${canRename && canRemove ? separator : ''}${canRemove ? removeItem : ''}
+</div>`
   }
 
   static #oldVersionBanner(shownVersion: number, currentVersion: number, canEdit: boolean): SafeHtml {

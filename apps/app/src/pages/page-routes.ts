@@ -7,12 +7,13 @@ import { HttpCookies } from '../http-cookies.ts'
 import { HOME_FILTERS, HomeListing, HomePage, type HomeFilter } from './home-page.ts'
 import { LoginPage } from './login-page.ts'
 import { MessagePages } from './message-pages.ts'
-import { SETTINGS_SECTIONS, SettingsPage, type SettingsSection } from './settings-page.ts'
+import { SETTINGS_SECTIONS, SettingsPage, type SettingsSection, type WorkspaceAdministration } from './settings-page.ts'
 import { ViewerPage, type ViewerModel } from './viewer-page.ts'
 
 const SIGNED_URL_LIFETIME_MS = 6 * 60 * 60 * 1000
 const UNLOCK_COOKIE_SECONDS = 30 * 24 * 60 * 60
 const MAX_LIVE_PREVIEWS = 12
+const AUDIT_EVENTS_SHOWN = 50
 
 export interface PageRouteSettings {
   usercontentOrigin: string
@@ -41,21 +42,22 @@ export class PageRoutes {
     const identity = await this.#context.identity()
     if (!identity) return this.#redirectToLogin(request)
     const searchParams = new URL(request.url).searchParams
-    const [visibleArtifacts, waitingForAgent, grantsOfUser] = await Promise.all([
-      this.#context.gate.listVisible(identity),
+    const [workspaceArtifacts, waitingForAgent, grantsOfUser] = await Promise.all([
+      this.#context.gate.listWorkspace(identity),
       this.#context.repositories.comments.countWaitingForAgent(identity.membership.workspace.workspaceId),
       this.#context.repositories.artifactAccess.listGrantsOfUser(identity.userId),
     ])
-    const listing = new HomeListing(visibleArtifacts, identity, waitingForAgent, new Set(grantsOfUser.map(grant => grant.artifactId)))
+    const listing = new HomeListing(workspaceArtifacts, identity, waitingForAgent, new Set(grantsOfUser.map(grant => grant.artifactId)))
     const requestedFilter = searchParams.get('filter')
     const query = {
       filter: HOME_FILTERS.find(filter => filter === requestedFilter) ?? ('all' as HomeFilter),
       agent: searchParams.get('agent'),
       search: searchParams.get('q') ?? '',
     }
-    const authorNames = await this.#context.people.namesOf(visibleArtifacts.map(openedArtifact => openedArtifact.summary.authorId))
+    const authorNames = await this.#context.people.namesOf(listing.peopleIds())
     const previewUrls = await this.#previewUrls(listing.matching(query))
-    return HomePage.render({ identity, listing, query, authorNames, previewUrls, usercontentOrigin: this.#settings.usercontentOrigin, now: Date.now() })
+    const justRemoved = listing.restorable(searchParams.get('removed'))
+    return HomePage.render({ identity, listing, query, authorNames, previewUrls, justRemoved, usercontentOrigin: this.#settings.usercontentOrigin, now: Date.now() })
   }
 
   async viewer(request: Request, artifactId: string): Promise<Response> {
@@ -122,7 +124,7 @@ export class PageRoutes {
   // Live previews of the first cards stand in for screenshots; the rest keep their colour cover.
   async #previewUrls(shownArtifacts: OpenedArtifact[]): Promise<Map<string, string>> {
     const expiresAt = Date.now() + SIGNED_URL_LIFETIME_MS
-    const previewedArtifacts = shownArtifacts.slice(0, MAX_LIVE_PREVIEWS)
+    const previewedArtifacts = shownArtifacts.filter(openedArtifact => openedArtifact.permissions.canView).slice(0, MAX_LIVE_PREVIEWS)
     const previewUrls = await Promise.all(
       previewedArtifacts.map(async ({ summary }) => {
         const signedPrefix = await this.#settings.usercontentSignature.signedPrefix(summary.artifactId, summary.version, expiresAt)
@@ -138,12 +140,25 @@ export class PageRoutes {
   }
 
   async #settingsPage(identity: Identity, section: SettingsSection): Promise<Response> {
-    const [accessTokens, members] = await Promise.all([
+    const [accessTokens, members, administration] = await Promise.all([
       this.#context.repositories.accessTokens.listForUser(identity.userId),
       this.#context.repositories.workspaces.listMembers(identity.membership.workspace.workspaceId),
+      section === 'workspace' ? this.#workspaceAdministration(identity) : null,
     ])
     const guideFiles = new AgentGuide(this.#context.appOrigin, this.#settings.mcpUrl).files()
-    return SettingsPage.render({ identity, section, mcpUrl: this.#settings.mcpUrl, accessTokens, guideFiles, members })
+    return SettingsPage.render({ identity, section, mcpUrl: this.#settings.mcpUrl, accessTokens, guideFiles, members, administration, now: Date.now() })
+  }
+
+  // Only an admin sees every artifact's metadata and the audit log; a member gets null.
+  async #workspaceAdministration(identity: Identity): Promise<WorkspaceAdministration | null> {
+    if (identity.membership.role !== 'admin') return null
+    const [artifacts, auditEvents] = await Promise.all([
+      this.#context.gate.listWorkspace(identity),
+      this.#context.repositories.auditLog.listLatest(identity.membership.workspace.workspaceId, AUDIT_EVENTS_SHOWN),
+    ])
+    const artifactPeople = artifacts.flatMap(({ summary }) => [summary.authorId, summary.removal?.removedBy ?? null])
+    const [artifactNames, auditNames] = await Promise.all([this.#context.people.namesOf(artifactPeople), this.#context.people.namesInAuditEvents(auditEvents)])
+    return { artifacts, auditEvents, names: new Map([...artifactNames, ...auditNames]) }
   }
 
   #refusal(request: Request, artifactId: string, identity: Identity | null, needsPublicLinkPassword: boolean): Response {
