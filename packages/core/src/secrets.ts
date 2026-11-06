@@ -41,6 +41,13 @@ export class AccessTokenSecret {
   }
 }
 
+/** The secret in an invite link; whoever holds a link invite's code may join its workspace. */
+export class InviteCode {
+  static generate(): string {
+    return base64UrlOf(randomBytes(24))
+  }
+}
+
 const PASSWORD_ITERATIONS = 100_000
 const PASSWORD_SCHEME = 'pbkdf2-sha256'
 

@@ -1,4 +1,4 @@
-import type { Membership, MembershipChange, UserDirectory, UserProfile, Workspace, WorkspaceMember, WorkspaceRepository, WorkspaceRole } from '@open-artifact/core'
+import type { JoinResult, Membership, MembershipChange, UserDirectory, UserProfile, Workspace, WorkspaceMember, WorkspaceRepository, WorkspaceRole } from '@open-artifact/core'
 
 // Checked in the same statement that changes the membership, so two admins stepping down at once cannot both succeed.
 const ANOTHER_ADMIN_REMAINS = `(memberships.role = 'member' OR EXISTS (
@@ -67,6 +67,20 @@ export class CloudflareWorkspaceRepository implements WorkspaceRepository {
     ])
     const [firstMembership] = await this.membershipsOf(userId)
     return firstMembership ?? null
+  }
+
+  // The readmission and the insert run in one batch, so the result says whether this call added the person.
+  async join(workspaceId: string, userId: string, joinedAt: number, readmission: { readmitsRemoved: boolean }): Promise<JoinResult> {
+    const [readmitted, inserted] = await this.#db.batch([
+      this.#db
+        .prepare(`UPDATE memberships SET removed_at = NULL, role = 'member', created_at = ? WHERE workspace_id = ? AND user_id = ? AND removed_at IS NOT NULL AND ? = 1`)
+        .bind(joinedAt, workspaceId, userId, readmission.readmitsRemoved ? 1 : 0),
+      this.#db.prepare(`INSERT OR IGNORE INTO memberships (workspace_id, user_id, role, created_at) VALUES (?, ?, 'member', ?)`).bind(workspaceId, userId, joinedAt),
+    ])
+    const membership = (await this.membershipsOf(userId)).find(candidate => candidate.workspace.workspaceId === workspaceId)
+    if (!membership) return { status: 'removed' }
+    const addedHere = (readmitted?.meta.changes ?? 0) + (inserted?.meta.changes ?? 0) > 0
+    return addedHere ? { status: 'joined', membership } : { status: 'already_member', membership }
   }
 
   async listMembers(workspaceId: string): Promise<WorkspaceMember[]> {

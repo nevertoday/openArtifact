@@ -3,6 +3,7 @@ import type { ArtifactAccessRepository } from './artifact-access-repository.ts'
 import type { ArtifactRepository } from './artifact-repository.ts'
 import type { AuditLog } from './audit-log.ts'
 import type { CommentRepository } from './comment-repository.ts'
+import type { InviteRepository } from './invite-repository.ts'
 import type { SharedDataRepository } from './shared-data-repository.ts'
 import type { UserDirectory, WorkspaceRepository } from './workspace-repository.ts'
 
@@ -13,6 +14,7 @@ export interface Repositories {
   comments: CommentRepository
   accessTokens: AccessTokenRepository
   workspaces: WorkspaceRepository
+  invites: InviteRepository
   users: UserDirectory
   sharedData: SharedDataRepository
   auditLog: AuditLog

@@ -4,6 +4,9 @@ export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number]
 /** How a role change or a removal ended; a workspace always keeps at least one admin. */
 export type MembershipChange = 'changed' | 'last_admin' | 'not_member'
 
+/** How joining a workspace ended; a person an admin removed stays out unless the join readmits them. */
+export type JoinResult = { status: 'joined'; membership: Membership } | { status: 'already_member'; membership: Membership } | { status: 'removed' }
+
 export interface Workspace {
   workspaceId: string
   name: string
@@ -36,6 +39,8 @@ export interface WorkspaceRepository {
    * user an admin removed: they are not let back in.
    */
   joinFirstWorkspace(userId: string, newWorkspaceName: string): Promise<Membership | null>
+  /** Adds the user as a member; `readmitsRemoved` brings back, as a member, a person an admin removed. */
+  join(workspaceId: string, userId: string, joinedAt: number, readmission: { readmitsRemoved: boolean }): Promise<JoinResult>
   listMembers(workspaceId: string): Promise<WorkspaceMember[]>
   rename(workspaceId: string, name: string): Promise<void>
   setPublicLinksEnabled(workspaceId: string, enabled: boolean): Promise<void>
