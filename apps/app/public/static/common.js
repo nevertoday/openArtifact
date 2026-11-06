@@ -107,5 +107,81 @@ function wireWorkspaceSwitcher() {
   })
 }
 
+/** The bell in the top bar: the unread count, and the person's notifications as sentences, newest first. */
+class NotificationBell {
+  constructor(bell, panel) {
+    this.bell = bell
+    this.panel = panel
+    this.list = panel.querySelector('[data-notification-list]')
+    this.unreadCount = bell.querySelector('[data-unread-count]')
+    this.markAllButton = panel.querySelector('[data-mark-all-read]')
+    this.notifications = []
+    this.markAllButton.addEventListener('click', () => this.#markAllRead())
+    panel.addEventListener('toggle', event => { if (event.newState === 'open') this.refresh() })
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.refresh() })
+  }
+
+  async refresh() {
+    try {
+      const { notifications } = await api('/api/notifications')
+      this.notifications = notifications
+      this.render()
+    } catch (error) {
+      this.list.replaceChildren(element('p', { className: 'app-notifications__status xxd-text', 'data-variant': 'secondary' }, `通知加载失败：${error.message}`))
+    }
+  }
+
+  render() {
+    const unreadCount = this.notifications.filter(notification => !notification.read).length
+    this.unreadCount.hidden = unreadCount === 0
+    this.unreadCount.textContent = unreadCount > 99 ? '99+' : String(unreadCount)
+    this.bell.setAttribute('aria-label', unreadCount === 0 ? '通知' : `通知，${unreadCount} 条未读`)
+    this.markAllButton.hidden = unreadCount === 0
+    if (this.notifications.length === 0) {
+      this.list.replaceChildren(element('div', { className: 'xxd-empty', 'data-size': 'sm' },
+        element('p', { className: 'xxd-empty__title' }, '还没有通知'),
+        element('p', { className: 'xxd-empty__text' }, '有人评论你的 artifact、回复或解决你的评论时，会出现在这里。')))
+      return
+    }
+    this.list.replaceChildren(element('ul', { className: 'xxd-list app-notifications__list', 'data-interactive': true }, this.notifications.map(notification => this.#item(notification))))
+  }
+
+  #item(notification) {
+    const link = element('a', { className: 'xxd-list__main', href: notification.url, onClick: event => this.#open(event, notification) },
+      element('span', { className: 'xxd-list__title app-notifications__text' }, notification.text),
+      element('span', { className: 'xxd-list__meta' }, notification.read ? timeAgo(notification.createdAt) : `未读 · ${timeAgo(notification.createdAt)}`))
+    return element('li', { className: 'xxd-list__item', 'data-unread': !notification.read },
+      notification.read ? null : element('span', { className: 'xxd-dot', 'data-tone': 'action', 'aria-hidden': 'true' }), link)
+  }
+
+  // Marking read first means the count is right when the person comes back.
+  async #open(event, notification) {
+    if (notification.read) return
+    event.preventDefault()
+    await api(`/api/notifications/${encodeURIComponent(notification.notificationId)}/read`, { method: 'POST' }).catch(() => null)
+    notification.read = true
+    this.render()
+    this.panel.hidePopover()
+    location.href = notification.url
+  }
+
+  async #markAllRead() {
+    try {
+      await api('/api/notifications/read-all', { method: 'POST' })
+      for (const notification of this.notifications) notification.read = true
+      this.render()
+    } catch (error) {
+      Xxd.toast(error.message, { tone: 'danger', within: this.panel })
+    }
+  }
+}
+
+function wireNotificationBell() {
+  const bell = document.querySelector('[data-notification-bell]')
+  const panel = document.getElementById('notification-panel')
+  if (bell && panel) new NotificationBell(bell, panel).refresh()
+}
+
 wireSignOut()
 wireWorkspaceSwitcher()
+wireNotificationBell()

@@ -4,6 +4,7 @@ import { html, SafeHtml } from './html.ts'
 /** Kit icon names the pages use; the union keeps a misspelt name from reaching the browser. */
 export type IconName =
   | 'ArrowLeft'
+  | 'Bell'
   | 'Bot'
   | 'Clock'
   | 'Copy'
@@ -106,7 +107,7 @@ ${options.description ? html`<meta name="description" content="${options.descrip
 
   /** The page's top bar; `middle` sits between the brand and the account menu. */
   static topBar(identity: Identity | null, middle: SafeHtml | string = ''): SafeHtml {
-    const account = identity ? PageShell.#accountMenu(identity) : html`<a class="xxd-btn" data-size="sm" href="/login">登录</a>`
+    const account = identity ? html`${PageShell.#notificationBell()}${PageShell.#accountMenu(identity)}` : html`<a class="xxd-btn" data-size="sm" href="/login">登录</a>`
     return html`<header class="xxd-topbar app-topbar">${PageShell.brandLink()}${middle}<span class="app-topbar__end">${account}</span></header>`
   }
 
@@ -137,6 +138,15 @@ ${options.description ? html`<meta name="description" content="${options.descrip
   static jsonData(elementId: string, value: unknown): SafeHtml {
     const json = JSON.stringify(value).replaceAll('<', '\\u003c').replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029')
     return html`<script type="application/json" id="${elementId}">${new SafeHtml(json)}</script>`
+  }
+
+  // common.js fills the count and the list; the list refreshes each time the panel opens.
+  static #notificationBell(): SafeHtml {
+    return html`<button type="button" class="xxd-btn app-bell" data-variant="ghost" data-icon-only data-xxd-popover="notification-panel" aria-label="通知" data-notification-bell>${PageShell.icon('Bell', 18)}<span class="xxd-badge app-bell__count" data-variant="solid" data-tone="action" aria-hidden="true" data-unread-count hidden></span></button>
+<div class="xxd-popover app-notifications" id="notification-panel" popover data-placement="bottom-end" aria-label="通知">
+  <div class="app-notifications__head"><p class="xxd-popover__title">通知</p><button type="button" class="xxd-btn" data-variant="ghost" data-size="xs" data-mark-all-read hidden>全部标为已读</button></div>
+  <div class="app-notifications__body" data-notification-list></div>
+</div>`
   }
 
   static #accountMenu(identity: Identity): SafeHtml {

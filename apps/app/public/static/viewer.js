@@ -5,6 +5,8 @@ const viewerConfig = readJsonData('viewer-config')
 const artifactPath = `/api/artifacts/${encodeURIComponent(viewerConfig.artifactId)}`
 const VISIBILITY_LABELS = { private: '私有', specified: '指定的人', workspace: 'Workspace 内可见', public_link: '公开链接' }
 const DAY_MS = 24 * 60 * 60 * 1000
+const LIVE_REFRESH_MS = 15_000
+const COMMENT_LINK_PREFIX = '#comment-'
 
 /** A one-line state of a side panel: empty, or a failure to load. */
 function panelMessage(text) {
@@ -23,15 +25,20 @@ class CommentsPanel {
     this.pendingAnchor = null
     this.pickingAnchor = false
     this.pagePins = null
+    // Comments others wrote since this page loaded; a refresh that lands while the person types waits in incomingComments.
+    this.newCommentIds = new Set()
+    this.incomingComments = null
+    this.panel.addEventListener('focusout', () => setTimeout(() => this.#applyIncomingWhenIdle()))
   }
 
-  /** Shows the comment a pin on the page belongs to. */
+  /** Shows the thread of a comment: one a pin on the page belongs to, or one a notification links to. */
   focusThread(commentId) {
     const comment = this.comments.find(candidate => candidate.commentId === commentId)
     if (!comment) return
-    if (!this.#matchesFilter(comment)) this.filter = 'all'
+    const rootComment = this.comments.find(candidate => candidate.commentId === (comment.parentId ?? comment.commentId)) ?? comment
+    if (!this.#matchesFilter(rootComment)) this.filter = 'all'
     this.render()
-    const threadElement = this.panel.querySelector(`[data-thread-id="${CSS.escape(commentId)}"]`)
+    const threadElement = this.panel.querySelector(`[data-thread-id="${CSS.escape(rootComment.commentId)}"]`)
     threadElement?.scrollIntoView({ block: 'center', behavior: 'smooth' })
     threadElement?.setAttribute('data-highlighted', '')
     setTimeout(() => threadElement?.removeAttribute('data-highlighted'), 1600)
@@ -54,9 +61,62 @@ class CommentsPanel {
       const { comments } = await api(`${artifactPath}/comments?filter=all`)
       this.comments = comments
       this.render()
+      this.focusLinkedComment()
     } catch (error) {
       this.panel.replaceChildren(panelMessage(`评论加载失败：${error.message}`))
     }
+  }
+
+  /** A notification links to #comment-<id>. */
+  focusLinkedComment() {
+    if (location.hash.startsWith(COMMENT_LINK_PREFIX)) this.focusThread(decodeURIComponent(location.hash.slice(COMMENT_LINK_PREFIX.length)))
+  }
+
+  /** Picks up comments others write while the tab is visible, and catches up as soon as it becomes visible again. */
+  startLiveRefresh() {
+    setInterval(() => { if (document.visibilityState === 'visible') this.refresh() }, LIVE_REFRESH_MS)
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.refresh() })
+  }
+
+  // A failed refresh keeps what is on screen; the next one tries again.
+  async refresh() {
+    const fetched = await api(`${artifactPath}/comments?filter=all`).catch(() => null)
+    if (!fetched) return
+    const knownCommentIds = new Set(this.comments.map(comment => comment.commentId))
+    const writtenByOthers = fetched.comments.filter(comment => !knownCommentIds.has(comment.commentId) && comment.author.userId !== viewerConfig.viewer?.userId)
+    for (const comment of writtenByOthers) this.newCommentIds.add(comment.commentId)
+    if (CommentsPanel.#revisionOf(fetched.comments) === CommentsPanel.#revisionOf(this.comments)) return
+    this.incomingComments = fetched.comments
+    this.#applyIncomingWhenIdle()
+    this.#renderNewCommentsCue()
+  }
+
+  // Re-rendering replaces the text boxes, so new comments wait while the person is typing in one.
+  #applyIncomingWhenIdle() {
+    const focusedElement = document.activeElement
+    const isTyping = this.panel.contains(focusedElement) && focusedElement.matches('textarea, input')
+    if (this.incomingComments === null || isTyping) return
+    this.comments = this.incomingComments
+    this.incomingComments = null
+    this.render()
+  }
+
+  // Which comments exist and which threads are resolved: what a refresh can change.
+  static #revisionOf(comments) {
+    return comments.map(comment => `${comment.commentId}:${comment.resolved}`).join(',')
+  }
+
+  #renderNewCommentsCue() {
+    if (!this.newsSlot) return
+    const newCount = this.newCommentIds.size
+    this.newsSlot.replaceChildren(newCount === 0 ? '' : element('button', { type: 'button', className: 'xxd-btn comment-news__cue', 'data-size': 'xs', onClick: () => this.#showNewComments() }, `有 ${newCount} 条新评论`))
+  }
+
+  #showNewComments() {
+    this.#applyIncomingWhenIdle()
+    const [firstNewCommentId] = this.newCommentIds
+    this.newCommentIds.clear()
+    this.focusThread(firstNewCommentId)
   }
 
   render() {
@@ -71,11 +131,17 @@ class CommentsPanel {
       forAgent: thread.comment.forAgent,
       ...thread.comment.anchor,
     })))
+    // Comments arriving above the fold must not move what the person is reading.
+    const scrollTop = this.panel.scrollTop
+    this.newsSlot = element('div', { className: 'comment-news', 'aria-live': 'polite' })
     this.panel.replaceChildren(
+      this.newsSlot,
       this.#filterChips(),
       shownThreads.length > 0 ? element('ul', { className: 'comment-threads' }, shownThreads.map(thread => this.#threadElement(thread))) : panelMessage(this.#emptyText()),
       this.#composer(),
     )
+    this.panel.scrollTop = scrollTop
+    this.#renderNewCommentsCue()
   }
 
   // Numbers follow the order comments were written, so a pin keeps its number when filters change.
@@ -113,7 +179,8 @@ class CommentsPanel {
   #threadElement({ comment, replies }) {
     const stateBadge = comment.resolved ? element('span', { className: 'xxd-badge', 'data-tone': 'success' }, '已解决') : comment.forAgent ? element('span', { className: 'xxd-badge', 'data-tone': 'warning' }, '给 agent') : null
     const pinNumber = this.pinNumbers.get(comment.commentId)
-    return element('li', { className: 'comment-thread', 'data-resolved': comment.resolved, 'data-thread-id': comment.commentId },
+    const hasNewComments = [comment, ...replies].some(threadComment => this.newCommentIds.has(threadComment.commentId))
+    return element('li', { className: 'comment-thread', 'data-resolved': comment.resolved, 'data-thread-id': comment.commentId, 'data-new': hasNewComments },
       this.#commentHeader(comment, stateBadge, pinNumber),
       element('p', { className: 'comment-body' }, comment.body),
       replies.map(reply => element('div', { className: 'comment-reply', 'data-via-agent': Boolean(reply.postedVia) }, this.#commentHeader(reply, null), element('p', { className: 'comment-body' }, reply.body))),
@@ -653,6 +720,8 @@ viewerTabs.addEventListener('xxd:change', event => {
 const showsCurrentVersion = viewerConfig.shownVersion === viewerConfig.currentVersion
 if (showsCurrentVersion) commentsPanel.pagePins = new PagePins(artifactFrame, commentsPanel, () => Xxd.selectTab(viewerTabs, document.getElementById('tab-comments')))
 commentsPanel.load()
+commentsPanel.startLiveRefresh()
+window.addEventListener('hashchange', () => commentsPanel.focusLinkedComment())
 new SharedDataProxy(artifactFrame, viewerConfig)
 
 const shareDialogElement = document.getElementById('share-dialog')

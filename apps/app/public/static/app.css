@@ -7,6 +7,19 @@
 .app-topbar__context { white-space: nowrap; }
 .app-search { flex: 0 1 360px; min-width: 0; }
 .app-account-head { padding-block: var(--space-1); }
+.app-bell { position: relative; }
+.app-bell__count { position: absolute; top: 0; inset-inline-end: 0; min-width: 18px; height: 18px; padding-inline: 4px; justify-content: center; font-size: 11px; line-height: 18px; pointer-events: none; }
+.app-bell__count[hidden] { display: none; }
+.app-notifications { width: min(360px, calc(100vw - 16px)); max-width: min(360px, calc(100vw - 16px)); padding: 0; }
+.app-notifications__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); }
+.app-notifications__head .xxd-popover__title { margin: 0; }
+.app-notifications__body { max-height: min(480px, 70vh); overflow-y: auto; }
+.app-notifications__body .xxd-empty { padding: var(--space-5) var(--space-3); }
+.app-notifications__status { margin: 0; padding: var(--space-3); }
+.app-notifications__list .xxd-list__item { position: relative; padding-inline-start: var(--space-3); }
+.app-notifications__list .xxd-list__item > .xxd-dot { position: absolute; inset-inline-start: 6px; top: 50%; translate: 0 -50%; }
+.app-notifications__list .xxd-list__item[data-unread] .app-notifications__text { font-weight: var(--weight-medium); }
+.app-notifications__text { white-space: normal; }
 
 .app-frame { display: flex; min-height: calc(100dvh - 56px); }
 .app-sidebar { height: auto; }
@@ -100,6 +113,10 @@
 .comment-thread { display: grid; gap: var(--space-2); padding: var(--space-3) var(--inset-md); }
 .comment-thread + .comment-thread { border-top: 1px solid var(--line); }
 /* A pin clicked on the page marks its thread the way the kit marks a current row. */
+.comment-thread[data-new] { box-shadow: inset 2px 0 0 var(--action); }
+.comment-news { position: sticky; top: 0; z-index: 1; display: flex; justify-content: center; }
+.comment-news:empty { display: none; }
+.comment-news__cue { margin-block-start: var(--space-2); box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,.12)); }
 .comment-thread[data-highlighted] { background: var(--selected-bg); box-shadow: inset 2px 0 0 var(--action); }
 .comment-thread[data-resolved] > .comment-body { color: var(--muted); }
 .comment-header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }

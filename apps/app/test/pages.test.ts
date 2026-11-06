@@ -90,6 +90,7 @@ describe('home page', () => {
     expect(homeMarkup).toContain('等我处理')
     expect(homeMarkup).toContain('等我的 agent 处理')
     expect(homeMarkup).not.toContain('待 agent 处理')
+    expect(homeMarkup).toContain('data-xxd-popover="notification-panel"')
     expect(forMeMarkup).toContain('Asked me')
     expect(forMeMarkup).toContain('Answered me')
     expect(forMeMarkup).not.toContain('Asked agent')
