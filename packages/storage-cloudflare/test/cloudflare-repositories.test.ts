@@ -29,6 +29,7 @@ async function createArtifactIn(workspaceId: string, authorId: string) {
     title: 'Signup sheet',
     visibility: 'workspace',
     publishedVia: null,
+    note: null,
     files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('<h1>Sign up</h1>') }],
   })
 }

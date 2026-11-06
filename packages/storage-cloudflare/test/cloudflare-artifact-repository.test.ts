@@ -38,6 +38,7 @@ describe('CloudflareArtifactRepository', () => {
       title: 'Design doc',
       visibility: 'workspace',
       publishedVia: 'Claude Code',
+      note: null,
       files: [htmlPage('draft'), { path: 'assets/app.css', contentType: 'text/css', body: new TextEncoder().encode('h1{}') }],
     })
   }
@@ -55,7 +56,7 @@ describe('CloudflareArtifactRepository', () => {
   it('publishes a new version on top of the current one', async () => {
     const designDoc = await createDesignDoc()
 
-    const publishResult = await artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId: reviewerId, publishedVia: null, files: [htmlPage('revised')] })
+    const publishResult = await artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId: reviewerId, publishedVia: null, origin: { kind: 'published' }, note: null, files: [htmlPage('revised')] })
 
     expect(publishResult).toEqual({ status: 'published', version: 2 })
     const currentVersion = await artifactRepository.readCurrentVersion(designDoc.artifactId)
@@ -65,10 +66,10 @@ describe('CloudflareArtifactRepository', () => {
 
   it('rejects a publish based on a stale version and leaves no trace of it', async () => {
     const designDoc = await createDesignDoc()
-    await artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId: reviewerId, publishedVia: null, files: [htmlPage('revised')] })
+    await artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId: reviewerId, publishedVia: null, origin: { kind: 'published' }, note: null, files: [htmlPage('revised')] })
     const objectsBeforeStalePublish = await storedObjectCount(designDoc.artifactId)
 
-    const publishResult = await artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId, publishedVia: null, files: [htmlPage('stale edit')] })
+    const publishResult = await artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId, publishedVia: null, origin: { kind: 'published' }, note: null, files: [htmlPage('stale edit')] })
 
     expect(publishResult).toEqual({ status: 'conflict', currentVersion: 2 })
     expect(await versionCount(designDoc.artifactId)).toBe(2)
@@ -80,7 +81,7 @@ describe('CloudflareArtifactRepository', () => {
   it('rejects a publish based on a version that does not exist yet without recording it', async () => {
     const designDoc = await createDesignDoc()
 
-    const publishResult = await artifactRepository.publishOnTopOf(designDoc.artifactId, 5, { authorId, publishedVia: null, files: [htmlPage('from the future')] })
+    const publishResult = await artifactRepository.publishOnTopOf(designDoc.artifactId, 5, { authorId, publishedVia: null, origin: { kind: 'published' }, note: null, files: [htmlPage('from the future')] })
 
     expect(publishResult).toEqual({ status: 'conflict', currentVersion: 1 })
     expect(await versionCount(designDoc.artifactId)).toBe(1)
@@ -90,8 +91,8 @@ describe('CloudflareArtifactRepository', () => {
     const designDoc = await createDesignDoc()
 
     const publishResults = await Promise.all([
-      artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId, publishedVia: null, files: [htmlPage('author edit')] }),
-      artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId: reviewerId, publishedVia: null, files: [htmlPage('reviewer edit')] }),
+      artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId, publishedVia: null, origin: { kind: 'published' }, note: null, files: [htmlPage('author edit')] }),
+      artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId: reviewerId, publishedVia: null, origin: { kind: 'published' }, note: null, files: [htmlPage('reviewer edit')] }),
     ])
 
     const statuses = publishResults.map(publishResult => publishResult.status).sort()
@@ -101,7 +102,7 @@ describe('CloudflareArtifactRepository', () => {
 
   it('reads one file of an older version after newer versions are published', async () => {
     const designDoc = await createDesignDoc()
-    await artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId: reviewerId, publishedVia: null, files: [htmlPage('revised')] })
+    await artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId: reviewerId, publishedVia: null, origin: { kind: 'published' }, note: null, files: [htmlPage('revised')] })
 
     const firstVersionPage = await artifactRepository.readVersionFile(designDoc.artifactId, 1, 'index.html')
     const missingFile = await artifactRepository.readVersionFile(designDoc.artifactId, 2, 'assets/app.css')
@@ -116,7 +117,7 @@ describe('CloudflareArtifactRepository', () => {
     const newerDoc = await createDesignDoc()
     // updated_at has millisecond resolution; the wait keeps the two timestamps apart.
     await scheduler.wait(5)
-    await artifactRepository.publishOnTopOf(olderDoc.artifactId, 1, { authorId: reviewerId, publishedVia: null, files: [htmlPage('revised')] })
+    await artifactRepository.publishOnTopOf(olderDoc.artifactId, 1, { authorId: reviewerId, publishedVia: null, origin: { kind: 'published' }, note: null, files: [htmlPage('revised')] })
 
     const workspaceArtifacts = await artifactRepository.listRecentlyUpdated(workspaceId)
     const olderDocSummary = await artifactRepository.findSummary(olderDoc.artifactId)
@@ -130,7 +131,7 @@ describe('CloudflareArtifactRepository', () => {
 
   it('keeps every version with who published it and through which agent', async () => {
     const designDoc = await createDesignDoc()
-    await artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId: reviewerId, publishedVia: 'Codex', files: [htmlPage('revised')] })
+    await artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId: reviewerId, publishedVia: 'Codex', origin: { kind: 'published' }, note: null, files: [htmlPage('revised')] })
 
     const versionHistory = await artifactRepository.listVersions(designDoc.artifactId)
     const firstVersion = await artifactRepository.readVersion(designDoc.artifactId, 1)
@@ -147,7 +148,7 @@ describe('CloudflareArtifactRepository', () => {
   it('reports an unknown artifact as not found and keeps no uploaded files', async () => {
     const unknownArtifactId = 'artifact-that-does-not-exist'
 
-    const publishResult = await artifactRepository.publishOnTopOf(unknownArtifactId, 1, { authorId, publishedVia: null, files: [htmlPage('orphan')] })
+    const publishResult = await artifactRepository.publishOnTopOf(unknownArtifactId, 1, { authorId, publishedVia: null, origin: { kind: 'published' }, note: null, files: [htmlPage('orphan')] })
 
     expect(publishResult).toEqual({ status: 'not_found' })
     expect(await storedObjectCount(unknownArtifactId)).toBe(0)

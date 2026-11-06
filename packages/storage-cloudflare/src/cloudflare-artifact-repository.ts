@@ -9,6 +9,7 @@ import type {
   NewArtifact,
   Publication,
   PublishResult,
+  VersionOrigin,
 } from '@open-artifact/core'
 
 const SUMMARY_SELECT = `
@@ -32,11 +33,16 @@ interface SummaryRow {
   published_via: string | null
 }
 
+const VERSION_SELECT = 'SELECT version, upload_id, author_id, published_via, origin, restored_from, note, created_at FROM artifact_versions'
+
 interface VersionRow {
   version: number
   upload_id: string
   author_id: string
   published_via: string | null
+  origin: VersionOrigin['kind']
+  restored_from: number | null
+  note: string | null
   created_at: number
 }
 
@@ -70,7 +76,7 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(artifactId, newArtifact.workspaceId, newArtifact.authorId, newArtifact.title, newArtifact.visibility, firstVersion, uploadId, createdAt, createdAt),
-      ...this.#recordVersionStatements(artifactId, firstVersion, uploadId, newArtifact, createdAt),
+      ...this.#recordVersionStatements(artifactId, firstVersion, uploadId, { ...newArtifact, origin: { kind: 'published' } }, createdAt),
     ])
     return { artifactId, version: firstVersion }
   }
@@ -137,20 +143,22 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
 
   async listVersions(artifactId: string): Promise<ArtifactVersionRecord[]> {
     const { results: versionRows } = await this.#db
-      .prepare('SELECT version, upload_id, author_id, published_via, created_at FROM artifact_versions WHERE artifact_id = ? ORDER BY version DESC')
+      .prepare(`${VERSION_SELECT} WHERE artifact_id = ? ORDER BY version DESC`)
       .bind(artifactId)
       .all<VersionRow>()
     return versionRows.map(versionRow => ({
       version: versionRow.version,
       authorId: versionRow.author_id,
       publishedVia: versionRow.published_via,
+      origin: CloudflareArtifactRepository.#originOf(versionRow),
+      note: versionRow.note,
       createdAt: versionRow.created_at,
     }))
   }
 
   async #versionRow(artifactId: string, version: number): Promise<VersionRow | null> {
     return this.#db
-      .prepare('SELECT version, upload_id, author_id, published_via, created_at FROM artifact_versions WHERE artifact_id = ? AND version = ?')
+      .prepare(`${VERSION_SELECT} WHERE artifact_id = ? AND version = ?`)
       .bind(artifactId, version)
       .first<VersionRow>()
   }
@@ -176,10 +184,22 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
   #recordVersionStatements(artifactId: string, version: number, uploadId: string, publication: Publication, createdAt: number): D1PreparedStatement[] {
     const versionRow = this.#db
       .prepare(
-        `INSERT INTO artifact_versions (artifact_id, version, upload_id, author_id, published_via, created_at)
-         SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM artifacts WHERE id = ? AND current_upload_id = ?)`,
+        `INSERT INTO artifact_versions (artifact_id, version, upload_id, author_id, published_via, origin, restored_from, note, created_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM artifacts WHERE id = ? AND current_upload_id = ?)`,
       )
-      .bind(artifactId, version, uploadId, publication.authorId, publication.publishedVia, createdAt, artifactId, uploadId)
+      .bind(
+        artifactId,
+        version,
+        uploadId,
+        publication.authorId,
+        publication.publishedVia,
+        publication.origin.kind,
+        CloudflareArtifactRepository.#restoredFromOf(publication.origin),
+        publication.note,
+        createdAt,
+        artifactId,
+        uploadId,
+      )
     const fileRows = publication.files.map(file =>
       this.#db
         .prepare(
@@ -232,6 +252,25 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
       version: summaryRow.current_version,
       publishedVia: summaryRow.published_via,
       updatedAt: summaryRow.updated_at,
+    }
+  }
+
+  static #restoredFromOf(origin: VersionOrigin): number | null {
+    switch (origin.kind) {
+      case 'published':
+        return null
+      case 'restored':
+        return origin.restoredFrom
+    }
+  }
+
+  static #originOf(versionRow: VersionRow): VersionOrigin {
+    switch (versionRow.origin) {
+      case 'published':
+        return { kind: 'published' }
+      case 'restored':
+        if (versionRow.restored_from === null) throw new Error(`Version ${versionRow.version} is restored but does not say from which version`)
+        return { kind: 'restored', restoredFrom: versionRow.restored_from }
     }
   }
 

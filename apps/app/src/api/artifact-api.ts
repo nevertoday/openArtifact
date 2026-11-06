@@ -1,4 +1,4 @@
-import type { ArtifactFile, ArtifactVisibility, PublishResult } from '@open-artifact/core'
+import type { ArtifactFile, ArtifactVisibility, PublishResult, VersionOrigin } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
@@ -7,6 +7,7 @@ import { JsonBody } from './json-body.ts'
 
 const VISIBILITIES: readonly ArtifactVisibility[] = ['private', 'specified', 'workspace', 'public_link']
 const MAX_TITLE_LENGTH = 200
+const MAX_NOTE_LENGTH = 200
 const BASE_VERSION_HINT = 'pass the version you read; pass force: true only when told to overwrite'
 
 /** Publishing, reading and versions of artifacts: what agents call through MCP or the HTTP API. */
@@ -24,6 +25,7 @@ export class ArtifactApi {
       workspaceId: identity.membership.workspace.workspaceId,
       authorId: identity.userId,
       publishedVia: identity.agentClient,
+      note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
       title: requestBody.text('title', MAX_TITLE_LENGTH),
       visibility: requestBody.oneOf('visibility', VISIBILITIES, 'workspace'),
       files: ArtifactFileJson.filesFrom(requestBody.raw('files')),
@@ -54,7 +56,13 @@ export class ArtifactApi {
     const requestBody = await JsonBody.of(request)
     const files = ArtifactFileJson.filesFrom(requestBody.raw('files'))
     const baseVersion = requestBody.boolean('force', false) ? openedArtifact.summary.version : requestBody.positiveInteger('baseVersion', BASE_VERSION_HINT)
-    const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, { authorId: identity.userId, publishedVia: identity.agentClient, files })
+    const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
+      authorId: identity.userId,
+      publishedVia: identity.agentClient,
+      origin: { kind: 'published' },
+      note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
+      files,
+    })
     return this.#publishResponse(artifactId, publishResult)
   }
 
@@ -66,23 +74,41 @@ export class ArtifactApi {
       version: versionRecord.version,
       author: { userId: versionRecord.authorId, name: authorNames.get(versionRecord.authorId) },
       publishedVia: versionRecord.publishedVia,
+      ...ArtifactApi.#originJson(versionRecord.origin),
+      note: versionRecord.note,
       createdAt: versionRecord.createdAt,
     }))
     return Response.json({ versions })
   }
 
-  /** Publishes the files of an older version as a new version; history is never rewritten. */
+  /**
+   * Publishes the files of an older version as a new version; history is never rewritten. Undoing a restore
+   * is one more restore, of the version it replaced.
+   */
   async restore(request: Request, artifactId: string, version: number): Promise<Response> {
     const identity = await this.#context.requireIdentity()
-    const openedArtifact = await this.#context.gate.require(artifactId, identity, request, 'canEdit', 'restore a version of this artifact')
+    await this.#context.gate.require(artifactId, identity, request, 'canEdit', 'restore a version of this artifact')
+    const requestBody = await JsonBody.of(request)
+    const baseVersion = requestBody.positiveInteger('baseVersion', BASE_VERSION_HINT)
     const olderVersion = await this.#context.repositories.artifacts.readVersion(artifactId, version)
     if (!olderVersion) throw HttpError.notFound(`version ${version} of artifact ${artifactId}`)
-    const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, openedArtifact.summary.version, {
+    const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
       authorId: identity.userId,
       publishedVia: identity.agentClient,
+      origin: { kind: 'restored', restoredFrom: version },
+      note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
       files: olderVersion.files,
     })
     return this.#publishResponse(artifactId, publishResult)
+  }
+
+  static #originJson(origin: VersionOrigin): { origin: VersionOrigin['kind']; restoredFrom: number | null } {
+    switch (origin.kind) {
+      case 'published':
+        return { origin: 'published', restoredFrom: null }
+      case 'restored':
+        return { origin: 'restored', restoredFrom: origin.restoredFrom }
+    }
   }
 
   async #publishResponse(artifactId: string, publishResult: PublishResult): Promise<Response> {

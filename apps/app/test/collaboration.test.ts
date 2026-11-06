@@ -12,6 +12,14 @@ beforeAll(async () => {
   agentToken = await app.createToken(authorCookie)
 })
 
+interface VersionJson {
+  version: number
+  publishedVia: string | null
+  origin: 'published' | 'restored'
+  restoredFrom: number | null
+  note: string | null
+}
+
 interface CommentJson {
   commentId: string
   parentId: string | null
@@ -69,19 +77,90 @@ describe('publishing and updating', () => {
     expect(bigFile.body.error).toContain('index.html')
   })
 
-  it('keeps every version and restores an older one as a new version', async () => {
+  it('keeps every version and restores an older one as a new version that says where it came from', async () => {
     const published = await app.publish({ token: agentToken, agentClient: 'Claude Code' }, 'Roadmap', '<h1>v1</h1>')
     await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, agentClient: 'Cursor', body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
 
-    const restored = await app.json<{ version: number }>(`/api/artifacts/${published.artifactId}/versions/1/restore`, { method: 'POST', cookie: authorCookie })
-    const history = await app.json<{ versions: { version: number; publishedVia: string | null; author: { name: string } }[] }>(`/api/artifacts/${published.artifactId}/versions`, { cookie: reviewerCookie })
+    const restored = await app.json<{ version: number }>(`/api/artifacts/${published.artifactId}/versions/1/restore`, { method: 'POST', cookie: authorCookie, body: { baseVersion: 2 } })
+    const history = await app.json<{ versions: VersionJson[] }>(`/api/artifacts/${published.artifactId}/versions`, { cookie: reviewerCookie })
     const current = await app.json<{ files: { content: string }[] }>(`/api/artifacts/${published.artifactId}`, { cookie: reviewerCookie })
-    const reviewerRestore = await app.request(`/api/artifacts/${published.artifactId}/versions/2/restore`, { method: 'POST', cookie: reviewerCookie })
+    const reviewerRestore = await app.request(`/api/artifacts/${published.artifactId}/versions/2/restore`, { method: 'POST', cookie: reviewerCookie, body: { baseVersion: 3 } })
 
     expect(restored.body.version).toBe(3)
-    expect(history.body.versions.map(version => [version.version, version.publishedVia])).toEqual([[3, null], [2, 'Cursor'], [1, 'Claude Code']])
+    expect(history.body.versions.map(version => [version.version, version.publishedVia, version.origin, version.restoredFrom])).toEqual([
+      [3, null, 'restored', 1],
+      [2, 'Cursor', 'published', null],
+      [1, 'Claude Code', 'published', null],
+    ])
     expect(current.body.files[0]?.content).toBe('<h1>v1</h1>')
     expect(reviewerRestore.status).toBe(403)
+  })
+
+  it('undoes a restore by restoring the version it replaced, so history only grows', async () => {
+    const published = await app.publish({ token: agentToken }, 'Pricing', '<h1>v1</h1>')
+    await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+    const restorePath = (version: number) => `/api/artifacts/${published.artifactId}/versions/${version}/restore`
+
+    await app.request(restorePath(1), { method: 'POST', cookie: authorCookie, body: { baseVersion: 2 } })
+    const undo = await app.json<{ version: number }>(restorePath(2), { method: 'POST', cookie: authorCookie, body: { baseVersion: 3 } })
+    const history = await app.json<{ versions: VersionJson[] }>(`/api/artifacts/${published.artifactId}/versions`, { cookie: authorCookie })
+    const current = await app.json<{ files: { content: string }[] }>(`/api/artifacts/${published.artifactId}`, { cookie: authorCookie })
+
+    expect(undo.body.version).toBe(4)
+    expect(history.body.versions.map(version => [version.version, version.origin, version.restoredFrom])).toEqual([
+      [4, 'restored', 2],
+      [3, 'restored', 1],
+      [2, 'published', null],
+      [1, 'published', null],
+    ])
+    expect(current.body.files[0]?.content).toBe('<h1>v2</h1>')
+  })
+
+  it('refuses a restore made on top of a version that is no longer current', async () => {
+    const published = await app.publish({ token: agentToken }, 'Launch plan', '<h1>v1</h1>')
+    await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+    await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 2, files: [{ path: 'index.html', content: '<h1>v3</h1>' }] } })
+
+    const staleRestore = await app.json<{ currentVersion: number }>(`/api/artifacts/${published.artifactId}/versions/1/restore`, { method: 'POST', cookie: authorCookie, body: { baseVersion: 2 } })
+    const current = await app.json<{ version: number }>(`/api/artifacts/${published.artifactId}`, { cookie: authorCookie })
+
+    expect(staleRestore.status).toBe(409)
+    expect(staleRestore.body.currentVersion).toBe(3)
+    expect(current.body.version).toBe(3)
+  })
+
+  it('keeps the note that says what each version changed', async () => {
+    const created = await app.json<{ artifactId: string }>('/api/artifacts', {
+      method: 'POST',
+      token: agentToken,
+      body: { title: 'Onboarding', note: '  第一版：三个步骤  ', files: [{ path: 'index.html', content: '<h1>v1</h1>' }] },
+    })
+    const artifactPath = `/api/artifacts/${created.body.artifactId}`
+    await app.request(artifactPath, { method: 'PUT', token: agentToken, body: { baseVersion: 1, note: '按评论补上第 3 节的连线', files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+    await app.request(artifactPath, { method: 'PUT', token: agentToken, body: { baseVersion: 2, files: [{ path: 'index.html', content: '<h1>v3</h1>' }] } })
+    await app.request(`${artifactPath}/versions/1/restore`, { method: 'POST', cookie: authorCookie, body: { baseVersion: 3, note: '第 3 节的改法不对，先回到第一版' } })
+
+    const history = await app.json<{ versions: VersionJson[] }>(`${artifactPath}/versions`, { cookie: reviewerCookie })
+
+    expect(history.body.versions.map(version => [version.version, version.note])).toEqual([
+      [4, '第 3 节的改法不对，先回到第一版'],
+      [3, null],
+      [2, '按评论补上第 3 节的连线'],
+      [1, '第一版：三个步骤'],
+    ])
+  })
+
+  it('rejects a note longer than one sentence', async () => {
+    const published = await app.publish({ token: agentToken }, 'Long note')
+
+    const rejected = await app.json<{ error: string }>(`/api/artifacts/${published.artifactId}`, {
+      method: 'PUT',
+      token: agentToken,
+      body: { baseVersion: 1, note: '改'.repeat(201), files: [{ path: 'index.html', content: '<h1>v2</h1>' }] },
+    })
+
+    expect(rejected.status).toBe(400)
+    expect(rejected.body.error).toContain('note must be 1 to 200 characters')
   })
 })
 

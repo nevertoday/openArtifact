@@ -15,6 +15,7 @@ export type {
   NewArtifact,
   Publication,
   PublishResult,
+  VersionOrigin,
 } from './artifact-repository.ts'
 export type { ArtifactComment, CommentAnchor, CommentRepository, NewComment } from './comment-repository.ts'
 export { AccessTokenSecret, PublicLinkPassword, SigningKey, UsercontentSignature } from './secrets.ts'

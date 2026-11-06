@@ -13,14 +13,23 @@ export interface ArtifactSharing {
   anonymousWriteEnabled: boolean
 }
 
-/** One complete set of files and who published it; `publishedVia` names the agent client, null for the web page. */
+/** How a version came to be: new files, or the files of an earlier version published again. */
+export type VersionOrigin = { kind: 'published' } | { kind: 'restored'; restoredFrom: number }
+
+/**
+ * One complete set of files and who published it; `publishedVia` names the agent client, null for the web page.
+ * `note` says in one sentence what changed, null when the publisher gave none.
+ */
 export interface Publication {
   authorId: string
   publishedVia: string | null
+  origin: VersionOrigin
+  note: string | null
   files: ArtifactFile[]
 }
 
-export interface NewArtifact extends Publication {
+/** The first version of an artifact is always published, never restored. */
+export interface NewArtifact extends Omit<Publication, 'origin'> {
   workspaceId: string
   title: string
   visibility: ArtifactVisibility
@@ -46,6 +55,8 @@ export interface ArtifactVersionRecord {
   version: number
   authorId: string
   publishedVia: string | null
+  origin: VersionOrigin
+  note: string | null
   createdAt: number
 }
 

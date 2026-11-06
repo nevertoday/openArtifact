@@ -26,13 +26,14 @@ describe('UsercontentFiles', () => {
       title: 'Report',
       visibility: 'workspace',
       publishedVia: null,
+      note: null,
       files: [
         { path: 'index.html', contentType: html, body: encoded('<html><head><title>v1</title></head><body><h1>v1</h1></body></html>') },
         { path: 'assets/app.css', contentType: 'text/css; charset=utf-8', body: encoded('h1{}') },
       ],
     })
     artifactId = createdArtifact.artifactId
-    await artifactRepository.publishOnTopOf(artifactId, 1, { authorId: 'user-author', publishedVia: null, files: [{ path: 'index.html', contentType: html, body: encoded('<h1>v2</h1>') }] })
+    await artifactRepository.publishOnTopOf(artifactId, 1, { authorId: 'user-author', publishedVia: null, origin: { kind: 'published' }, note: null, files: [{ path: 'index.html', contentType: html, body: encoded('<h1>v2</h1>') }] })
   })
 
   async function signedPath(version: number, filePath: string, expiresAt = Date.now() + 60_000): Promise<string> {
