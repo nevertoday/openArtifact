@@ -78,10 +78,10 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     await this.#writeVersion(artifactId, newArtifact.files, uploadId => [
       this.#db
         .prepare(
-          `INSERT INTO artifacts (id, workspace_id, author_id, title, visibility, current_version, current_upload_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO artifacts (id, workspace_id, author_id, title, visibility, public_link_expires_at, current_version, current_upload_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .bind(artifactId, newArtifact.workspaceId, newArtifact.authorId, newArtifact.title, newArtifact.visibility, firstVersion, uploadId, createdAt, createdAt),
+        .bind(artifactId, newArtifact.workspaceId, newArtifact.authorId, newArtifact.title, newArtifact.visibility, newArtifact.publicLinkExpiresAt, firstVersion, uploadId, createdAt, createdAt),
       ...this.#recordVersionStatements(artifactId, firstVersion, uploadId, { ...newArtifact, origin: { kind: 'published' } }, createdAt),
     ])
     return { artifactId, version: firstVersion }

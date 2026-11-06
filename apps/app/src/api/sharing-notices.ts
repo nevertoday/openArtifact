@@ -1,6 +1,7 @@
 import type { ArtifactSummary, GrantRole, PersonGrant } from '@open-artifact/core'
 import type { Identity } from '../auth/request-identity.ts'
 import type { ApiContext } from './api-context.ts'
+import { AGENT_PUBLIC_LINK_DAYS } from './public-link-expiry.ts'
 
 interface Notice {
   recipientId: string
@@ -31,6 +32,19 @@ export class SharingNotices {
         text: `${sharer.name} 把「${summary.title}」分享给了你，你的权限是「${ROLE_LABELS[grant.role]}」。\n\n打开查看：${viewerUrl}`,
       })),
     )
+  }
+
+  /** Tells the author that their agent opened a public link that will close on its own. */
+  async agentOpenedPublicLink(agent: Identity, artifact: { artifactId: string; title: string; authorId: string }, expiresAt: number): Promise<void> {
+    const agentName = agent.agentClient ?? agent.name
+    const expiryDate = new Date(expiresAt).toISOString().slice(0, 10)
+    await this.#notify([
+      {
+        recipientId: artifact.authorId,
+        subject: `${agentName} 把「${artifact.title}」设为公开链接，${AGENT_PUBLIC_LINK_DAYS} 天后过期`,
+        text: `${agentName} 用你的 token 把「${artifact.title}」设为公开链接。拿到链接的人不用登录就能打开，链接在 ${expiryDate} 过期。\n\n要改过期时间或取消公开，打开页面后点「分享」：${this.#context.viewerUrl(artifact.artifactId)}`,
+      },
+    ])
   }
 
   // The one place sharing mail is sent; each notice goes out on its own, so one failure never stops the others.

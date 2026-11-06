@@ -5,6 +5,8 @@ import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { ArtifactFileJson } from './artifact-file-json.ts'
 import { JsonBody } from './json-body.ts'
+import { PublicLinkExpiry } from './public-link-expiry.ts'
+import { SharingNotices } from './sharing-notices.ts'
 
 const VISIBILITIES: readonly ArtifactVisibility[] = ['private', 'specified', 'workspace', 'public_link']
 const MAX_TITLE_LENGTH = 200
@@ -22,16 +24,25 @@ export class ArtifactApi {
   async create(request: Request): Promise<Response> {
     const identity = await this.#context.requireIdentity()
     const requestBody = await JsonBody.of(request)
+    const title = requestBody.text('title', MAX_TITLE_LENGTH)
+    const visibility = requestBody.oneOf('visibility', VISIBILITIES, 'workspace')
+    const publicLinkExpiry = PublicLinkExpiry.of(requestBody, identity, { visibilityBefore: null, visibilityAfter: visibility, savedExpiresAt: null }, Date.now())
     const createdArtifact = await this.#context.repositories.artifacts.create({
       workspaceId: identity.membership.workspace.workspaceId,
       authorId: identity.userId,
       publishedVia: identity.agentClient,
       note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
-      title: requestBody.text('title', MAX_TITLE_LENGTH),
-      visibility: requestBody.oneOf('visibility', VISIBILITIES, 'workspace'),
+      title,
+      visibility,
+      publicLinkExpiresAt: publicLinkExpiry.expiresAt,
       files: ArtifactFileJson.filesFrom(requestBody.raw('files')),
     })
-    return Response.json({ ...createdArtifact, url: this.#context.viewerUrl(createdArtifact.artifactId) }, { status: 201 })
+    if (publicLinkExpiry.agentDefaultExpiresAt !== null) {
+      const artifact = { artifactId: createdArtifact.artifactId, title, authorId: identity.userId }
+      await new SharingNotices(this.#context).agentOpenedPublicLink(identity, artifact, publicLinkExpiry.agentDefaultExpiresAt)
+    }
+    const createdJson = { ...createdArtifact, url: this.#context.viewerUrl(createdArtifact.artifactId), visibility, publicLinkExpiresAt: publicLinkExpiry.expiresAt }
+    return Response.json(createdJson, { status: 201 })
   }
 
   /** `?removed=true` lists the removed artifacts the caller may restore instead of the ones they can view. */

@@ -194,6 +194,81 @@ describe('saving sharing in one request', () => {
   })
 })
 
+describe('a public link opened by an agent', () => {
+  const DAY = 24 * 60 * 60 * 1000
+
+  async function expiryOf(artifactId: string): Promise<number | null> {
+    return (await app.repositories.artifacts.findSummary(artifactId))?.sharing.publicLinkExpiresAt ?? null
+  }
+
+  it('expires in 7 days when the agent publishes straight to a public link, and tells the author', async () => {
+    const publishedAt = Date.now()
+    const published = await app.json<{ artifactId: string; publicLinkExpiresAt: number }>('/api/artifacts', {
+      method: 'POST',
+      token: authorToken,
+      agentClient: 'Claude Code',
+      body: { title: 'Launch teaser', visibility: 'public_link', files: [{ path: 'index.html', content: '<h1>soon</h1>' }] },
+    })
+
+    const expiresAt = await expiryOf(published.body.artifactId)
+    expect(published.status).toBe(201)
+    expect(expiresAt).toBeGreaterThanOrEqual(publishedAt + 7 * DAY)
+    expect(expiresAt).toBeLessThan(publishedAt + 7 * DAY + 60_000)
+    expect(published.body.publicLinkExpiresAt).toBe(expiresAt)
+    expect(app.mailer.lastTo('author@example.com')?.subject).toBe('Claude Code 把「Launch teaser」设为公开链接，7 天后过期')
+    expect(app.mailer.lastTo('author@example.com')?.text).toContain(`${APP_ORIGIN}/a/${published.body.artifactId}`)
+  })
+
+  it('keeps the expiry the agent asks for', async () => {
+    const mailBefore = app.mailer.sent.length
+    const published = await app.json<{ artifactId: string }>('/api/artifacts', {
+      method: 'POST',
+      token: authorToken,
+      body: { title: 'Evergreen docs', visibility: 'public_link', publicLinkExpiresAt: null, files: [{ path: 'index.html', content: '<h1>docs</h1>' }] },
+    })
+
+    expect(await expiryOf(published.body.artifactId)).toBeNull()
+    expect(app.mailer.sent.length).toBe(mailBefore)
+  })
+
+  it('expires in 7 days when an agent with full access switches an artifact to a public link, but not when it only changes other settings', async () => {
+    const fullToken = await app.createToken(authorCookie, 'full')
+    const published = await app.publish({ token: fullToken }, 'Press kit')
+    const sharingPath = `/api/artifacts/${published.artifactId}/sharing`
+
+    await app.request(sharingPath, { method: 'PUT', token: fullToken, agentClient: 'Codex', body: { visibility: 'public_link' } })
+    const expiresAt = await expiryOf(published.artifactId)
+    const mailAfterSwitch = app.mailer.sent.length
+    await app.request(sharingPath, { method: 'PUT', token: fullToken, body: { visibility: 'public_link', anonymousWriteEnabled: true } })
+
+    expect(expiresAt).toBeGreaterThan(Date.now() + 6 * DAY)
+    expect(app.mailer.lastTo('author@example.com')?.subject).toBe('Codex 把「Press kit」设为公开链接，7 天后过期')
+    expect(await expiryOf(published.artifactId)).toBe(expiresAt)
+    expect(app.mailer.sent.length).toBe(mailAfterSwitch)
+  })
+
+  it('leaves the choice to a person on the web page', async () => {
+    const published = await app.publish({ token: authorToken }, 'Hand picked')
+    const mailBefore = app.mailer.sent.length
+
+    await setSharing(published.artifactId, { visibility: 'public_link' })
+
+    expect(await expiryOf(published.artifactId)).toBeNull()
+    expect(app.mailer.sent.length).toBe(mailBefore)
+  })
+
+  it('publishes even when the mail to the author cannot be sent', async () => {
+    const mailOutageApp = new TestApp()
+    const outageAuthorCookie = await mailOutageApp.signIn('author@example.com')
+    const outageToken = await mailOutageApp.createToken(outageAuthorCookie)
+    mailOutageApp.mailer.goOutOfService()
+
+    const published = await mailOutageApp.request('/api/artifacts', { method: 'POST', token: outageToken, body: { title: 'Mail down', visibility: 'public_link', files: [{ path: 'index.html', content: 'x' }] } })
+
+    expect(published.status).toBe(201)
+  })
+})
+
 describe('public links', () => {
   it('lets anyone with the link open the page, read-only unless the author allows writes', async () => {
     const published = await app.publish({ token: authorToken }, 'Workshop sign-up')

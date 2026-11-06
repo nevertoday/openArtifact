@@ -37,6 +37,8 @@ export interface NewArtifact extends Omit<Publication, 'origin'> {
   workspaceId: string
   title: string
   visibility: ArtifactVisibility
+  /** null for a link that never expires; it matters only while the visibility is public_link. */
+  publicLinkExpiresAt: number | null
 }
 
 export interface CreatedArtifact {

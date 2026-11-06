@@ -37,6 +37,7 @@ describe('CloudflareArtifactRepository', () => {
       authorId,
       title: 'Design doc',
       visibility: 'workspace',
+      publicLinkExpiresAt: null,
       publishedVia: 'Claude Code',
       note: null,
       files: [htmlPage('draft'), { path: 'assets/app.css', contentType: 'text/css', body: new TextEncoder().encode('h1{}') }],

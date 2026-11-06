@@ -11,6 +11,7 @@ import { HttpError } from '../http-error.ts'
 import { People } from '../people.ts'
 import type { ApiContext } from './api-context.ts'
 import { JsonBody } from './json-body.ts'
+import { PublicLinkExpiry } from './public-link-expiry.ts'
 import { SharingNotices } from './sharing-notices.ts'
 
 const VISIBILITIES: readonly ArtifactVisibility[] = ['private', 'specified', 'workspace', 'public_link']
@@ -52,22 +53,25 @@ export class SharingApi {
     const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canManageSharing', MANAGE_SHARING)
     const requestBody = await JsonBody.of(request)
     const savedGrants: PersonGrant[] = (await this.#context.repositories.artifactAccess.listGrants(artifactId)).map(({ userId, role }) => ({ userId, role }))
-    const sharing = await this.#sharingFrom(requestBody, summary)
+    const visibility = requestBody.oneOf('visibility', VISIBILITIES, summary.sharing.visibility)
+    const publicLinkExpiry = PublicLinkExpiry.of(requestBody, identity, { visibilityBefore: summary.sharing.visibility, visibilityAfter: visibility, savedExpiresAt: summary.sharing.publicLinkExpiresAt }, Date.now())
+    const sharing = await this.#sharingFrom(requestBody, summary, visibility, publicLinkExpiry.expiresAt)
     const grants = requestBody.has('grants') ? await this.#grantsFrom(requestBody.raw('grants'), summary, savedGrants) : savedGrants
     await this.#context.repositories.artifactAccess.saveSharing(artifactId, sharing, grants)
-    const newlyGranted = SharingApi.#newlyGranted({ visibility: summary.sharing.visibility, grants: savedGrants }, { visibility: sharing.visibility, grants })
-    await new SharingNotices(this.#context).sharedWith(identity, summary, newlyGranted)
+    const sharingNotices = new SharingNotices(this.#context)
+    const newlyGranted = SharingApi.#newlyGranted({ visibility: summary.sharing.visibility, grants: savedGrants }, { visibility, grants })
+    await sharingNotices.sharedWith(identity, summary, newlyGranted)
+    if (publicLinkExpiry.agentDefaultExpiresAt !== null) await sharingNotices.agentOpenedPublicLink(identity, summary, publicLinkExpiry.agentDefaultExpiresAt)
     return Response.json(await this.#sharingJson({ ...summary, sharing }, grants))
   }
 
-  async #sharingFrom(requestBody: JsonBody, summary: ArtifactSummary): Promise<ArtifactSharing> {
-    const visibility = requestBody.oneOf('visibility', VISIBILITIES, summary.sharing.visibility)
+  async #sharingFrom(requestBody: JsonBody, summary: ArtifactSummary, visibility: ArtifactVisibility, publicLinkExpiresAt: number | null): Promise<ArtifactSharing> {
     const workspace = await this.#context.repositories.workspaces.findWorkspace(summary.workspaceId)
     const publicLinkForbidden = visibility === 'public_link' && !workspace?.publicLinksEnabled
     if (publicLinkForbidden) throw HttpError.badRequest('the workspace admin has switched public links off')
     return {
       visibility,
-      publicLinkExpiresAt: SharingApi.#expiresAtOf(requestBody, summary.sharing.publicLinkExpiresAt),
+      publicLinkExpiresAt,
       publicLinkPasswordHash: await SharingApi.#passwordHashOf(requestBody, summary.sharing.publicLinkPasswordHash),
       anonymousWriteEnabled: requestBody.boolean('anonymousWriteEnabled', summary.sharing.anonymousWriteEnabled),
       publicLinkShowsComments: requestBody.boolean('publicLinkShowsComments', summary.sharing.publicLinkShowsComments),
@@ -127,16 +131,6 @@ export class SharingApi {
     if (!ArtifactAccess.grantsApplyUnder(after.visibility)) return []
     const grantedBefore = ArtifactAccess.grantsApplyUnder(before.visibility) ? new Set(before.grants.map(grant => grant.userId)) : new Set<string>()
     return after.grants.filter(grant => !grantedBefore.has(grant.userId))
-  }
-
-  // Absent keeps the current expiry, so an author can still save after the link has expired; null means never.
-  static #expiresAtOf(requestBody: JsonBody, currentExpiresAt: number | null): number | null {
-    if (!requestBody.has('publicLinkExpiresAt')) return currentExpiresAt
-    const expiresAt = requestBody.raw('publicLinkExpiresAt')
-    if (expiresAt === null) return null
-    const isFutureTime = Number.isInteger(expiresAt) && (expiresAt as number) > Date.now()
-    if (!isFutureTime) throw HttpError.badRequest('publicLinkExpiresAt must be a future time in milliseconds, or null for never')
-    return expiresAt as number
   }
 
   // Absent keeps the current password, null removes it, a string sets a new one.
