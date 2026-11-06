@@ -37,9 +37,12 @@ export class CommentApi {
       this.#context.repositories.comments.listInOpenThreads(identity.membership.workspace.workspaceId),
     ])
     const editableArtifacts = new Map(visibleArtifacts.filter(openedArtifact => openedArtifact.permissions.canEdit).map(openedArtifact => [openedArtifact.summary.artifactId, openedArtifact]))
-    const threadsForAgent = CommentThread.allOf(openThreadComments).filter(thread => thread.root.forAgent && editableArtifacts.has(thread.root.artifactId))
-    const names = await this.#context.people.namesOf(threadsForAgent.flatMap(thread => thread.comments.map(comment => comment.authorId)))
-    return Response.json({ comments: threadsForAgent.map(thread => this.#inboxJson(thread, editableArtifacts.get(thread.root.artifactId) as OpenedArtifact, names)) })
+    const waitingThreads = CommentThread.allOf(openThreadComments).flatMap(thread => {
+      const editableArtifact = editableArtifacts.get(thread.root.artifactId)
+      return thread.root.forAgent && editableArtifact ? [{ thread, editableArtifact }] : []
+    })
+    const names = await this.#context.people.namesOf(waitingThreads.flatMap(({ thread }) => thread.comments.map(comment => comment.authorId)))
+    return Response.json({ comments: waitingThreads.map(({ thread, editableArtifact }) => this.#inboxJson(thread, editableArtifact, names)) })
   }
 
   async add(request: Request, artifactId: string): Promise<Response> {
@@ -59,7 +62,7 @@ export class CommentApi {
       anchor: threadRoot === null ? CommentApi.#anchorOf(requestBody, openedArtifact.summary.version) : null,
     })
     const resolvesThread = resolveRequested && threadRoot?.resolvedAt === null
-    if (resolvesThread) await this.#context.repositories.comments.setResolved(addedComment.parentId as string, identity.userId)
+    if (resolvesThread && threadRoot) await this.#context.repositories.comments.setResolved(threadRoot.commentId, identity.userId)
     await this.#context.notifier.notify(identity, openedArtifact.summary, { kind: 'comment_added', comment: addedComment, resolvesThread })
     const names = await this.#context.people.namesOf([identity.userId])
     return Response.json({ comment: CommentApi.#commentJson(addedComment, names) }, { status: 201 })

@@ -13,9 +13,9 @@ export class CommentThread {
   /** Groups comments into threads, in the order the threads were started; replies whose thread is missing are left out. */
   static allOf(comments: ArtifactComment[]): CommentThread[] {
     const repliesByRoot = new Map<string, ArtifactComment[]>()
-    for (const reply of comments.filter(comment => comment.parentId !== null)) {
-      const rootId = reply.parentId as string
-      repliesByRoot.set(rootId, [...(repliesByRoot.get(rootId) ?? []), reply])
+    for (const comment of comments) {
+      const rootId = comment.parentId
+      if (rootId !== null) repliesByRoot.set(rootId, [...(repliesByRoot.get(rootId) ?? []), comment])
     }
     const roots = comments.filter(comment => comment.parentId === null)
     return roots.map(root => new CommentThread(root, repliesByRoot.get(root.commentId) ?? []))
