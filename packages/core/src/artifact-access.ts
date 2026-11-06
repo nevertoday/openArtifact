@@ -1,4 +1,5 @@
 import type { GrantRole } from './artifact-access-repository.ts'
+import type { ArtifactRemoval } from './artifact-removal.ts'
 import type { ArtifactSummary } from './artifact-repository.ts'
 import type { WorkspaceRole } from './workspace-repository.ts'
 
@@ -18,6 +19,11 @@ export interface ArtifactPermissions {
   canEdit: boolean
   canManageSharing: boolean
   canWriteSharedData: boolean
+  canRename: boolean
+  /** Removing hides the artifact from everyone; an admin may remove any artifact without being able to view it. */
+  canRemove: boolean
+  /** Only a removed artifact can be restored, and only until it is purged. */
+  canRestore: boolean
   /** The viewer could open the public link after entering its password. */
   needsPublicLinkPassword: boolean
 }
@@ -28,6 +34,9 @@ const NO_PERMISSIONS: ArtifactPermissions = {
   canEdit: false,
   canManageSharing: false,
   canWriteSharedData: false,
+  canRename: false,
+  canRemove: false,
+  canRestore: false,
   needsPublicLinkPassword: false,
 }
 
@@ -44,6 +53,9 @@ const AUTHOR_PERMISSIONS: ArtifactPermissions = {
   canEdit: true,
   canManageSharing: true,
   canWriteSharedData: true,
+  canRename: true,
+  canRemove: true,
+  canRestore: false,
   needsPublicLinkPassword: false,
 }
 
@@ -65,10 +77,27 @@ export class ArtifactAccess {
     return visibility === 'public_link' && this.#publicLinksEnabled && notExpired
   }
 
+  // A removed artifact is gone for everyone; the only thing left to do with it is restore it.
   permissionsFor(viewer: ArtifactViewer): ArtifactPermissions {
-    const isAuthor = viewer.userId !== null && viewer.userId === this.#summary.authorId
-    if (isAuthor) return AUTHOR_PERMISSIONS
-    return ArtifactAccess.#widest([this.#grantPermissions(viewer), this.#memberPermissions(viewer), this.#publicLinkPermissions(viewer)])
+    const removal = this.#summary.removal
+    if (removal !== null) return { ...NO_PERMISSIONS, canRestore: this.#mayRestore(viewer, removal) }
+    if (this.#isAuthor(viewer)) return AUTHOR_PERMISSIONS
+    const sharedPermissions = ArtifactAccess.#widest([this.#grantPermissions(viewer), this.#memberPermissions(viewer), this.#publicLinkPermissions(viewer)])
+    return { ...sharedPermissions, canRename: sharedPermissions.canEdit, canRemove: ArtifactAccess.#isAdmin(viewer) }
+  }
+
+  #mayRestore(viewer: ArtifactViewer, removal: ArtifactRemoval): boolean {
+    if (removal.isPastRestoring(this.#now)) return false
+    const authorMayRestore = this.#isAuthor(viewer) && !removal.removedAsAdmin
+    return ArtifactAccess.#isAdmin(viewer) || authorMayRestore
+  }
+
+  #isAuthor(viewer: ArtifactViewer): boolean {
+    return viewer.userId !== null && viewer.userId === this.#summary.authorId
+  }
+
+  static #isAdmin(viewer: ArtifactViewer): boolean {
+    return viewer.workspaceRole === 'admin'
   }
 
   #grantPermissions(viewer: ArtifactViewer): ArtifactPermissions {
@@ -98,6 +127,9 @@ export class ArtifactAccess {
       canEdit: anyGrants('canEdit'),
       canManageSharing: anyGrants('canManageSharing'),
       canWriteSharedData: anyGrants('canWriteSharedData'),
+      canRename: anyGrants('canRename'),
+      canRemove: anyGrants('canRemove'),
+      canRestore: anyGrants('canRestore'),
       needsPublicLinkPassword: !canView && anyGrants('needsPublicLinkPassword'),
     }
   }

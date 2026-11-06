@@ -1,20 +1,22 @@
-import type {
-  ArtifactFile,
-  ArtifactRepository,
-  ArtifactSummary,
-  ArtifactVersionContent,
-  ArtifactVersionRecord,
-  ArtifactVisibility,
-  CreatedArtifact,
-  NewArtifact,
-  Publication,
-  PublishResult,
+import {
+  ArtifactRemoval,
+  type ArtifactFile,
+  type ArtifactRepository,
+  type ArtifactSummary,
+  type ArtifactVersionContent,
+  type ArtifactVersionRecord,
+  type ArtifactVisibility,
+  type CreatedArtifact,
+  type NewArtifact,
+  type Publication,
+  type PublishResult,
 } from '@open-artifact/core'
 
 const SUMMARY_SELECT = `
   SELECT artifacts.id, artifacts.workspace_id, artifacts.title, artifacts.author_id, artifacts.visibility,
          artifacts.public_link_expires_at, artifacts.public_link_password_hash, artifacts.anonymous_write_enabled,
-         artifacts.current_version, artifacts.updated_at, artifact_versions.published_via
+         artifacts.current_version, artifacts.updated_at, artifact_versions.published_via,
+         artifacts.removed_at, artifacts.removed_by, artifacts.removed_as_admin
   FROM artifacts
   JOIN artifact_versions ON artifact_versions.artifact_id = artifacts.id AND artifact_versions.version = artifacts.current_version`
 
@@ -30,6 +32,9 @@ interface SummaryRow {
   current_version: number
   updated_at: number
   published_via: string | null
+  removed_at: number | null
+  removed_by: string | null
+  removed_as_admin: number | null
 }
 
 interface VersionRow {
@@ -148,6 +153,26 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     }))
   }
 
+  async rename(artifactId: string, title: string): Promise<void> {
+    await this.#db.prepare('UPDATE artifacts SET title = ? WHERE id = ?').bind(title, artifactId).run()
+  }
+
+  async remove(artifactId: string, removal: ArtifactRemoval): Promise<boolean> {
+    const removalUpdate = await this.#db
+      .prepare('UPDATE artifacts SET removed_at = ?, removed_by = ?, removed_as_admin = ? WHERE id = ? AND removed_at IS NULL')
+      .bind(removal.removedAt, removal.removedBy, removal.removedAsAdmin ? 1 : 0, artifactId)
+      .run()
+    return removalUpdate.meta.changes === 1
+  }
+
+  async restore(artifactId: string): Promise<boolean> {
+    const restoreUpdate = await this.#db
+      .prepare('UPDATE artifacts SET removed_at = NULL, removed_by = NULL, removed_as_admin = NULL WHERE id = ? AND removed_at IS NOT NULL')
+      .bind(artifactId)
+      .run()
+    return restoreUpdate.meta.changes === 1
+  }
+
   async #versionRow(artifactId: string, version: number): Promise<VersionRow | null> {
     return this.#db
       .prepare('SELECT version, upload_id, author_id, published_via, created_at FROM artifact_versions WHERE artifact_id = ? AND version = ?')
@@ -232,7 +257,13 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
       version: summaryRow.current_version,
       publishedVia: summaryRow.published_via,
       updatedAt: summaryRow.updated_at,
+      removal: CloudflareArtifactRepository.#removalOf(summaryRow),
     }
+  }
+
+  static #removalOf(summaryRow: SummaryRow): ArtifactRemoval | null {
+    if (summaryRow.removed_at === null || summaryRow.removed_by === null) return null
+    return new ArtifactRemoval(summaryRow.removed_at, summaryRow.removed_by, summaryRow.removed_as_admin === 1)
   }
 
   static #objectKey(artifactId: string, uploadId: string, path: string): string {

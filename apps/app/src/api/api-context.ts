@@ -52,6 +52,13 @@ export class ApiContext {
     return this.requireIdentity()
   }
 
+  /** Workspace administration happens in the browser, by an admin of the current workspace. */
+  async requireWorkspaceAdmin(action: string): Promise<Identity> {
+    const identity = await this.requireBrowserSession()
+    if (identity.membership.role !== 'admin') throw HttpError.forbidden(`${action}; ask a workspace admin`)
+    return identity
+  }
+
   viewerUrl(artifactId: string): string {
     return `${this.appOrigin}/a/${encodeURIComponent(artifactId)}`
   }

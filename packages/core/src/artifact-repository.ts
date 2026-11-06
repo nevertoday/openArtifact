@@ -1,3 +1,5 @@
+import type { ArtifactRemoval } from './artifact-removal.ts'
+
 export interface ArtifactFile {
   path: string
   contentType: string
@@ -40,6 +42,8 @@ export interface ArtifactSummary {
   version: number
   publishedVia: string | null
   updatedAt: number
+  /** null while the artifact is active. */
+  removal: ArtifactRemoval | null
 }
 
 export interface ArtifactVersionRecord {
@@ -74,7 +78,14 @@ export interface ArtifactRepository extends ArtifactFileSource {
   publishOnTopOf(artifactId: string, baseVersion: number, publication: Publication): Promise<PublishResult>
   readCurrentVersion(artifactId: string): Promise<ArtifactVersionContent | null>
   readVersion(artifactId: string, version: number): Promise<ArtifactVersionContent | null>
+  /** Finds removed artifacts too; access rules decide who may still act on them. */
   findSummary(artifactId: string): Promise<ArtifactSummary | null>
+  /** Every artifact of the workspace, removed ones included, most recently updated first. */
   listRecentlyUpdated(workspaceId: string): Promise<ArtifactSummary[]>
   listVersions(artifactId: string): Promise<ArtifactVersionRecord[]>
+  rename(artifactId: string, title: string): Promise<void>
+  /** Returns false when the artifact is missing or already removed. */
+  remove(artifactId: string, removal: ArtifactRemoval): Promise<boolean>
+  /** Returns false when the artifact is missing or not removed. */
+  restore(artifactId: string): Promise<boolean>
 }

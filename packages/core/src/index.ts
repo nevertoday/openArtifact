@@ -16,6 +16,8 @@ export type {
   Publication,
   PublishResult,
 } from './artifact-repository.ts'
+export { ArtifactRemoval } from './artifact-removal.ts'
+export type { AuditAction, AuditChange, AuditEvent, AuditLog, NewAuditEvent } from './audit-log.ts'
 export type { ArtifactComment, CommentAnchor, CommentRepository, NewComment } from './comment-repository.ts'
 export { AccessTokenSecret, PublicLinkPassword, SigningKey, UsercontentSignature } from './secrets.ts'
 export type { UsercontentRequest } from './secrets.ts'

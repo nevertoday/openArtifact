@@ -36,24 +36,37 @@ export class ArtifactGate {
     return this.#opened(summary, identity, grantRole, await this.#publicLinkUnlocked(summary, request))
   }
 
-  /** Throws the error the requester should see: 404 hides artifacts they may not view, 401/403 explain the rest. */
+  /**
+   * Throws the error the requester should see: 404 hides artifacts they may not view, 401/403 explain the rest.
+   * A permission that needs no view, such as an admin removing a private artifact, passes on its own.
+   */
   async require(artifactId: string, identity: Identity | null, request: Request, permission: Permission, action: string): Promise<OpenedArtifact> {
     const openedArtifact = await this.open(artifactId, identity, request)
-    if (!openedArtifact || !openedArtifact.permissions.canView) throw HttpError.notFound(`artifact ${artifactId}`)
-    if (openedArtifact.permissions[permission]) return openedArtifact
+    if (openedArtifact?.permissions[permission]) return openedArtifact
+    const viewable = openedArtifact?.permissions.canView ?? false
+    if (!viewable) throw HttpError.notFound(`artifact ${artifactId}`)
     throw identity ? HttpError.forbidden(action) : HttpError.unauthorized()
   }
 
   /** The artifacts of the identity's current workspace that they may view, most recently updated first. */
   async listVisible(identity: Identity): Promise<OpenedArtifact[]> {
+    return (await this.listWorkspace(identity)).filter(openedArtifact => openedArtifact.permissions.canView)
+  }
+
+  /** The removed artifacts the identity may still restore. */
+  async listRestorable(identity: Identity): Promise<OpenedArtifact[]> {
+    return (await this.listWorkspace(identity)).filter(openedArtifact => openedArtifact.permissions.canRestore)
+  }
+
+  /** Every artifact of the identity's current workspace, removed ones included, each with what the identity may do. */
+  async listWorkspace(identity: Identity): Promise<OpenedArtifact[]> {
     const workspaceId = identity.membership.workspace.workspaceId
     const [summaries, grantsOfUser] = await Promise.all([
       this.#repositories.artifacts.listRecentlyUpdated(workspaceId),
       this.#repositories.artifactAccess.listGrantsOfUser(identity.userId),
     ])
     const grantRoleByArtifact = new Map(grantsOfUser.map(grant => [grant.artifactId, grant.role]))
-    const openedArtifacts = await Promise.all(summaries.map(summary => this.#opened(summary, identity, grantRoleByArtifact.get(summary.artifactId) ?? null, false)))
-    return openedArtifacts.filter(openedArtifact => openedArtifact.permissions.canView)
+    return Promise.all(summaries.map(summary => this.#opened(summary, identity, grantRoleByArtifact.get(summary.artifactId) ?? null, false)))
   }
 
   /** A cookie that proves the public link's password was entered; changing the password invalidates it. */

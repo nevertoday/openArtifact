@@ -1,0 +1,21 @@
+import type { WorkspaceRole } from './workspace-repository.ts'
+
+/** What happened, to which artifact or member, with the facts needed to describe it after the target is gone. */
+export type AuditChange =
+  | { action: 'artifact.removed'; targetType: 'artifact'; targetId: string; detail: { title: string; removedAsAdmin: boolean } }
+  | { action: 'artifact.restored'; targetType: 'artifact'; targetId: string; detail: { title: string } }
+  | { action: 'artifact.renamed'; targetType: 'artifact'; targetId: string; detail: { from: string; to: string } }
+  | { action: 'member.removed'; targetType: 'member'; targetId: string; detail: Record<string, never> }
+  | { action: 'member.role_changed'; targetType: 'member'; targetId: string; detail: { from: WorkspaceRole; to: WorkspaceRole } }
+
+export type AuditAction = AuditChange['action']
+
+export type NewAuditEvent = AuditChange & { workspaceId: string; actorId: string }
+
+export type AuditEvent = NewAuditEvent & { eventId: string; createdAt: number }
+
+/** Who removed, restored or renamed content and who changed membership; admins read it. */
+export interface AuditLog {
+  record(newEvent: NewAuditEvent): Promise<void>
+  listLatest(workspaceId: string, limit: number): Promise<AuditEvent[]>
+}
