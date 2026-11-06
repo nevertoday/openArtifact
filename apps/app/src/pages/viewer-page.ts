@@ -23,15 +23,6 @@ export class ViewerPage {
   static render(model: ViewerModel): Response {
     const { summary, permissions } = model.openedArtifact
     const isOldVersion = model.shownVersion !== summary.version
-    const viewerConfig = {
-      artifactId: summary.artifactId,
-      title: summary.title,
-      shownVersion: model.shownVersion,
-      currentVersion: summary.version,
-      usercontentOrigin: model.usercontentOrigin,
-      permissions: { canComment: permissions.canComment, canEdit: permissions.canEdit, canManageSharing: permissions.canManageSharing },
-      viewer: model.identity ? { userId: model.identity.userId, name: model.identity.name } : null,
-    }
     const body = html`<div class="viewer-page">
 ${PageShell.topBar(model.identity, ViewerPage.#heading(model))}
 <div class="viewer-body">
@@ -39,7 +30,7 @@ ${PageShell.topBar(model.identity, ViewerPage.#heading(model))}
     ${isOldVersion ? ViewerPage.#oldVersionBanner(model.shownVersion, summary.version, permissions.canEdit) : ''}
     <div class="viewer-sandbox-note xxd-text" data-variant="caption">
       <span class="xxd-cluster">${PageShell.icon('Lock', 14)}在沙箱中运行 · <span class="xxd-mono">${new URL(model.usercontentOrigin).host}</span></span>
-      <a class="xxd-link" href="${model.artifactUrl}" target="_blank" rel="noopener noreferrer">新标签页打开</a>
+      <a class="xxd-link" href="${ViewerPage.#pathOf(model, '/full')}" target="_blank" rel="noopener">新标签页打开</a>
     </div>
     <div class="viewer-frame"><iframe id="artifact-frame" src="${model.artifactUrl}" title="${summary.title}" sandbox="${ARTIFACT_SANDBOX}" referrerpolicy="no-referrer"></iframe></div>
   </section>
@@ -56,14 +47,60 @@ ${PageShell.topBar(model.identity, ViewerPage.#heading(model))}
 </div>
 </div>
 ${permissions.canManageSharing ? ViewerPage.#shareDialog() : ''}
-${PageShell.jsonData('viewer-config', viewerConfig)}`
+${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     return PageShell.render({
       title: `${summary.title} · Open Artifact`,
-      description: `${model.authorName} 发布 · v${summary.version} · ${ArtifactLabels.publishedVia(summary.publishedVia)}`,
+      description: ViewerPage.#description(model),
       body,
       scripts: ['common.js', 'viewer.js'],
       frameOrigin: model.usercontentOrigin,
     })
+  }
+
+  /** The artifact alone, filling the tab; the page still proxies its shared data. */
+  static renderFull(model: ViewerModel): Response {
+    const { summary } = model.openedArtifact
+    const body = html`<div class="viewer-full">
+<header class="viewer-full__bar">
+  <a class="xxd-btn" data-variant="ghost" data-size="sm" href="${ViewerPage.#pathOf(model, '')}">${PageShell.icon('ArrowLeft')}评论和版本</a>
+  <span class="viewer-full__title">${summary.title}</span>
+  <span class="xxd-text xxd-mono" data-variant="caption">v${model.shownVersion}</span>
+</header>
+<div class="viewer-full__frame"><iframe id="artifact-frame" src="${model.artifactUrl}" title="${summary.title}" sandbox="${ARTIFACT_SANDBOX}" referrerpolicy="no-referrer"></iframe></div>
+</div>
+${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
+    return PageShell.render({
+      title: `${summary.title} · Open Artifact`,
+      description: ViewerPage.#description(model),
+      body,
+      scripts: ['artifact-full.js'],
+      frameOrigin: model.usercontentOrigin,
+    })
+  }
+
+  // An older version keeps its number, so a link from it shows the same version.
+  static #pathOf(model: ViewerModel, suffix: '' | '/full'): string {
+    const { summary } = model.openedArtifact
+    const versionQuery = model.shownVersion === summary.version ? '' : `?v=${model.shownVersion}`
+    return `/a/${encodeURIComponent(summary.artifactId)}${suffix}${versionQuery}`
+  }
+
+  static #viewerConfig(model: ViewerModel) {
+    const { summary, permissions } = model.openedArtifact
+    return {
+      artifactId: summary.artifactId,
+      title: summary.title,
+      shownVersion: model.shownVersion,
+      currentVersion: summary.version,
+      usercontentOrigin: model.usercontentOrigin,
+      permissions: { canComment: permissions.canComment, canEdit: permissions.canEdit, canManageSharing: permissions.canManageSharing },
+      viewer: model.identity ? { userId: model.identity.userId, name: model.identity.name } : null,
+    }
+  }
+
+  static #description(model: ViewerModel): string {
+    const { summary } = model.openedArtifact
+    return `${model.authorName} 发布 · v${summary.version} · ${ArtifactLabels.publishedVia(summary.publishedVia)}`
   }
 
   static #heading(model: ViewerModel): SafeHtml {

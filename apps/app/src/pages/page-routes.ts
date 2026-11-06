@@ -8,7 +8,7 @@ import { HOME_FILTERS, HomeListing, HomePage, type HomeFilter } from './home-pag
 import { LoginPage } from './login-page.ts'
 import { MessagePages } from './message-pages.ts'
 import { SETTINGS_SECTIONS, SettingsPage, type SettingsSection } from './settings-page.ts'
-import { ViewerPage } from './viewer-page.ts'
+import { ViewerPage, type ViewerModel } from './viewer-page.ts'
 
 const SIGNED_URL_LIFETIME_MS = 6 * 60 * 60 * 1000
 const UNLOCK_COOKIE_SECONDS = 30 * 24 * 60 * 60
@@ -59,6 +59,17 @@ export class PageRoutes {
   }
 
   async viewer(request: Request, artifactId: string): Promise<Response> {
+    const viewing = await this.#viewing(request, artifactId)
+    return viewing instanceof Response ? viewing : ViewerPage.render(viewing)
+  }
+
+  async fullView(request: Request, artifactId: string): Promise<Response> {
+    const viewing = await this.#viewing(request, artifactId)
+    return viewing instanceof Response ? viewing : ViewerPage.renderFull(viewing)
+  }
+
+  // Both pages decide access and sign a fresh file URL on every visit, so their addresses are safe to pass around.
+  async #viewing(request: Request, artifactId: string): Promise<ViewerModel | Response> {
     const identity = await this.#context.identity()
     const openedArtifact = await this.#context.gate.open(artifactId, identity, request)
     if (!openedArtifact) return MessagePages.notFound(identity !== null)
@@ -69,7 +80,7 @@ export class PageRoutes {
     const now = Date.now()
     const signedPrefix = await this.#settings.usercontentSignature.signedPrefix(artifactId, shownVersion, now + SIGNED_URL_LIFETIME_MS)
     const authorNames = await this.#context.people.namesOf([openedArtifact.summary.authorId])
-    return ViewerPage.render({
+    return {
       openedArtifact,
       identity,
       authorName: authorNames.get(openedArtifact.summary.authorId) ?? '',
@@ -77,7 +88,7 @@ export class PageRoutes {
       artifactUrl: `${this.#settings.usercontentOrigin}${signedPrefix}index.html`,
       usercontentOrigin: this.#settings.usercontentOrigin,
       now,
-    })
+    }
   }
 
   async unlock(request: Request, artifactId: string): Promise<Response> {

@@ -101,6 +101,39 @@ describe('viewer page', () => {
   })
 })
 
+describe('full-screen view', () => {
+  it('opens in a new tab through an app address that checks access on every visit', async () => {
+    const published = await app.publish({ token: agentToken }, 'Private draft', '<h1>draft</h1>', 'private')
+    const fullViewPath = `/a/${published.artifactId}/full`
+
+    const viewerMarkup = await pageText(`/a/${published.artifactId}`, authorCookie)
+    const authorResponse = await app.request(fullViewPath, { cookie: authorCookie })
+    const authorMarkup = await authorResponse.text()
+    const reviewerResponse = await app.request(fullViewPath, { cookie: reviewerCookie })
+    const anonymousResponse = await app.request(fullViewPath)
+
+    expect(viewerMarkup).toContain(`href="${fullViewPath}"`)
+    expect(viewerMarkup).not.toMatch(/<a [^>]*href="http:\/\/usercontent\.test/)
+    expect(authorResponse.status).toBe(200)
+    expect(authorMarkup).toMatch(new RegExp(`<iframe [^>]*src="http://usercontent\\.test/s/[^"]+/${published.artifactId}/v1/index\\.html"`))
+    expect(authorResponse.headers.get('Content-Security-Policy')).toContain('frame-src http://usercontent.test')
+    expect(reviewerResponse.status).toBe(404)
+    expect(anonymousResponse.status).toBe(302)
+    expect(anonymousResponse.headers.get('Location')).toBe(`${APP_ORIGIN}/login?next=${encodeURIComponent(fullViewPath)}`)
+  })
+
+  it('keeps the version the person was looking at', async () => {
+    const published = await app.publish({ token: agentToken }, 'Two versions', '<h1>v1</h1>')
+    await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+
+    const oldVersionViewer = await pageText(`/a/${published.artifactId}?v=1`, authorCookie)
+    const oldVersionFullView = await pageText(`/a/${published.artifactId}/full?v=1`, authorCookie)
+
+    expect(oldVersionViewer).toContain(`href="/a/${published.artifactId}/full?v=1"`)
+    expect(oldVersionFullView).toContain(`/${published.artifactId}/v1/index.html`)
+  })
+})
+
 describe('content security policy', () => {
   it('runs only our own scripts and lets only pages that show artifacts frame the usercontent origin', async () => {
     const published = await app.publish({ token: agentToken }, 'Policy check')

@@ -12,6 +12,7 @@ import { People } from './people.ts'
 import type { Repositories } from '@open-artifact/core'
 
 const VIEWER = new URLPattern({ pathname: '/a/:artifactId' })
+const FULL_VIEW = new URLPattern({ pathname: '/a/:artifactId/full' })
 const UNLOCK = new URLPattern({ pathname: '/a/:artifactId/unlock' })
 const SETTINGS = new URLPattern({ pathname: '/settings{/:section}?' })
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
@@ -57,6 +58,8 @@ export class AppRoutes {
     if (requestUrl.pathname === '/llms.txt') return pageRoutes.llmsTxt()
     const viewerMatch = VIEWER.exec(requestUrl)
     if (viewerMatch) return pageRoutes.viewer(request, decodeURIComponent(viewerMatch.pathname.groups.artifactId ?? ''))
+    const fullViewMatch = FULL_VIEW.exec(requestUrl)
+    if (fullViewMatch) return pageRoutes.fullView(request, decodeURIComponent(fullViewMatch.pathname.groups.artifactId ?? ''))
     const settingsMatch = SETTINGS.exec(requestUrl)
     if (settingsMatch) return pageRoutes.settings(request, settingsMatch.pathname.groups.section)
     return new Response('Not found', { status: 404 })
