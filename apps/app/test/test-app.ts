@@ -86,13 +86,17 @@ export class TestApp {
     return { status: response.status, body: (await response.json()) as Body }
   }
 
-  /** Signs in through the emailed link, exactly as a person does, and returns the session cookie. */
-  async signIn(email: string): Promise<string> {
-    const sendResponse = await this.request('/api/auth/sign-in/magic-link', { method: 'POST', body: { email, callbackURL: '/' } })
+  /**
+   * Signs in through the emailed link, exactly as a person does, and returns the session cookie.
+   * `browserCookie` is what the browser already holds, such as the cookie an invite link set.
+   */
+  async signIn(email: string, browserCookie?: string): Promise<string> {
+    const sendResponse = await this.request('/api/auth/sign-in/magic-link', { method: 'POST', body: { email, callbackURL: '/' }, ...(browserCookie ? { cookie: browserCookie } : {}) })
     if (!sendResponse.ok) throw new Error(`magic link request failed: ${sendResponse.status} ${await sendResponse.text()}`)
     const signInLink = this.mailer.lastTo(email)?.text.match(/https?:\/\/\S+/)?.[0]
     if (!signInLink) throw new Error(`no sign-in link was mailed to ${email}`)
-    const verifyResponse = await this.routes.respond(new Request(signInLink, { redirect: 'manual' }))
+    const verifyHeaders = new Headers(browserCookie ? { Cookie: browserCookie } : {})
+    const verifyResponse = await this.routes.respond(new Request(signInLink, { redirect: 'manual', headers: verifyHeaders }))
     const sessionCookie = verifyResponse.headers.getSetCookie().map(setCookie => setCookie.split(';')[0]).join('; ')
     if (!sessionCookie.includes('session_token')) throw new Error(`sign-in did not set a session: ${verifyResponse.status}`)
     return sessionCookie

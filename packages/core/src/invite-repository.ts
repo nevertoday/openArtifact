@@ -32,7 +32,7 @@ export interface InviteRepository {
   create(newInvite: NewInvite): Promise<Invite>
   findPendingByCode(code: string, now: number): Promise<Invite | null>
   listPending(workspaceId: string, now: number): Promise<Invite[]>
-  /** Pending email invites addressed to `email` in any workspace, newest first. */
+  /** Pending email invites addressed to `email` (lower-cased, as invites store it) in any workspace, newest first. */
   listPendingForEmail(email: string, now: number): Promise<Invite[]>
   /** Returns the invite it revoked, or null when the workspace has no such pending invite. */
   revoke(workspaceId: string, inviteId: string, now: number): Promise<Invite | null>

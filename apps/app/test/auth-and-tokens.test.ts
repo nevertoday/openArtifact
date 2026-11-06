@@ -104,11 +104,12 @@ describe('personal API tokens', () => {
 })
 
 describe('who may sign up', () => {
-  it('refuses an email outside the allowed domains before sending any link', async () => {
-    const refused = await app.json<{ message: string }>('/api/auth/sign-in/magic-link', { method: 'POST', body: { email: 'stranger@other.org', callbackURL: '/' } })
+  it('refuses an email outside the allowed domains before sending any link, without naming the domains', async () => {
+    const refused = await app.json<{ message: string; code: string }>('/api/auth/sign-in/magic-link', { method: 'POST', body: { email: 'stranger@other.org', callbackURL: '/' } })
 
     expect(refused.status).toBe(403)
-    expect(refused.body.message).toContain('example.com')
+    expect(refused.body).toMatchObject({ code: 'EMAIL_NOT_ADMITTED', message: '这个邮箱不能登录 Open Artifact。请用公司邮箱，或请管理员邀请你。' })
+    expect(refused.body.message).not.toContain('example.com')
     expect(app.mailer.lastTo('stranger@other.org')).toBeUndefined()
   })
 

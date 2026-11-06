@@ -282,6 +282,12 @@ ${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
         return `${actor} 把 ${names.get(auditEvent.targetId)} 移出了 workspace`
       case 'member.role_changed':
         return `${actor} 把 ${names.get(auditEvent.targetId)} 设为${ArtifactLabels.role(auditEvent.detail.to)}`
+      case 'member.invited':
+        return auditEvent.detail.email === null ? `${actor} 生成了一个邀请链接` : `${actor} 邀请了 ${auditEvent.detail.email}`
+      case 'invite.revoked':
+        return auditEvent.detail.email === null ? `${actor} 撤销了一个邀请链接` : `${actor} 撤销了给 ${auditEvent.detail.email} 的邀请`
+      case 'member.joined':
+        return auditEvent.detail.via === 'link' ? `${actor} 通过邀请链接加入了 workspace` : `${actor} 接受邀请加入了 workspace`
       case 'workspace.renamed':
         return `${actor} 把 workspace 从「${auditEvent.detail.from}」改名为「${auditEvent.detail.to}」`
     }

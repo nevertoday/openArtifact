@@ -49,8 +49,8 @@ export class CloudflareInviteRepository implements InviteRepository {
 
   async listPendingForEmail(email: string, now: number): Promise<Invite[]> {
     const { results: inviteRows } = await this.#db
-      .prepare(`SELECT * FROM invites WHERE email = lower(?) AND ${PENDING} ORDER BY created_at DESC, rowid DESC`)
-      .bind(email.trim(), now)
+      .prepare(`SELECT * FROM invites WHERE email = ? AND ${PENDING} ORDER BY created_at DESC, rowid DESC`)
+      .bind(email, now)
       .all<InviteRow>()
     return inviteRows.map(CloudflareInviteRepository.#inviteOf)
   }

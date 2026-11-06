@@ -1,7 +1,8 @@
-import { PublicLinkPassword, UsercontentSignature } from '@open-artifact/core'
+import { PublicLinkPassword, UsercontentSignature, type Invite } from '@open-artifact/core'
 import { ArtifactGate, type OpenedArtifact } from '../access/artifact-gate.ts'
 import type { ApiContext } from '../api/api-context.ts'
-import type { Identity } from '../auth/request-identity.ts'
+import { INVITE_COOKIE } from '../auth/admission.ts'
+import { WORKSPACE_COOKIE, type Identity } from '../auth/request-identity.ts'
 import { AgentGuide } from '../guide/agent-guide.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { HOME_FILTERS, HomeListing, HomePage, type HomeFilter } from './home-page.ts'
@@ -14,6 +15,7 @@ const SIGNED_URL_LIFETIME_MS = 6 * 60 * 60 * 1000
 const UNLOCK_COOKIE_SECONDS = 30 * 24 * 60 * 60
 const MAX_LIVE_PREVIEWS = 12
 const AUDIT_EVENTS_SHOWN = 50
+const YEAR_SECONDS = 365 * 24 * 60 * 60
 
 export interface PageRouteSettings {
   usercontentOrigin: string
@@ -36,6 +38,47 @@ export class PageRoutes {
     const nextPath = PageRoutes.#safeNextPath(new URL(request.url).searchParams.get('next'), this.#context.appOrigin)
     if (await this.#context.identity()) return Response.redirect(new URL(nextPath, this.#context.appOrigin).toString(), 302)
     return LoginPage.render(this.#context.auth.loginProviders, nextPath, new URL(this.#context.appOrigin).host)
+  }
+
+  /**
+   * Where an invite link lands. A visitor signs in first, with the invite kept in a cookie for sign-up;
+   * a signed-in person joins the invite's workspace and goes home, switched to it.
+   */
+  async invite(request: Request, inviteCode: string): Promise<Response> {
+    const invite = await this.#context.repositories.invites.findPendingByCode(inviteCode, Date.now())
+    if (!invite) return MessagePages.inviteUnusable()
+    const identity = await this.#context.identity()
+    if (!identity) return this.#inviteLogin(request, invite)
+    const acceptance = await this.#context.admission.accept(invite, identity)
+    switch (acceptance.status) {
+      case 'joined':
+      case 'already_member':
+        return this.#homeIn(request, invite.workspaceId)
+      case 'removed':
+        return MessagePages.removedFromWorkspace()
+      case 'other_address':
+        return MessagePages.inviteForOtherAddress(acceptance.invitedEmail)
+    }
+  }
+
+  async #inviteLogin(request: Request, invite: Invite): Promise<Response> {
+    const [inviterNames, workspace] = await Promise.all([this.#context.people.namesOf([invite.invitedBy]), this.#context.repositories.workspaces.findWorkspace(invite.workspaceId)])
+    if (!workspace) throw new Error(`Invite ${invite.inviteId} names workspace ${invite.workspaceId}, which does not exist`)
+    const invitation = { inviterName: inviterNames.get(invite.invitedBy) ?? '', workspaceName: workspace.name, email: invite.email }
+    const invitePath = new URL(request.url).pathname
+    const loginPage = LoginPage.render(this.#context.auth.loginProviders, invitePath, new URL(this.#context.appOrigin).host, invitation)
+    const secondsLeft = Math.ceil((invite.expiresAt - Date.now()) / 1000)
+    loginPage.headers.append('Set-Cookie', HttpCookies.serialize(INVITE_COOKIE, invite.code, { maxAgeSeconds: secondsLeft }, this.#isSecure(request)))
+    return loginPage
+  }
+
+  #homeIn(request: Request, workspaceId: string): Response {
+    const workspaceCookie = HttpCookies.serialize(WORKSPACE_COOKIE, workspaceId, { maxAgeSeconds: YEAR_SECONDS }, this.#isSecure(request))
+    return new Response(null, { status: 302, headers: { Location: new URL('/', this.#context.appOrigin).toString(), 'Set-Cookie': workspaceCookie } })
+  }
+
+  #isSecure(request: Request): boolean {
+    return new URL(request.url).protocol === 'https:'
   }
 
   async home(request: Request): Promise<Response> {

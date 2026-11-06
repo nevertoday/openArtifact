@@ -1,12 +1,21 @@
+import { Admission } from '../auth/admission.ts'
 import type { LoginProvider } from '../auth/open-artifact-auth.ts'
-import { html } from './html.ts'
+import { html, type SafeHtml } from './html.ts'
 import { PageShell } from './page-shell.ts'
 
 const AGENTS_ON_STAGE = ['Claude Code', 'Codex', 'Cursor', 'Gemini CLI']
 
+/** The invite a person followed to the login page. */
+export interface LoginInvitation {
+  inviterName: string
+  workspaceName: string
+  /** The address an email invite was sent to; null for a link anyone may use. */
+  email: string | null
+}
+
 export class LoginPage {
   /** `nextPath` is where to land after sign-in; only same-site paths are accepted. */
-  static render(providers: LoginProvider[], nextPath: string, appHost: string): Response {
+  static render(providers: LoginProvider[], nextPath: string, appHost: string, invitation: LoginInvitation | null = null): Response {
     const providerButtons = providers.map((provider, index) =>
       html`<button type="button" class="xxd-btn" data-block ${index === 0 ? html`data-variant="primary"` : ''} data-provider-id="${provider.providerId}" data-provider-kind="${provider.kind}">用 ${provider.label} 登录</button>`)
     const body = html`<div class="login-page">
@@ -22,12 +31,12 @@ export class LoginPage {
   <main class="login-panel">
     <div class="xxd-auth login-card" data-next-path="${nextPath}">
       <h2 class="xxd-auth__name">登录</h2>
-      <p class="xxd-auth__line">用团队允许的方式登录。</p>
+      ${invitation ? LoginPage.#invitationBanner(invitation) : html`<p class="xxd-auth__line">用团队允许的方式登录。</p>`}
       <form id="magic-link-form" data-xxd-validate>
         ${providers.length > 0 ? html`${providerButtons}<div class="xxd-auth__or">或者用邮箱</div>` : ''}
         <div class="xxd-field">
           <label class="xxd-label" for="login-email">工作邮箱</label>
-          <input id="login-email" class="xxd-input" name="email" type="email" autocomplete="email" required placeholder="name@example.com" aria-describedby="login-email-help" data-error-type="请输入有效的邮箱，比如 name@example.com">
+          <input id="login-email" class="xxd-input" name="email" type="email" autocomplete="email" required placeholder="name@example.com" aria-describedby="login-email-help" data-error-type="请输入有效的邮箱，比如 name@example.com" data-error-not-admitted="${Admission.REFUSAL}">
           <p class="xxd-help" id="login-email-help">我们会发一封邮件，点里面的链接就能登录，不需要密码。</p>
         </div>
         <button type="submit" class="xxd-btn" data-variant="primary" data-block>发送登录链接</button>
@@ -38,5 +47,13 @@ export class LoginPage {
   </main>
 </div>`
     return PageShell.render({ title: '登录 · Open Artifact', body, scripts: ['login.js'] })
+  }
+
+  static #invitationBanner(invitation: LoginInvitation): SafeHtml {
+    const howToJoin = invitation.email === null ? '登录后就会加入。' : html`用 <strong>${invitation.email}</strong> 登录后就会加入。`
+    return html`<div class="xxd-banner" data-size="sm" role="status">${PageShell.icon('UserPlus')}<div>
+  <p class="xxd-banner__title">${invitation.inviterName} 邀请你加入 ${invitation.workspaceName}</p>
+  <p class="xxd-banner__text">${howToJoin}</p>
+</div></div>`
   }
 }

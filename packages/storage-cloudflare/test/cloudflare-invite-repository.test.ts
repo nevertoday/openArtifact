@@ -35,8 +35,8 @@ describe('CloudflareInviteRepository', () => {
     expect(await inviteRepository.findPendingByCode(link.code, now)).toEqual(link)
     expect(await inviteRepository.findPendingByCode(expiredLink.code, now)).toBeNull()
     expect(await inviteRepository.findPendingByCode(revokedLink.code, now)).toBeNull()
-    expect(await inviteRepository.listPendingForEmail('ACCEPTED@example.com', now)).toEqual([])
-    expect(await inviteRepository.listPendingForEmail(' Pending@Example.com ', now)).toEqual([pendingEmail])
+    expect(await inviteRepository.listPendingForEmail('accepted@example.com', now)).toEqual([])
+    expect(await inviteRepository.listPendingForEmail('pending@example.com', now)).toEqual([pendingEmail])
   })
 
   it('keeps one pending invite per address: inviting again replaces the earlier one', async () => {

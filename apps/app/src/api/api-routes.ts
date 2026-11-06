@@ -2,6 +2,7 @@ import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { ArtifactApi } from './artifact-api.ts'
 import { CommentApi } from './comment-api.ts'
+import { InviteApi } from './invite-api.ts'
 import { SharedDataApi } from './shared-data-api.ts'
 import { SharingApi } from './sharing-api.ts'
 import { TokenApi } from './token-api.ts'
@@ -18,6 +19,7 @@ interface ApiRoute {
 class Apis {
   readonly artifacts: ArtifactApi
   readonly comments: CommentApi
+  readonly invites: InviteApi
   readonly sharing: SharingApi
   readonly tokens: TokenApi
   readonly sharedData: SharedDataApi
@@ -26,6 +28,7 @@ class Apis {
   constructor(context: ApiContext) {
     this.artifacts = new ArtifactApi(context)
     this.comments = new CommentApi(context)
+    this.invites = new InviteApi(context)
     this.sharing = new SharingApi(context)
     this.tokens = new TokenApi(context)
     this.sharedData = new SharedDataApi(context)
@@ -51,6 +54,10 @@ const API_ROUTES: ApiRoute[] = [
   route('PATCH', '/api/workspace/members/:userId', (apis, request, params) => apis.workspace.changeRole(request, param(params, 'userId'))),
   route('DELETE', '/api/workspace/members/:userId', (apis, _request, params) => apis.workspace.removeMember(param(params, 'userId'))),
   route('PATCH', '/api/workspace', (apis, request) => apis.workspace.updateSettings(request)),
+  route('GET', '/api/workspace/invites', apis => apis.invites.list()),
+  route('POST', '/api/workspace/invites/link', apis => apis.invites.createLink()),
+  route('POST', '/api/workspace/invites/email', (apis, request) => apis.invites.inviteByEmail(request)),
+  route('DELETE', '/api/workspace/invites/:inviteId', (apis, _request, params) => apis.invites.revoke(param(params, 'inviteId'))),
   route('GET', '/api/tokens', apis => apis.tokens.list()),
   route('POST', '/api/tokens', (apis, request) => apis.tokens.create(request)),
   route('DELETE', '/api/tokens/:tokenId', (apis, _request, params) => apis.tokens.revoke(param(params, 'tokenId'))),

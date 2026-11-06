@@ -3,8 +3,9 @@ import { betterAuth } from 'better-auth'
 import { APIError } from 'better-auth/api'
 import { genericOAuth, magicLink } from 'better-auth/plugins'
 import type { AppEnv } from '../env.ts'
+import { HttpCookies } from '../http-cookies.ts'
+import { Admission, INVITE_COOKIE } from './admission.ts'
 import type { Mailer } from './mailer.ts'
-import { SignUpPolicy } from './sign-up-policy.ts'
 
 export interface SignedInUser {
   userId: string
@@ -17,6 +18,12 @@ export interface LoginProvider {
   label: string
   /** Generic OIDC providers sign in through a different Better Auth endpoint than built-in social ones. */
   kind: 'social' | 'oidc'
+}
+
+/** The request part of a Better Auth endpoint context, which its sign-up hooks receive. */
+interface AuthEndpointContext {
+  request?: Request | undefined
+  headers?: Headers | undefined
 }
 
 // The part of Better Auth this app calls; its full inferred type is too wide to hold in a field.
@@ -35,13 +42,13 @@ const OIDC_PROVIDER_ID = 'company-sso'
 export class OpenArtifactAuth {
   readonly #auth: BetterAuthInstance
   readonly #loginProviders: LoginProvider[]
-  readonly #signUpPolicy: SignUpPolicy
+  readonly #admission: Admission
   readonly #repositories: Repositories
   readonly #mailer: Mailer
 
-  constructor(env: AppEnv, appOrigin: string, mailer: Mailer, repositories: Repositories) {
+  constructor(env: AppEnv, appOrigin: string, mailer: Mailer, repositories: Repositories, admission: Admission) {
     this.#loginProviders = OpenArtifactAuth.#configuredProviders(env)
-    this.#signUpPolicy = new SignUpPolicy(env.ALLOWED_EMAIL_DOMAINS, repositories.users)
+    this.#admission = admission
     this.#repositories = repositories
     this.#mailer = mailer
     this.#auth = betterAuth({
@@ -52,19 +59,19 @@ export class OpenArtifactAuth {
       session: { expiresIn: SESSION_DAYS * 24 * 60 * 60 },
       socialProviders: OpenArtifactAuth.#socialProviders(env),
       plugins: [
-        magicLink({ sendMagicLink: ({ email, url }) => this.#sendSignInLink(email, url) }),
+        magicLink({ sendMagicLink: ({ email, url }, endpointContext) => this.#sendSignInLink(email, url, endpointContext) }),
         ...OpenArtifactAuth.#companySso(env),
       ],
       databaseHooks: {
         user: {
           create: {
-            // OAuth and SSO sign-ups reach this hook without passing #sendSignInLink, so the policy is checked here too.
-            before: async newUser => {
-              if (!(await this.#signUpPolicy.allows(newUser.email))) throw new APIError('FORBIDDEN', { message: this.#signUpPolicy.refusalMessage })
+            // OAuth and SSO sign-ups reach this hook without passing #sendSignInLink, so admission is checked here too.
+            before: async (newUser, endpointContext) => {
+              if (!(await this.#admission.mayCreateAccount(newUser.email, OpenArtifactAuth.#inviteCodeIn(endpointContext)))) throw OpenArtifactAuth.#refusal()
             },
-            // Every person belongs to a workspace from their first sign-in on.
-            after: async createdUser => {
-              await repositories.workspaces.joinFirstWorkspace(createdUser.id, '我的团队')
+            // Every person belongs to a workspace from their first sign-in on, so the first to sign up becomes its admin.
+            after: async (createdUser, endpointContext) => {
+              await this.#admission.join({ userId: createdUser.id, email: createdUser.email }, OpenArtifactAuth.#inviteCodeIn(endpointContext))
             },
           },
         },
@@ -74,9 +81,10 @@ export class OpenArtifactAuth {
   }
 
   // A link is mailed only to a person who has an account or may create one, so a refused address hears why at once.
-  async #sendSignInLink(email: string, url: string): Promise<void> {
+  async #sendSignInLink(email: string, url: string, endpointContext: AuthEndpointContext | null | undefined): Promise<void> {
     const hasAccount = (await this.#repositories.users.findByEmail(email)) !== null
-    if (!hasAccount && !(await this.#signUpPolicy.allows(email))) throw new APIError('FORBIDDEN', { message: this.#signUpPolicy.refusalMessage })
+    const mayCreateAccount = hasAccount || (await this.#admission.mayCreateAccount(email, OpenArtifactAuth.#inviteCodeIn(endpointContext)))
+    if (!mayCreateAccount) throw OpenArtifactAuth.#refusal()
     await this.#mailer.send({ to: email, subject: '登录 Open Artifact', text: `点下面的链接登录 Open Artifact，链接 5 分钟内有效：\n\n${url}\n\n如果不是你本人操作，忽略这封邮件即可。` })
   }
 
@@ -96,6 +104,15 @@ export class OpenArtifactAuth {
 
   async rename(request: Request, name: string): Promise<void> {
     await this.#auth.api.updateUser({ headers: request.headers, body: { name } })
+  }
+
+  static #refusal(): APIError {
+    return new APIError('FORBIDDEN', { message: Admission.REFUSAL, code: Admission.REFUSAL_CODE })
+  }
+
+  static #inviteCodeIn(endpointContext: AuthEndpointContext | null | undefined): string | null {
+    const headers = endpointContext?.request?.headers ?? endpointContext?.headers
+    return headers ? HttpCookies.read({ headers }, INVITE_COOKIE) : null
   }
 
   static #socialProviders(env: AppEnv) {
