@@ -94,6 +94,20 @@ describe('McpEndpoint', () => {
     expect(result.content[0]?.text).toContain('http://app.test/a/a1')
   })
 
+  it('passes the note that says what this version changed', async () => {
+    const fakeApp = new FakeApp(Response.json({ artifactId: 'a1', version: 2, url: 'http://app.test/a/a1' }), Response.json({ artifactId: 'a2', version: 1, url: 'http://app.test/a/a2' }, { status: 201 }))
+    const endpoint = mcpEndpoint(fakeApp)
+    const files = [{ path: 'index.html', content: '<h1>Plan</h1>' }]
+
+    await callTool(endpoint, 'update', { artifactId: 'a1', baseVersion: 1, files, note: '按评论补上第 3 节的连线' })
+    await callTool(endpoint, 'publish', { title: 'Plan', files, note: '第一版' })
+    const toolList = await rpc(endpoint, { jsonrpc: '2.0', id: 2, method: 'tools/list' })
+    const { result } = (await toolList.json()) as { result: { tools: { name: string; inputSchema: { properties: Record<string, unknown> } }[] } }
+
+    expect(fakeApp.calls.map(call => (call.body as { note?: string }).note)).toEqual(['按评论补上第 3 节的连线', '第一版'])
+    expect(result.tools.filter(tool => 'note' in tool.inputSchema.properties).map(tool => tool.name)).toEqual(['publish', 'update'])
+  })
+
   it('turns a version conflict into merge instructions rather than a failure', async () => {
     const fakeApp = new FakeApp(Response.json({ error: 'conflict', currentVersion: 4, latestFiles: [{ path: 'index.html', content: 'latest' }] }, { status: 409 }))
 

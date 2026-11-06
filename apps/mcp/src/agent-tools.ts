@@ -27,6 +27,12 @@ const FILES_SCHEMA = {
   },
 }
 
+const NOTE = {
+  type: 'string',
+  maxLength: 200,
+  description: 'What changed in this version, in one plain sentence (这次改了什么，一句话). People read it in the version list.',
+}
+
 const ARTIFACT_ID = { type: 'string', description: 'The artifactId returned by publish or list.' }
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
@@ -39,16 +45,17 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         title: { type: 'string', description: 'Short name people will recognize, at most 200 characters.' },
         files: FILES_SCHEMA,
         visibility: { type: 'string', enum: ['private', 'specified', 'workspace', 'public_link'], default: 'workspace' },
+        note: NOTE,
       },
       required: ['title', 'files'],
     },
   },
   {
     name: 'update',
-    description: 'Publish a new version of an artifact. Pass baseVersion = the version you read. If someone published in between, the result is a conflict with the latest files: merge your change into them and update again with baseVersion = currentVersion. Use force only when the person explicitly asks to overwrite.',
+    description: 'Publish a new version of an artifact. Pass baseVersion = the version you read. If someone published in between, the result is a conflict with the latest files: merge your change into them and update again with baseVersion = currentVersion. Use force only when the person explicitly asks to overwrite. Always pass a note saying what you changed; when the change answers a comment, say which.',
     inputSchema: {
       type: 'object',
-      properties: { artifactId: ARTIFACT_ID, baseVersion: { type: 'integer', minimum: 1 }, files: FILES_SCHEMA, force: { type: 'boolean', default: false } },
+      properties: { artifactId: ARTIFACT_ID, baseVersion: { type: 'integer', minimum: 1 }, files: FILES_SCHEMA, note: NOTE, force: { type: 'boolean', default: false } },
       required: ['artifactId', 'files'],
     },
   },
@@ -117,14 +124,14 @@ export class AgentTools {
   }
 
   async #publish(toolArguments: Record<string, unknown>): Promise<ToolResult> {
-    const { title, files, visibility } = toolArguments
-    const published = await this.#appClient.call('POST', '/api/artifacts', { title, files, visibility })
+    const { title, files, visibility, note } = toolArguments
+    const published = await this.#appClient.call('POST', '/api/artifacts', { title, files, visibility, note })
     return AgentTools.#result(published, 'Published. Share the url with the person:')
   }
 
   async #update(toolArguments: Record<string, unknown>): Promise<ToolResult> {
-    const { artifactId, baseVersion, files, force } = toolArguments
-    const updated = await this.#appClient.call('PUT', `/api/artifacts/${AgentTools.#segment(artifactId)}`, { baseVersion, files, force })
+    const { artifactId, baseVersion, files, note, force } = toolArguments
+    const updated = await this.#appClient.call('PUT', `/api/artifacts/${AgentTools.#segment(artifactId)}`, { baseVersion, files, note, force })
     if (updated.status === 409) return AgentTools.#text(`Conflict: someone published in between. Merge your change into latestFiles and call update again with baseVersion = currentVersion.\n\n${JSON.stringify(updated.body, null, 2)}`)
     return AgentTools.#result(updated, 'Published a new version:')
   }

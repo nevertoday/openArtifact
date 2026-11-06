@@ -171,5 +171,6 @@ describe('settings', () => {
 
     expect(llmsTxt).toContain(`${APP_ORIGIN}/api/artifacts`)
     expect(llmsTxt).toContain('window.openArtifact.db')
+    expect(llmsTxt).toContain('{ baseVersion, note, files }')
   })
 })

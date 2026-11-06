@@ -60,7 +60,7 @@ export class AgentGuide {
 
 ### Update, never overwrite blindly
 1. \`read\` the artifact; note its \`version\`.
-2. \`update\` with \`baseVersion\` set to that version.
+2. \`update\` with \`baseVersion\` set to that version, and a \`note\`: what you changed, in one sentence of at most 200 characters (\`"按评论把第 3 节的连线补上"\`). People read notes in the version list, so pass one on every update, above all when the change answers a comment.
 3. On a conflict (HTTP 409), someone published in between: merge your change into \`latestFiles\` from the response and update again with \`baseVersion = currentVersion\`.
 4. Pass \`force: true\` only when the person explicitly asks to overwrite.
 
@@ -82,9 +82,9 @@ const viewer = await window.openArtifact.viewer()  // { userId, name } or null f
 Collection names and ids: letters, digits, \`-\`, \`_\`; at most 64 characters. A document is at most 64 KB of JSON.
 
 ### HTTP API
-- \`POST ${api}/artifacts\` \`{ title, visibility?, files: [{ path, content, encoding?: "utf8"|"base64", contentType? }] }\`
+- \`POST ${api}/artifacts\` \`{ title, visibility?, note?, files: [{ path, content, encoding?: "utf8"|"base64", contentType? }] }\`
 - \`GET ${api}/artifacts\`, \`GET ${api}/artifacts/{id}\`
-- \`PUT ${api}/artifacts/{id}\` \`{ baseVersion, files }\`
+- \`PUT ${api}/artifacts/{id}\` \`{ baseVersion, note, files }\`
 - \`GET ${api}/artifacts/{id}/comments?filter=for_agent\`, \`POST ${api}/artifacts/{id}/comments\` \`{ body, parentId }\`, \`PATCH ${api}/comments/{commentId}\` \`{ resolved: true }\`
 `
   }
