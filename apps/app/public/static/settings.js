@@ -6,38 +6,71 @@ function secondaryText(text) {
   return element('span', { className: 'xxd-text', 'data-variant': 'secondary' }, text)
 }
 
+const POLL_INTERVAL_MS = 5000
+const JUST_CREATED_HIGHLIGHT_MS = 2500
+
+function tokenStateOf(accessToken) {
+  if (accessToken.revokedAt) return { label: '已撤销', tone: undefined, isActive: false }
+  if (accessToken.expiresAt && accessToken.expiresAt <= Date.now()) return { label: '已过期', tone: 'warning', isActive: false }
+  return { label: '有效', tone: 'success', isActive: true }
+}
+
+// One entry per column, so a new column is one line here; the label also heads the cell on a phone.
+const TOKEN_COLUMNS = [
+  { label: '名称', cell: accessToken => accessToken.name },
+  { label: '最近使用', cell: accessToken => secondaryText(accessToken.lastUsedAt ? timeAgo(accessToken.lastUsedAt) : '还没用过') },
+  { label: '到期', cell: accessToken => secondaryText(accessToken.expiresAt ? new Date(accessToken.expiresAt).toLocaleDateString('zh-CN') : '永不过期') },
+  {
+    label: '状态',
+    cell: accessToken => {
+      const state = tokenStateOf(accessToken)
+      return element('span', { className: 'xxd-badge', 'data-appearance': 'dot', 'data-tone': state.tone }, state.label)
+    },
+  },
+]
+
+/** The person's tokens: working ones in a table, revoked and expired ones folded away below it. */
 class TokenTable {
-  constructor(container) {
+  #onRevoked
+
+  constructor(container, { onRevoked }) {
     this.container = container
+    this.#onRevoked = onRevoked
   }
 
-  render(accessTokens) {
+  render(accessTokens, justCreatedTokenId = null) {
     if (accessTokens.length === 0) {
-      this.container.replaceChildren(element('div', { className: 'xxd-empty', 'data-size': 'sm' },
-        element('p', { className: 'xxd-empty__title' }, '还没有 token。新建一个，填进 agent 的 MCP 配置。')))
+      this.container.replaceChildren(secondaryText('还没有 token。'))
       return
     }
-    this.container.replaceChildren(element('div', { className: 'xxd-table-wrap' }, element('table', { className: 'xxd-table' },
-      element('thead', {}, element('tr', {}, element('th', {}, '名称'), element('th', {}, '最近使用'), element('th', {}, '过期'), element('th', {}, '状态'), element('th', { className: 'xxd-table__actions' }, element('span', { className: 'xxd-sr-only' }, '操作')))),
-      element('tbody', {}, accessTokens.map(accessToken => this.#row(accessToken))),
-    )))
+    const activeTokens = accessTokens.filter(accessToken => tokenStateOf(accessToken).isActive)
+    const inactiveTokens = accessTokens.filter(accessToken => !tokenStateOf(accessToken).isActive)
+    const inactiveFold = element('details', { className: 'xxd-collapse' }, element('summary', {}, `显示已失效的 token（${inactiveTokens.length}）`), this.#table(inactiveTokens, null))
+    this.container.replaceChildren(
+      activeTokens.length > 0 ? this.#table(activeTokens, justCreatedTokenId) : secondaryText('没有有效的 token。'),
+      inactiveTokens.length > 0 ? inactiveFold : null,
+    )
   }
 
-  async refresh() {
+  async refresh(justCreatedTokenId = null) {
     const { tokens } = await api('/api/tokens')
-    this.render(tokens)
+    this.render(tokens, justCreatedTokenId)
+    if (justCreatedTokenId !== null) setTimeout(() => this.container.querySelector('[data-just-created]')?.removeAttribute('data-just-created'), JUST_CREATED_HIGHLIGHT_MS)
   }
 
-  #row(accessToken) {
-    const state = TokenTable.#stateOf(accessToken)
-    return element('tr', {},
-      element('td', {}, accessToken.name),
-      element('td', {}, secondaryText(accessToken.lastUsedAt ? timeAgo(accessToken.lastUsedAt) : '从未')),
-      element('td', {}, secondaryText(accessToken.expiresAt ? new Date(accessToken.expiresAt).toLocaleDateString('zh-CN') : '永不')),
-      element('td', {}, element('span', { className: 'xxd-badge', 'data-appearance': 'dot', 'data-tone': state.tone }, state.label)),
-      element('td', { className: 'xxd-table__actions' }, state.isActive
-        ? element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'xs', onClick: () => this.#revoke(accessToken) }, '撤销')
-        : null),
+  #table(accessTokens, justCreatedTokenId) {
+    const actionsHeader = element('th', { className: 'xxd-table__actions' }, element('span', { className: 'xxd-sr-only' }, '操作'))
+    return element('div', { className: 'xxd-table-wrap' }, element('table', { className: 'xxd-table token-table' },
+      element('thead', {}, element('tr', {}, TOKEN_COLUMNS.map(column => element('th', {}, column.label)), actionsHeader)),
+      element('tbody', {}, accessTokens.map(accessToken => this.#row(accessToken, accessToken.tokenId === justCreatedTokenId))),
+    ))
+  }
+
+  #row(accessToken, justCreated) {
+    const revokeButton = element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'xs', onClick: () => this.#revoke(accessToken) }, '撤销')
+    return element('tr', { 'data-just-created': justCreated },
+      TOKEN_COLUMNS.map(column => element('td', { 'data-label': column.label }, column.cell(accessToken))),
+      element('td', { className: 'xxd-table__actions' }, tokenStateOf(accessToken).isActive ? revokeButton : null),
     )
   }
 
@@ -54,35 +87,140 @@ class TokenTable {
     try {
       await api(`/api/tokens/${encodeURIComponent(accessToken.tokenId)}`, { method: 'DELETE' })
       Xxd.toast(`已撤销「${accessToken.name}」`, { tone: 'success' })
+      this.#onRevoked(accessToken.tokenId)
       await this.refresh()
+      this.container.focus()
     } catch (error) {
       Xxd.toast(error.message, { tone: 'danger' })
     }
   }
+}
 
-  static #stateOf(accessToken) {
-    if (accessToken.revokedAt) return { label: '已撤销', tone: undefined, isActive: false }
-    if (accessToken.expiresAt && accessToken.expiresAt <= Date.now()) return { label: '已过期', tone: 'warning', isActive: false }
-    return { label: '有效', tone: 'success', isActive: true }
+/** The person's newest page published through an agent since `since`, or undefined. */
+function pagePublishedByAgentSince(artifacts, authorId, since) {
+  const publishedByAgent = artifacts.filter(artifact => artifact.author.userId === authorId && artifact.publishedVia !== null && artifact.updatedAt >= since)
+  return publishedByAgent.sort((left, right) => right.updatedAt - left.updatedAt)[0]
+}
+
+/**
+ * The token created on this page: its value fills every snippet, and the page watches until the agent using it
+ * publishes. The value lives only here, so leaving the page loses it.
+ */
+class AgentConnection {
+  #createdToken = null
+  #pollTimer = null
+  #setupStep = document.getElementById('connect-setup')
+  #checkStep = document.getElementById('connect-check')
+  #status = document.getElementById('connect-status')
+
+  constructor() {
+    document.addEventListener('visibilitychange', () => this.#checkWhileVisible())
+  }
+
+  show(createdToken) {
+    this.#createdToken = createdToken
+    this.#fillToken(createdToken.token)
+    this.#setupStep.querySelector('[data-token-name]').textContent = createdToken.name
+    this.#setupStep.hidden = false
+    this.#checkStep.hidden = false
+    this.#showStatus(AgentConnection.#waiting('等 agent 连上…'))
+    this.#stopWatching()
+    this.#pollTimer = setInterval(() => this.#checkWhileVisible(), POLL_INTERVAL_MS)
+    this.#setupStep.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  /** A revoked token must not stay on screen as if it still worked. */
+  forget(tokenId) {
+    if (this.#createdToken?.tokenId !== tokenId) return
+    this.#createdToken = null
+    this.#stopWatching()
+    this.#fillToken('')
+    this.#setupStep.hidden = true
+    this.#checkStep.hidden = true
+  }
+
+  #fillToken(tokenValue) {
+    for (const tokenSlot of document.querySelectorAll('[data-token-slot]')) tokenSlot.textContent = tokenValue
+  }
+
+  #stopWatching() {
+    clearInterval(this.#pollTimer)
+    this.#pollTimer = null
+  }
+
+  async #checkWhileVisible() {
+    const watching = this.#pollTimer !== null && document.visibilityState === 'visible'
+    if (!watching) return
+    try {
+      await this.#check(this.#createdToken)
+    } catch (error) {
+      console.error(new Error('could not check whether the agent connected', { cause: error }))
+    }
+  }
+
+  // The token's first use says the agent connected; a page by this person, published through an agent since the token was made, says it works.
+  async #check(watchedToken) {
+    const { tokens } = await api('/api/tokens')
+    const tokenNow = tokens.find(accessToken => accessToken.tokenId === watchedToken.tokenId)
+    if (!tokenNow?.lastUsedAt) return
+    const { artifacts } = await api('/api/artifacts')
+    const firstPage = pagePublishedByAgentSince(artifacts, settingsConfig.userId, watchedToken.createdAt)
+    const stillWatched = watchedToken === this.#createdToken
+    if (!stillWatched) return
+    if (!firstPage) {
+      this.#showStatus(AgentConnection.#waiting('agent 已经连上了，等它发布测试页…'))
+      return
+    }
+    this.#stopWatching()
+    this.#showStatus(AgentConnection.#connected(firstPage))
+  }
+
+  #showStatus(statusElement) {
+    this.#status.replaceChildren(statusElement)
+  }
+
+  static #waiting(text) {
+    return element('p', { className: 'xxd-cluster xxd-text', 'data-variant': 'secondary' }, element('span', { className: 'xxd-spinner', 'aria-hidden': 'true' }), text)
+  }
+
+  static #connected(firstPage) {
+    return element('div', { className: 'xxd-banner', 'data-tone': 'success' },
+      element('div', {}, element('p', { className: 'xxd-banner__title' }, `连上了：${firstPage.publishedVia} 刚刚发布了「${firstPage.title}」`)),
+      element('div', { className: 'xxd-banner__actions' }, element('a', { className: 'xxd-btn', 'data-size': 'sm', href: `/a/${encodeURIComponent(firstPage.artifactId)}` }, '打开')),
+    )
   }
 }
 
-function wireTokenCreation(tokenTable) {
+function expiresInDaysOf(expiryChoice) {
+  return expiryChoice === 'never' ? null : Number(expiryChoice)
+}
+
+function wireAgentConnection() {
+  const tokenTableContainer = document.getElementById('token-table')
+  if (!tokenTableContainer) return
+  const agentConnection = new AgentConnection()
+  const tokenTable = new TokenTable(tokenTableContainer, { onRevoked: tokenId => agentConnection.forget(tokenId) })
+  tokenTableContainer.tabIndex = -1
+  tokenTable.render(settingsConfig.accessTokens)
+
+  // Submitted once: the button stays busy and disabled until the token exists, so a double click cannot make two.
   const createForm = document.getElementById('create-token-form')
-  const reveal = document.getElementById('token-reveal')
+  const createButton = createForm.querySelector('[type="submit"]')
   createForm.addEventListener('submit', async event => {
     event.preventDefault()
+    if (createButton.disabled) return
     const formData = new FormData(createForm)
-    const expiryChoice = formData.get('expiresInDays')
+    const newToken = { name: formData.get('name'), expiresInDays: expiresInDaysOf(formData.get('expiresInDays')) }
+    createButton.disabled = true
     try {
-      const createdToken = await api('/api/tokens', { method: 'POST', body: { name: formData.get('name'), expiresInDays: expiryChoice === 'never' ? null : Number(expiryChoice) } })
-      reveal.querySelector('[data-token-reveal-title]').textContent = `「${createdToken.name}」已创建。这个 token 只显示这一次，请现在复制。`
-      reveal.querySelector('[data-token-value]').textContent = createdToken.token
-      reveal.hidden = false
+      const createdToken = await Xxd.runBusy(createButton, () => api('/api/tokens', { method: 'POST', body: newToken }))
       createForm.reset()
-      await tokenTable.refresh()
+      agentConnection.show(createdToken)
+      await tokenTable.refresh(createdToken.tokenId)
     } catch (error) {
-      Xxd.toast(`创建失败：${error.message}`, { tone: 'danger' })
+      Xxd.toast(`新建失败：${error.message}`, { tone: 'danger' })
+    } finally {
+      createButton.disabled = false
     }
   })
 }
@@ -325,12 +463,7 @@ function wireContentAdministration() {
   }
 }
 
-const tokenTableContainer = document.getElementById('token-table')
-if (tokenTableContainer) {
-  const tokenTable = new TokenTable(tokenTableContainer)
-  tokenTable.render(settingsConfig.accessTokens)
-  wireTokenCreation(tokenTable)
-}
+wireAgentConnection()
 wireProfileForm()
 wireWorkspaceNameForm()
 wirePublicLinksSwitch()

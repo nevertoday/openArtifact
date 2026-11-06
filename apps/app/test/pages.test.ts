@@ -168,6 +168,26 @@ describe('settings', () => {
     expect(settingsMarkup).toContain('AGENTS.md 片段')
   })
 
+  it('walks through naming a token, then ready-to-run setup with the token filled in, then a check', async () => {
+    const settingsMarkup = await pageText('/settings/agents', authorCookie)
+    const tokenSlots = settingsMarkup.match(/data-token-slot/g) ?? []
+
+    expect(settingsMarkup).toContain('1 · 给这个 agent 起个名字')
+    expect(settingsMarkup).toContain('<label class="xxd-label" for="token-name">名字</label>')
+    expect(settingsMarkup).toContain('<label class="xxd-label" for="token-expiry">有效期</label>')
+    expect(settingsMarkup).toContain('这个 token 只显示这一次。离开这个页面后就看不到了。')
+    expect(settingsMarkup).toContain('让 agent 发布一个测试页')
+    expect(settingsMarkup).not.toContain('oa_pat_…')
+    expect(tokenSlots.length).toBeGreaterThanOrEqual(6)
+    expect(settingsMarkup).toContain('http_headers = { Authorization = &quot;Bearer <span data-token-slot></span>&quot; }')
+    expect(settingsMarkup).not.toContain('bearer_token_env_var')
+    expect(settingsMarkup).toContain('其他（HTTP）')
+    expect(settingsMarkup).toContain(`${APP_ORIGIN}/llms.txt`)
+    expect(settingsMarkup).toContain(`curl -X POST ${APP_ORIGIN}/api/artifacts`)
+    expect(settingsMarkup).toContain('-H &quot;X-Open-Artifact-Client: 我的脚本&quot;')
+    expect(settingsMarkup).toContain('已有的 token')
+  })
+
   it('lists members and lets only an admin change workspace settings', async () => {
     const membersMarkup = await pageText('/settings/members', reviewerCookie)
     const reviewerWorkspaceMarkup = await pageText('/settings/workspace', reviewerCookie)

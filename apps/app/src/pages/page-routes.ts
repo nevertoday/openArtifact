@@ -198,7 +198,7 @@ export class PageRoutes {
       section === 'workspace' ? this.#workspaceAdministration(identity) : null,
     ])
     const guideFiles = new AgentGuide(this.#context.appOrigin, this.#settings.mcpUrl).files()
-    return SettingsPage.render({ identity, section, mcpUrl: this.#settings.mcpUrl, accessTokens, guideFiles, members, administration, now: Date.now() })
+    return SettingsPage.render({ identity, section, mcpUrl: this.#settings.mcpUrl, appOrigin: this.#context.appOrigin, accessTokens, guideFiles, members, administration, now: Date.now() })
   }
 
   // Only an admin sees every artifact's metadata and the audit log; a member gets null.

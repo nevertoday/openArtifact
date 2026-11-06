@@ -2,6 +2,7 @@ import { ArtifactRemoval, type AccessToken, type AuditEvent, type WorkspaceMembe
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import type { GuideFile } from '../guide/agent-guide.ts'
+import { AgentConnectSection } from './agent-connect-section.ts'
 import { INVITE_LIFETIME_DAYS } from '../api/invite-api.ts'
 import { People } from '../people.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
@@ -25,6 +26,7 @@ export interface SettingsModel {
   identity: Identity
   section: SettingsSection
   mcpUrl: string
+  appOrigin: string
   accessTokens: AccessToken[]
   guideFiles: GuideFile[]
   members: WorkspaceMember[]
@@ -39,7 +41,7 @@ export class SettingsPage {
     const body = html`
 ${PageShell.topBar(model.identity, html`<span class="xxd-text app-topbar__context" data-variant="secondary">/ 设置</span>`)}
 ${PageShell.withSidebar(SettingsPage.#sidebar(model), html`<div class="xxd-read">${SettingsPage.#section(model)}</div>`)}
-${PageShell.jsonData('settings-config', { accessTokens: model.accessTokens })}`
+${PageShell.jsonData('settings-config', { userId: model.identity.userId, accessTokens: model.accessTokens })}`
     return PageShell.render({ title: `${SECTION_LABELS[model.section]} · Open Artifact`, body, scripts: ['common.js', 'settings.js'] })
   }
 
@@ -73,56 +75,8 @@ ${PageShell.jsonData('settings-config', { accessTokens: model.accessTokens })}`
   }
 
   static #agentsSection(model: SettingsModel): SafeHtml {
-    const clients = SettingsPage.#mcpSnippets(model.mcpUrl)
-    return html`${SettingsPage.#pageHeader('Agent 接入', `让 Claude Code、Codex、Cursor、Gemini CLI 等 agent 以你的身份发布和修改 artifact。agent 的权限和你的权限相同。`)}
-<div class="xxd-settings">
-<section class="xxd-stack" aria-labelledby="mcp-title">
-  <div class="xxd-text-pair">
-    <div class="xxd-cluster"><h2 class="xxd-text" data-variant="heading3" id="mcp-title">1 · 连接 MCP server</h2><span class="xxd-badge">推荐</span></div>
-    <p class="xxd-text" data-variant="secondary">支持 MCP 的 agent 用这一种就够了。工具说明会自动进入 agent 的上下文。把 <code class="xxd-code-inline">oa_pat_…</code> 换成第 2 步生成的 token。</p>
-  </div>
-  <div class="xxd-tabs" data-xxd-tabs aria-label="MCP 客户端">
-    ${clients.map((client, index) => html`<button type="button" role="tab" id="mcp-client-${index}" aria-controls="mcp-snippet-${index}" aria-selected="${index === 0 ? 'true' : 'false'}">${client.name}</button>`)}
-  </div>
-  ${clients.map((client, index) => html`<div class="xxd-code-block" id="mcp-snippet-${index}" ${index === 0 ? '' : new SafeHtml('hidden')}>
-    <div class="xxd-code__head">${client.name}<button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="xs" aria-label="复制 ${client.name} 配置" data-copy="${client.snippet}">${PageShell.icon('Copy', 14)}</button></div>
-    <pre class="xxd-code" tabindex="0"><code>${client.snippet}</code></pre>
-  </div>`)}
-</section>
-
-<section class="xxd-stack" aria-labelledby="pat-title">
-  <h2 class="xxd-text" data-variant="heading3" id="pat-title">2 · 个人 API token</h2>
-  <form class="token-form" id="create-token-form" data-xxd-validate>
-    <div class="xxd-field token-form__name">
-      <label class="xxd-sr-only" for="token-name">token 名称</label>
-      <input class="xxd-input" id="token-name" name="name" required maxlength="80" placeholder="名称，例如 Claude Code · 工作机" data-error-required="给 token 起个名字，比如它装在哪台机器上">
-    </div>
-    <label class="xxd-select"><span class="xxd-sr-only">有效期</span><select id="token-expiry" name="expiresInDays"><option value="90">90 天</option><option value="30">30 天</option><option value="365">1 年</option><option value="never">永不过期</option></select></label>
-    <button type="submit" class="xxd-btn" data-variant="primary">新建 token</button>
-  </form>
-  <div class="xxd-banner" data-tone="warning" id="token-reveal" role="status" hidden>
-    ${PageShell.icon('TriangleAlert')}
-    <div class="xxd-stack token-created">
-      <p class="xxd-banner__title" data-token-reveal-title></p>
-      <div class="xxd-clipboard"><code data-token-value></code><button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" aria-label="复制 token" data-copy-target="[data-token-value]" data-copy-done="token 已复制">${PageShell.icon('Copy', 14)}</button></div>
-    </div>
-  </div>
-  <div id="token-table"></div>
-</section>
-
-<section class="xxd-group" aria-labelledby="guide-title">
-  <div class="xxd-text-pair">
-    <h2 class="xxd-text" data-variant="heading3" id="guide-title">3 · 指南包（不支持 MCP 时用）</h2>
-    <p class="xxd-text" data-variant="secondary">告诉 agent 什么时候发布、页面要遵守什么约定、该更新而不是新建。已经填好本实例的地址。</p>
-  </div>
-  <div class="xxd-group__body">
-    ${model.guideFiles.map(guideFile => html`<div class="xxd-row">
-      <div class="xxd-row__text"><span class="xxd-row__title">${guideFile.label}</span><span class="xxd-row__desc xxd-mono">${guideFile.savePath}</span></div>
-      <div class="xxd-row__control"><button type="button" class="xxd-btn" data-size="sm" data-copy="${guideFile.content}" data-copy-done="已复制 ${guideFile.label}">${PageShell.icon('Copy', 14)}复制内容</button></div>
-    </div>`)}
-  </div>
-</section>
-</div>`
+    return html`${SettingsPage.#pageHeader('Agent 接入', 'Claude Code、Codex、Cursor、Gemini CLI 等 agent 以你的身份发布和修改 artifact，权限和你相同。')}
+${AgentConnectSection.render(model)}`
   }
 
   static #profileSection(identity: Identity): SafeHtml {
@@ -316,14 +270,5 @@ ${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
       case 'workspace.renamed':
         return `${actor} 把 workspace 从「${auditEvent.detail.from}」改名为「${auditEvent.detail.to}」`
     }
-  }
-
-  static #mcpSnippets(mcpUrl: string): { name: string; snippet: string }[] {
-    return [
-      { name: 'Claude Code', snippet: `claude mcp add --transport http open-artifact ${mcpUrl} \\\n  --header "Authorization: Bearer oa_pat_…"` },
-      { name: 'Codex', snippet: `# ~/.codex/config.toml\n[mcp_servers.open-artifact]\nurl = "${mcpUrl}"\nbearer_token_env_var = "OPEN_ARTIFACT_TOKEN"` },
-      { name: 'Cursor', snippet: `// .cursor/mcp.json\n{ "mcpServers": { "open-artifact": {\n    "url": "${mcpUrl}",\n    "headers": { "Authorization": "Bearer oa_pat_…" } } } }` },
-      { name: 'Gemini CLI', snippet: `// ~/.gemini/settings.json\n{ "mcpServers": { "open-artifact": {\n    "httpUrl": "${mcpUrl}",\n    "headers": { "Authorization": "Bearer oa_pat_…" } } } }` },
-    ]
   }
 }
