@@ -37,6 +37,7 @@ export interface WorkspaceRepository {
    */
   joinFirstWorkspace(userId: string, newWorkspaceName: string): Promise<Membership | null>
   listMembers(workspaceId: string): Promise<WorkspaceMember[]>
+  rename(workspaceId: string, name: string): Promise<void>
   setPublicLinksEnabled(workspaceId: string, enabled: boolean): Promise<void>
   changeRole(workspaceId: string, userId: string, role: WorkspaceRole): Promise<MembershipChange>
   /** Ends the membership, revokes the person's API tokens for the workspace and drops their grants on its artifacts. */

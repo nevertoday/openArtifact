@@ -104,9 +104,46 @@ function wireProfileForm() {
   })
 }
 
+function wireWorkspaceNameForm() {
+  const workspaceNameForm = document.getElementById('workspace-name-form')
+  workspaceNameForm?.addEventListener('submit', async event => {
+    event.preventDefault()
+    const saveButton = event.submitter
+    saveButton.disabled = true
+    saveButton.setAttribute('aria-busy', 'true')
+    try {
+      await api('/api/workspace', { method: 'PATCH', body: { name: new FormData(workspaceNameForm).get('name') } })
+      location.reload()
+    } catch (error) {
+      Xxd.setFieldError(document.getElementById('workspace-name'), error.message)
+      saveButton.disabled = false
+      saveButton.removeAttribute('aria-busy')
+    }
+  })
+}
+
+// Everyone outside the workspace who holds one of those links loses the page at once, so it asks first.
+function confirmPublicLinksOff(publicLinkCount) {
+  if (publicLinkCount === 0) return Promise.resolve(true)
+  return Xxd.confirmDialog({
+    title: '关闭公开链接？',
+    message: `关闭后，${publicLinkCount} 个公开链接立即失效。`,
+    confirmLabel: '关闭公开链接',
+    cancelLabel: '取消',
+    closeLabel: '关闭',
+    tone: 'danger',
+  })
+}
+
 function wirePublicLinksSwitch() {
   const publicLinksSwitch = document.getElementById('public-links-enabled')
   publicLinksSwitch?.addEventListener('change', async () => {
+    const turningOff = !publicLinksSwitch.checked
+    const confirmed = turningOff ? await confirmPublicLinksOff(Number(publicLinksSwitch.dataset.publicLinkCount)) : true
+    if (!confirmed) {
+      publicLinksSwitch.checked = true
+      return
+    }
     try {
       await api('/api/workspace', { method: 'PATCH', body: { publicLinksEnabled: publicLinksSwitch.checked } })
       Xxd.toast(publicLinksSwitch.checked ? '已允许公开链接' : '已关闭公开链接', { tone: 'success' })
@@ -191,6 +228,7 @@ if (tokenTableContainer) {
   wireTokenCreation(tokenTable)
 }
 wireProfileForm()
+wireWorkspaceNameForm()
 wirePublicLinksSwitch()
 wireMemberAdministration()
 wireContentAdministration()

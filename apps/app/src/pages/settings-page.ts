@@ -10,7 +10,7 @@ import { type IconName, PageShell } from './page-shell.ts'
 export const SETTINGS_SECTIONS = ['agents', 'profile', 'members', 'workspace'] as const
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
 
-const SECTION_LABELS: Record<SettingsSection, string> = { agents: 'Agent 接入', profile: '个人资料', members: '成员', workspace: 'Workspace 设置' }
+const SECTION_LABELS: Record<SettingsSection, string> = { agents: 'Agent 接入', profile: '个人资料', members: '成员', workspace: 'workspace 设置' }
 
 /** What only an admin sees: every artifact of the workspace as metadata, and the latest audit events. */
 export interface WorkspaceAdministration {
@@ -73,7 +73,7 @@ ${PageShell.jsonData('settings-config', { accessTokens: model.accessTokens })}`
 
   static #agentsSection(model: SettingsModel): SafeHtml {
     const clients = SettingsPage.#mcpSnippets(model.mcpUrl)
-    return html`${SettingsPage.#pageHeader('Agent 接入', `让 Claude Code、Codex、Cursor、Gemini CLI 等 agent 以你的身份发布和修改 artifact。agent 的权限和你在 ${model.identity.membership.workspace.name} 里的权限相同。`)}
+    return html`${SettingsPage.#pageHeader('Agent 接入', `让 Claude Code、Codex、Cursor、Gemini CLI 等 agent 以你的身份发布和修改 artifact。agent 的权限和你的权限相同。`)}
 <div class="xxd-settings">
 <section class="xxd-stack" aria-labelledby="mcp-title">
   <div class="xxd-text-pair">
@@ -175,21 +175,43 @@ ${PageShell.jsonData('settings-config', { accessTokens: model.accessTokens })}`
   }
 
   static #workspaceSection(model: SettingsModel): SafeHtml {
-    const { identity } = model
-    const isAdmin = identity.membership.role === 'admin'
-    return html`${SettingsPage.#pageHeader('Workspace 设置')}
+    const { identity, administration } = model
+    return html`${SettingsPage.#pageHeader(SECTION_LABELS.workspace)}
+${administration ? SettingsPage.#workspaceNameForm(identity) : ''}
 <section class="xxd-group" aria-labelledby="public-links-title">
   <h2 class="xxd-group__title" id="public-links-title">公开链接</h2>
   <div class="xxd-group__body">
     <div class="xxd-row">
-      <div class="xxd-row__text"><label class="xxd-row__title" for="public-links-enabled">允许成员把 artifact 分享为公开链接</label><span class="xxd-row__desc" id="public-links-help">关闭后，现有的公开链接立即失效；成员仍然可以在 workspace 内查看。</span></div>
-      <div class="xxd-row__control"><input type="checkbox" role="switch" class="xxd-switch" id="public-links-enabled" aria-describedby="public-links-help" ${identity.membership.workspace.publicLinksEnabled ? new SafeHtml('checked') : ''} ${isAdmin ? '' : new SafeHtml('disabled')}></div>
+      <div class="xxd-row__text"><span class="xxd-row__title" id="public-links-label">允许成员把 artifact 分享为公开链接</span><span class="xxd-row__desc" id="public-links-help">关闭后，现有的公开链接立即失效；成员仍然可以在 workspace 内查看。</span></div>
+      <div class="xxd-row__control">${administration ? SettingsPage.#publicLinksSwitch(identity, administration) : SettingsPage.#publicLinksState(identity)}</div>
     </div>
   </div>
-  ${isAdmin ? '' : html`<p class="xxd-group__note">只有管理员可以修改。</p>`}
 </section>
-${model.administration ? SettingsPage.#contentSection(model.administration, identity, model.now) : ''}
-${model.administration ? SettingsPage.#auditSection(model.administration, model.now) : ''}`
+${administration ? SettingsPage.#contentSection(administration, identity, model.now) : ''}
+${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
+  }
+
+  static #workspaceNameForm(identity: Identity): SafeHtml {
+    return html`<form class="xxd-stack workspace-name-form" id="workspace-name-form" data-xxd-validate>
+  <div class="xxd-field">
+    <label class="xxd-label" for="workspace-name">名称</label>
+    <input class="xxd-input" id="workspace-name" name="name" required maxlength="40" value="${identity.membership.workspace.name}" aria-describedby="workspace-name-help" data-error-required="写一个名称，比如团队或项目的名字">
+    <p class="xxd-help" id="workspace-name-help">成员在侧栏和切换 workspace 时看到它。最多 40 个字。</p>
+  </div>
+  <div><button type="submit" class="xxd-btn" data-variant="primary">保存</button></div>
+</form>`
+  }
+
+  // Turning public links off ends every live one at once, so the switch carries how many that is for the confirmation.
+  static #publicLinksSwitch(identity: Identity, administration: WorkspaceAdministration): SafeHtml {
+    const livePublicLinks = administration.artifacts.filter(({ summary }) => summary.sharing.visibility === 'public_link' && summary.removal === null)
+    return html`<input type="checkbox" role="switch" class="xxd-switch" id="public-links-enabled" aria-labelledby="public-links-label" aria-describedby="public-links-help" data-public-link-count="${livePublicLinks.length}" ${identity.membership.workspace.publicLinksEnabled ? new SafeHtml('checked') : ''}>`
+  }
+
+  // A disabled switch reads as "off", so a member sees the setting as words.
+  static #publicLinksState(identity: Identity): SafeHtml {
+    const state = identity.membership.workspace.publicLinksEnabled ? '已允许' : '已关闭'
+    return html`<span class="xxd-text" data-variant="secondary">${state} · 只有管理员可以修改</span>`
   }
 
   // Metadata only: a private artifact shows its title but no link, since an admin may not open it.
@@ -260,6 +282,8 @@ ${model.administration ? SettingsPage.#auditSection(model.administration, model.
         return `${actor} 把 ${names.get(auditEvent.targetId)} 移出了 workspace`
       case 'member.role_changed':
         return `${actor} 把 ${names.get(auditEvent.targetId)} 设为${ArtifactLabels.role(auditEvent.detail.to)}`
+      case 'workspace.renamed':
+        return `${actor} 把 workspace 从「${auditEvent.detail.from}」改名为「${auditEvent.detail.to}」`
     }
   }
 

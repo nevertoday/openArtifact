@@ -118,12 +118,18 @@ ${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(mod
   static #artifactsSection(shownArtifacts: OpenedArtifact[], model: HomeModel): SafeHtml {
     return html`<header class="xxd-page-header">
   <div class="xxd-page-header__row">
-    <h1 class="xxd-page-header__title">${model.identity.membership.workspace.name}的 artifact</h1>
+    <h1 class="xxd-page-header__title">${HomePage.#heading(model.query)}</h1>
     <div class="xxd-page-header__actions"><a class="xxd-btn" data-variant="primary" href="/settings/agents">让 agent 发布</a></div>
   </div>
   <p class="xxd-page-header__desc">由团队成员的 agent 发布，默认整个 workspace 可见</p>
 </header>
 ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#emptyState(model)}`
+  }
+
+  // The heading names what the list shows, so it never runs the workspace name into a sentence.
+  static #heading(query: HomeQuery): string {
+    if (query.agent !== null) return `${query.agent} 发布的`
+    return query.filter === 'all' ? '全部 artifact' : FILTER_LABELS[query.filter]
   }
 
   // Removed artifacts have no page to open; the list offers only 恢复 until they are purged.

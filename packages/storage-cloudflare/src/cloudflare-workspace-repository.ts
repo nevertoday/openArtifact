@@ -81,6 +81,10 @@ export class CloudflareWorkspaceRepository implements WorkspaceRepository {
     return memberRows.map(memberRow => ({ ...CloudflareUserDirectory.profileOf(memberRow), role: memberRow.role }))
   }
 
+  async rename(workspaceId: string, name: string): Promise<void> {
+    await this.#db.prepare('UPDATE workspaces SET name = ? WHERE id = ?').bind(name, workspaceId).run()
+  }
+
   async setPublicLinksEnabled(workspaceId: string, enabled: boolean): Promise<void> {
     await this.#db.prepare('UPDATE workspaces SET public_links_enabled = ? WHERE id = ?').bind(enabled ? 1 : 0, workspaceId).run()
   }
