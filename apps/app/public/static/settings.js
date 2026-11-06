@@ -178,7 +178,7 @@ async function removeMember(removeButton) {
   const memberName = removeButton.dataset.name
   const confirmed = await Xxd.confirmDialog({
     title: `移除 ${memberName}？`,
-    message: 'TA 会立即失去访问权限，个人 API token 也会被撤销，再次登录也不会自动加入。TA 发布的 artifact 会留在 workspace 里。',
+    message: 'TA 会立即失去访问权限，个人 API token 也会被撤销，再次登录也不会自动加入，除非你用邮箱重新邀请 TA。TA 发布的 artifact 会留在 workspace 里。',
     confirmLabel: '移除',
     cancelLabel: '取消',
     closeLabel: '关闭',
@@ -192,6 +192,110 @@ async function removeMember(removeButton) {
   } catch (error) {
     Xxd.toast(`移除失败：${error.message}`, { tone: 'danger' })
   }
+}
+
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** The admin's pending invites: links anyone may use, and addresses that have not joined yet. */
+class PendingInvites {
+  constructor(container) {
+    this.container = container
+  }
+
+  async refresh() {
+    const { invites } = await api('/api/workspace/invites')
+    this.render(invites)
+  }
+
+  render(invites) {
+    if (invites.length === 0) {
+      this.container.replaceChildren(secondaryText('没有待接受的邀请。'))
+      return
+    }
+    this.container.replaceChildren(
+      element('h3', { className: 'xxd-text', 'data-variant': 'body' }, `待接受的邀请（${invites.length}）`),
+      element('ul', { className: 'xxd-list' }, invites.map(invite => this.#item(invite))),
+    )
+  }
+
+  #item(invite) {
+    const subject = invite.email ?? '邀请链接 · 任何人可用'
+    const expiry = new Date(invite.expiresAt).toLocaleDateString('zh-CN')
+    return element('li', { className: 'xxd-list__item' },
+      element('span', { className: 'xxd-list__main' },
+        element('span', { className: 'xxd-list__title' }, subject),
+        element('span', { className: 'xxd-list__meta' }, `${invite.invitedBy.name} 邀请 · ${expiry} 到期`),
+      ),
+      element('span', { className: 'xxd-cluster invite-actions' },
+        element('button', { type: 'button', className: 'xxd-btn', 'data-size': 'xs', 'data-copy': invite.url, 'data-copy-done': '已复制邀请链接' }, '复制链接'),
+        element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'xs', onClick: () => this.#revoke(invite, subject) }, '撤销'),
+      ),
+    )
+  }
+
+  async #revoke(invite, subject) {
+    try {
+      await api(`/api/workspace/invites/${encodeURIComponent(invite.inviteId)}`, { method: 'DELETE' })
+      Xxd.toast(`已撤销「${subject}」`, { tone: 'success' })
+      await this.refresh()
+    } catch (error) {
+      Xxd.toast(`撤销失败：${error.message}`, { tone: 'danger' })
+    }
+  }
+}
+
+function emailsIn(text) {
+  return text.split(/[\s,，;；]+/).filter(email => email.length > 0)
+}
+
+function wireInvites() {
+  const pendingContainer = document.getElementById('pending-invites')
+  if (!pendingContainer) return
+  const pendingInvites = new PendingInvites(pendingContainer)
+  pendingInvites.refresh().catch(error => Xxd.toast(`读取邀请失败：${error.message}`, { tone: 'danger' }))
+
+  const linkButton = document.getElementById('create-invite-link')
+  linkButton.addEventListener('click', async () => {
+    linkButton.disabled = true
+    try {
+      await Xxd.runBusy(linkButton, () => api('/api/workspace/invites/link', { method: 'POST' }))
+      Xxd.toast('已生成邀请链接。点「复制链接」发给同事。', { tone: 'success' })
+      await pendingInvites.refresh()
+    } catch (error) {
+      Xxd.toast(`生成失败：${error.message}`, { tone: 'danger' })
+    } finally {
+      linkButton.disabled = false
+    }
+  })
+
+  const emailForm = document.getElementById('invite-email-form')
+  const emailsInput = document.getElementById('invite-emails')
+  emailForm.addEventListener('submit', async event => {
+    event.preventDefault()
+    const emails = emailsIn(emailsInput.value)
+    const malformedEmail = emails.find(email => !EMAIL_SHAPE.test(email))
+    if (emails.length === 0) return Xxd.setFieldError(emailsInput, '填一个或多个邮箱')
+    if (malformedEmail) return Xxd.setFieldError(emailsInput, `「${malformedEmail}」不是邮箱地址`)
+    Xxd.setFieldError(emailsInput, '')
+    const sendButton = event.submitter
+    sendButton.disabled = true
+    try {
+      const { invites, alreadyMembers } = await Xxd.runBusy(sendButton, () => api('/api/workspace/invites/email', { method: 'POST', body: { emails } }))
+      emailForm.reset()
+      Xxd.toast(invitationSummary(invites.length, alreadyMembers), { tone: 'success' })
+      await pendingInvites.refresh()
+    } catch (error) {
+      Xxd.setFieldError(emailsInput, error.message)
+    } finally {
+      sendButton.disabled = false
+    }
+  })
+}
+
+function invitationSummary(invitedCount, alreadyMembers) {
+  const invited = invitedCount > 0 ? `已邀请 ${invitedCount} 人。` : ''
+  const skipped = alreadyMembers.length > 0 ? `${alreadyMembers.join('、')} 已经是成员。` : ''
+  return invited + skipped
 }
 
 // The table and the audit log below it both change, so the page reloads after each action.
@@ -231,4 +335,5 @@ wireProfileForm()
 wireWorkspaceNameForm()
 wirePublicLinksSwitch()
 wireMemberAdministration()
+wireInvites()
 wireContentAdministration()

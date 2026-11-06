@@ -2,6 +2,7 @@ import { ArtifactRemoval, type AccessToken, type AuditEvent, type WorkspaceMembe
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import type { GuideFile } from '../guide/agent-guide.ts'
+import { INVITE_LIFETIME_DAYS } from '../api/invite-api.ts'
 import { People } from '../people.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
 import { html, SafeHtml } from './html.ts'
@@ -151,11 +152,35 @@ ${PageShell.jsonData('settings-config', { accessTokens: model.accessTokens })}`
     ${isAdmin ? SettingsPage.#memberControls(member, name, identity.userId, adminCount) : html`<td>${member.role === 'admin' ? html`<span class="xxd-badge">管理员</span>` : '成员'}</td>`}
   </tr>`
     }
-    return html`${SettingsPage.#pageHeader('成员', `${members.length} 人。新同事第一次登录后会自动加入。`)}
+    const joiningHint = isAdmin ? '' : '要请同事加入，请管理员邀请。'
+    return html`${SettingsPage.#pageHeader('成员', `${members.length} 人。${joiningHint}`)}
+${isAdmin ? SettingsPage.#inviteSection() : ''}
 <div class="xxd-table-wrap"><table class="xxd-table">
   <thead><tr><th>名称</th><th>邮箱</th><th>角色</th>${isAdmin ? html`<th class="xxd-table__actions"><span class="xxd-sr-only">操作</span></th>` : ''}</tr></thead>
   <tbody>${members.map(memberRow)}</tbody>
 </table></div>`
+  }
+
+  // The pending list is drawn by settings.js from /api/workspace/invites, the same JSON every later change returns.
+  static #inviteSection(): SafeHtml {
+    return html`<section class="xxd-stack invite-section" aria-labelledby="invite-title">
+  <div class="xxd-text-pair">
+    <h2 class="xxd-text" data-variant="heading3" id="invite-title">邀请同事</h2>
+    <p class="xxd-text" data-variant="secondary">收到邀请的人登录后就会加入，不受邮箱域名限制。邀请 ${INVITE_LIFETIME_DAYS} 天后失效。</p>
+  </div>
+  <form class="invite-form" id="invite-email-form" novalidate>
+    <div class="xxd-field invite-form__emails">
+      <label class="xxd-label" for="invite-emails">用邮箱邀请</label>
+      <textarea class="xxd-textarea" id="invite-emails" name="emails" rows="2" data-autosize placeholder="name@example.com" aria-describedby="invite-emails-help"></textarea>
+      <p class="xxd-help" id="invite-emails-help">可以一次填多个，用逗号或换行分开。每人会收到一封带链接的邮件。</p>
+    </div>
+    <div class="xxd-cluster invite-form__actions">
+      <button type="submit" class="xxd-btn" data-variant="primary">发送邀请</button>
+      <button type="button" class="xxd-btn" id="create-invite-link">${PageShell.icon('Link', 14)}生成邀请链接</button>
+    </div>
+  </form>
+  <div class="xxd-stack" id="pending-invites" aria-live="polite"></div>
+</section>`
   }
 
   // An admin acting on someone else always leaves themselves as admin, so only their own row can hit the limits.
@@ -263,7 +288,7 @@ ${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
     return html`<section class="xxd-stack" aria-labelledby="audit-title">
   <div class="xxd-text-pair">
     <h2 class="xxd-text" data-variant="heading3" id="audit-title">管理记录</h2>
-    <p class="xxd-text" data-variant="secondary">最近 ${auditEvents.length} 条删除、下架、恢复、重命名和成员变动。</p>
+    <p class="xxd-text" data-variant="secondary">最近 ${auditEvents.length} 条删除、下架、恢复、重命名、邀请和成员变动。</p>
   </div>
   ${auditEvents.length > 0 ? html`<ul class="xxd-list">${auditEvents.map(eventItem)}</ul>` : html`<p class="xxd-text" data-variant="secondary">还没有管理记录。</p>`}
 </section>`

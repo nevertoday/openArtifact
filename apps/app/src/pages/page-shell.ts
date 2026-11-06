@@ -14,6 +14,7 @@ export type IconName =
   | 'Inbox'
   | 'LayoutGrid'
   | 'LayoutTemplate'
+  | 'Link'
   | 'Lock'
   | 'LockKeyhole'
   | 'LogOut'

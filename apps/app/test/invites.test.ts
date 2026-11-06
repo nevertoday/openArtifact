@@ -191,3 +191,17 @@ describe('who manages invites', () => {
     expect([byMember.status, byToken.status, listByMember.status, unknownRevoke.status]).toEqual([403, 403, 403, 404])
   })
 })
+
+describe('the members page', () => {
+  it('gives an admin the invite tools and tells a member to ask an admin', async () => {
+    const memberCookie = await app.signIn('page-member@example.com')
+
+    const adminMarkup = await (await app.request('/settings/members', { cookie: adminCookie })).text()
+    const memberMarkup = await (await app.request('/settings/members', { cookie: memberCookie })).text()
+
+    expect(adminMarkup).toContain('id="invite-email-form"')
+    expect(adminMarkup).toContain('生成邀请链接')
+    expect(memberMarkup).not.toContain('id="invite-email-form"')
+    expect(memberMarkup).toContain('要请同事加入，请管理员邀请。')
+  })
+})

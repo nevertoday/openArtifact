@@ -53,6 +53,10 @@
 .token-created { --stack-gap: var(--space-2); min-width: 0; flex: 1; }
 .profile-form { max-width: 400px; }
 .member-reason { margin: var(--space-1) 0 0; }
+.invite-form { display: grid; gap: var(--gap-items); }
+.invite-section .xxd-list__item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.invite-section .xxd-list__main { flex: 1 1 12em; min-width: 0; overflow-wrap: anywhere; }
+.invite-actions { --cluster-gap: var(--space-1); flex: none; }
 
 /* Viewer: the artifact on the left, comments, versions and data on the right. */
 .viewer-page { display: flex; flex-direction: column; height: 100dvh; }
