@@ -27,13 +27,13 @@ function jsonDataOf(markup: string, elementId: string): unknown {
 
 describe('viewer page actions', () => {
   it('offers 重命名 and 删除 to the author, 重命名 to an editor, 下架 to an admin, and nothing to a member', async () => {
-    const published = await app.publish({ token: authorToken }, 'Menu check', '<h1>x</h1>', 'workspace')
-    await app.request(`/api/artifacts/${published.artifactId}/grants`, { method: 'PUT', cookie: authorCookie, body: { email: 'member@example.com', role: 'editor' } })
+    const published = await app.publish({ token: authorToken }, 'Menu check', '<h1>x</h1>', 'specified')
+    await app.grant(authorCookie, published.artifactId, 'member@example.com', 'editor')
     const memberOnly = await app.publish({ token: authorToken }, 'Member view')
 
     const authorMarkup = await pageText(`/a/${published.artifactId}`, authorCookie)
     const editorMarkup = await pageText(`/a/${published.artifactId}`, memberCookie)
-    const adminMarkup = await pageText(`/a/${published.artifactId}`, adminCookie)
+    const adminMarkup = await pageText(`/a/${memberOnly.artifactId}`, adminCookie)
     const memberMarkup = await pageText(`/a/${memberOnly.artifactId}`, memberCookie)
 
     expect(authorMarkup).toContain('data-rename-artifact')

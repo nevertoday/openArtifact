@@ -68,6 +68,16 @@ describe('ArtifactAccess', () => {
     expect(permissions({ visibility: 'specified' }, { ...member, grantRole: 'editor' })).toMatchObject({ canEdit: true, canManageSharing: false })
   })
 
+  it('counts grants only while the artifact is shared with specified people', () => {
+    const grantedOutsider: ArtifactViewer = { ...outsider, grantRole: 'editor' }
+    const grantedMember: ArtifactViewer = { ...member, grantRole: 'editor' }
+
+    expect(permissions({ visibility: 'specified' }, grantedOutsider).canEdit).toBe(true)
+    expect(permissions({ visibility: 'workspace' }, grantedOutsider).canView).toBe(false)
+    expect(permissions({ visibility: 'workspace' }, grantedMember)).toMatchObject({ canView: true, canEdit: false })
+    expect(permissions({ visibility: 'public_link' }, grantedMember).canEdit).toBe(false)
+  })
+
   it('lets anyone open an active public link but write shared data only when the author allows it', () => {
     expect(permissions({ visibility: 'public_link' }, anonymous)).toMatchObject({ canView: true, canComment: false, canWriteSharedData: false })
     expect(permissions({ visibility: 'public_link', anonymousWriteEnabled: true }, anonymous).canWriteSharedData).toBe(true)

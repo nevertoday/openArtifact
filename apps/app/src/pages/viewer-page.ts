@@ -200,16 +200,16 @@ ${ViewerPage.#artifactMenu(model)}`
 
   static #shareDialog(): SafeHtml {
     return html`<dialog class="xxd-dialog" data-size="lg" id="share-dialog" aria-labelledby="share-title">
-  <form method="dialog" id="share-form">
+  <form id="share-form">
     <div class="xxd-dialog__head">
       <div class="xxd-text-pair share-dialog__heading"><h2 class="xxd-dialog__title" id="share-title">分享</h2><p class="xxd-text" data-variant="caption" data-share-subtitle></p></div>
-      <button type="submit" value="close" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" aria-label="关闭">${PageShell.icon('X')}</button>
+      <button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" aria-label="关闭" data-close-share>${PageShell.icon('X')}</button>
     </div>
     <div class="xxd-dialog__body share-dialog__body" data-share-body><p class="viewer-side__status"><span class="xxd-spinner" aria-hidden="true"></span>正在加载…</p></div>
     <div class="xxd-dialog__actions">
       <span class="xxd-text share-dialog__url" data-variant="mono-secondary" data-share-url></span>
       <button type="button" class="xxd-btn" data-copy-link data-copy-done="链接已复制">${PageShell.icon('Copy', 14)}复制链接</button>
-      <button type="button" class="xxd-btn" data-variant="primary" data-save-sharing>保存</button>
+      <button type="submit" class="xxd-btn" data-variant="primary" data-save-sharing disabled>保存</button>
     </div>
   </form>
 </dialog>`

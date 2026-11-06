@@ -76,7 +76,7 @@ describe('home page', () => {
   it('separates what I published from what was shared with me', async () => {
     const reviewerToken = await app.createToken(reviewerCookie)
     const reviewerDoc = await app.publish({ token: reviewerToken }, 'Reviewer only', '<h1>x</h1>', 'specified')
-    await app.request(`/api/artifacts/${reviewerDoc.artifactId}/grants`, { method: 'PUT', cookie: reviewerCookie, body: { email: 'lin@example.com', role: 'commenter' } })
+    await app.grant(reviewerCookie, reviewerDoc.artifactId, 'lin@example.com', 'commenter')
 
     const mineMarkup = await pageText('/?filter=mine', authorCookie)
     const sharedMarkup = await pageText('/?filter=shared', authorCookie)

@@ -52,12 +52,12 @@ describe('visibility', () => {
     const published = await app.publish({ token: authorToken }, 'Salary review', '<h1>v1</h1>', 'specified')
     const before = await app.request(`/api/artifacts/${published.artifactId}`, { cookie: memberCookie })
 
-    const grantResponse = await app.request(`/api/artifacts/${published.artifactId}/grants`, { method: 'PUT', cookie: authorCookie, body: { email: 'MEMBER@example.com', role: 'editor' } })
+    const grantResponse = await app.grant(authorCookie, published.artifactId, 'MEMBER@example.com', 'editor')
     const editorUpdate = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', cookie: memberCookie, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
     const editorSharing = await app.request(`/api/artifacts/${published.artifactId}/sharing`, { cookie: memberCookie })
     const outsiderRead = await app.request(`/api/artifacts/${published.artifactId}`, { cookie: outsiderCookie })
 
-    await app.request(`/api/artifacts/${published.artifactId}/grants`, { method: 'PUT', cookie: authorCookie, body: { email: 'member@example.com', role: 'viewer' } })
+    await app.grant(authorCookie, published.artifactId, 'member@example.com', 'viewer')
     const viewerComment = await app.request(`/api/artifacts/${published.artifactId}/comments`, { method: 'POST', cookie: memberCookie, body: { body: 'hi' } })
     const members = await app.json<{ artifacts: { title: string }[] }>('/api/artifacts', { cookie: memberCookie })
 
@@ -70,13 +70,127 @@ describe('visibility', () => {
     expect(members.body.artifacts.map(artifact => artifact.title)).toContain('Salary review')
   })
 
-  it('cannot add a person who has never signed in', async () => {
+  it('finds a person to share with by email, and explains who cannot be added', async () => {
     const published = await app.publish({ token: authorToken }, 'Invite test')
+    const peoplePath = `/api/artifacts/${published.artifactId}/sharing/people`
 
-    const grantResponse = await app.json<{ error: string }>(`/api/artifacts/${published.artifactId}/grants`, { method: 'PUT', cookie: authorCookie, body: { email: 'nobody@example.com', role: 'viewer' } })
+    const found = await app.json<{ userId: string; name: string; email: string }>(`${peoplePath}?email=Member@example.com`, { cookie: authorCookie })
+    const neverSignedIn = await app.json<{ error: string }>(`${peoplePath}?email=nobody@example.com`, { cookie: authorCookie })
+    const theAuthor = await app.json<{ error: string }>(`${peoplePath}?email=author@example.com`, { cookie: authorCookie })
+    const askedByMember = await app.request(`${peoplePath}?email=author@example.com`, { cookie: memberCookie })
 
-    expect(grantResponse.status).toBe(404)
-    expect(grantResponse.body.error).toContain('sign in once')
+    expect(found.status).toBe(200)
+    expect(found.body).toMatchObject({ name: 'member', email: 'member@example.com' })
+    expect(neverSignedIn.status).toBe(404)
+    expect(neverSignedIn.body.error).toContain('sign in once')
+    expect(theAuthor.status).toBe(400)
+    expect(askedByMember.status).toBe(403)
+  })
+})
+
+describe('saving sharing in one request', () => {
+  async function sharingOf(artifactId: string) {
+    return (await app.json<{ visibility: string; grants: { userId: string; role: string }[]; publicLink: { expiresAt: number | null; hasPassword: boolean } }>(`/api/artifacts/${artifactId}/sharing`, { cookie: authorCookie })).body
+  }
+
+  async function memberUserId(artifactId: string): Promise<string> {
+    const { body } = await app.json<{ userId: string }>(`/api/artifacts/${artifactId}/sharing/people?email=member@example.com`, { cookie: authorCookie })
+    return body.userId
+  }
+
+  it('applies the visibility, the people and the public link settings together', async () => {
+    const published = await app.publish({ token: authorToken }, 'Hiring plan', '<h1>v1</h1>', 'private')
+    const memberId = await memberUserId(published.artifactId)
+
+    const saved = await app.json<{ visibility: string; grants: { userId: string; role: string }[] }>(`/api/artifacts/${published.artifactId}/sharing`, {
+      method: 'PUT',
+      cookie: authorCookie,
+      body: { visibility: 'specified', grants: [{ userId: memberId, role: 'editor' }] },
+    })
+    const memberUpdate = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', cookie: memberCookie, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+    await setSharing(published.artifactId, { grants: [] })
+    const memberAfterRemoval = await app.request(`/api/artifacts/${published.artifactId}`, { cookie: memberCookie })
+
+    expect(saved.status).toBe(200)
+    expect(saved.body).toMatchObject({ visibility: 'specified', grants: [{ userId: memberId, role: 'editor' }] })
+    expect(memberUpdate.status).toBe(200)
+    expect(memberAfterRemoval.status).toBe(404)
+  })
+
+  it('changes nothing when any part of the save is wrong', async () => {
+    const published = await app.publish({ token: authorToken }, 'Atomic save', '<h1>v1</h1>', 'private')
+    const memberId = await memberUserId(published.artifactId)
+
+    const unknownPerson = await setSharing(published.artifactId, { visibility: 'specified', grants: [{ userId: memberId, role: 'viewer' }, { userId: 'user-nobody', role: 'viewer' }] })
+    const unknownRole = await setSharing(published.artifactId, { visibility: 'specified', grants: [{ userId: memberId, role: 'owner' }] })
+    const twice = await setSharing(published.artifactId, { visibility: 'specified', grants: [{ userId: memberId, role: 'viewer' }, { userId: memberId, role: 'editor' }] })
+
+    expect([unknownPerson.status, unknownRole.status, twice.status]).toEqual([400, 400, 400])
+    expect(await sharingOf(published.artifactId)).toMatchObject({ visibility: 'private', grants: [] })
+  })
+
+  it('lets granted people in only while the artifact is shared with specified people', async () => {
+    const published = await app.publish({ token: authorToken }, 'Board memo', '<h1>v1</h1>', 'specified')
+    await app.grant(authorCookie, published.artifactId, 'member@example.com', 'editor')
+    const editAsSpecified = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', cookie: memberCookie, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+
+    await setSharing(published.artifactId, { visibility: 'workspace' })
+    const editAsWorkspace = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', cookie: memberCookie, body: { baseVersion: 2, files: [{ path: 'index.html', content: '<h1>v3</h1>' }] } })
+    await setSharing(published.artifactId, { visibility: 'private' })
+    const readAsPrivate = await app.request(`/api/artifacts/${published.artifactId}`, { cookie: memberCookie })
+
+    expect(editAsSpecified.status).toBe(200)
+    expect(editAsWorkspace.status).toBe(403)
+    expect(readAsPrivate.status).toBe(404)
+    expect((await sharingOf(published.artifactId)).grants).toHaveLength(1)
+  })
+
+  it('tells each person once when an artifact is shared with them', async () => {
+    const published = await app.publish({ token: authorToken }, 'Quarterly numbers', '<h1>v1</h1>', 'specified')
+    const mailBefore = app.mailer.sent.length
+
+    await app.grant(authorCookie, published.artifactId, 'member@example.com', 'viewer')
+    await app.grant(authorCookie, published.artifactId, 'member@example.com', 'commenter')
+    await setSharing(published.artifactId, { publicLinkExpiresAt: null })
+    const shareMail = app.mailer.sent.slice(mailBefore)
+
+    expect(shareMail).toHaveLength(1)
+    expect(shareMail[0]).toMatchObject({ to: 'member@example.com', subject: 'author 把「Quarterly numbers」分享给了你' })
+    expect(shareMail[0]?.text).toContain(`${APP_ORIGIN}/a/${published.artifactId}`)
+    expect(shareMail[0]?.text).toContain('可查看')
+  })
+
+  it('does not tell people about grants that do nothing yet', async () => {
+    const published = await app.publish({ token: authorToken }, 'Draft budget', '<h1>v1</h1>', 'private')
+    const memberId = await memberUserId(published.artifactId)
+    const mailBefore = app.mailer.sent.length
+
+    await setSharing(published.artifactId, { grants: [{ userId: memberId, role: 'viewer' }] })
+    const mailWhilePrivate = app.mailer.sent.length - mailBefore
+    await setSharing(published.artifactId, { visibility: 'specified' })
+
+    expect(mailWhilePrivate).toBe(0)
+    expect(app.mailer.lastTo('member@example.com')?.subject).toBe('author 把「Draft budget」分享给了你')
+  })
+
+  it('saves the sharing even when the mail cannot be sent', async () => {
+    const mailOutageApp = new TestApp()
+    const outageAuthorCookie = await mailOutageApp.signIn('author@example.com')
+    await mailOutageApp.signIn('member@example.com')
+    const published = await mailOutageApp.publish({ cookie: outageAuthorCookie }, 'Mail down', '<h1>v1</h1>', 'specified')
+    mailOutageApp.mailer.goOutOfService()
+
+    const grantResponse = await mailOutageApp.grant(outageAuthorCookie, published.artifactId, 'member@example.com', 'viewer')
+
+    expect(grantResponse.status).toBe(200)
+  })
+
+  it('no longer changes grants one at a time', async () => {
+    const published = await app.publish({ token: authorToken }, 'Old endpoint')
+
+    const oldGrant = await app.request(`/api/artifacts/${published.artifactId}/grants`, { method: 'PUT', cookie: authorCookie, body: { email: 'member@example.com', role: 'viewer' } })
+
+    expect(oldGrant.status).toBe(404)
   })
 })
 
@@ -140,7 +254,7 @@ describe('public links', () => {
     const published = await app.publish({ token: authorToken }, 'Expired campaign')
     await setSharing(published.artifactId, { visibility: 'public_link', publicLinkExpiresAt: Date.now() + 60_000 })
     const summary = await app.repositories.artifacts.findSummary(published.artifactId)
-    await app.repositories.artifactAccess.updateSharing(published.artifactId, { ...(summary?.sharing ?? { visibility: 'public_link', publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false }), publicLinkExpiresAt: Date.now() - 1 })
+    await app.repositories.artifactAccess.saveSharing(published.artifactId, { ...(summary?.sharing ?? { visibility: 'public_link', publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false }), publicLinkExpiresAt: Date.now() - 1 }, [])
 
     const backToPrivate = await setSharing(published.artifactId, { visibility: 'private' })
     const sharing = await app.json<{ visibility: string; publicLink: { expiresAt: number } }>(`/api/artifacts/${published.artifactId}/sharing`, { cookie: authorCookie })

@@ -134,16 +134,28 @@ describe('artifact access, comments and shared data', () => {
     const accessRepository = new CloudflareArtifactAccessRepository(env.DB)
     const { artifactId } = await createArtifactIn(workspaceId, authorId)
 
-    await accessRepository.updateSharing(artifactId, { visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true })
-    await accessRepository.setGrant({ artifactId, userId: reviewerId, role: 'commenter' })
-    await accessRepository.setGrant({ artifactId, userId: reviewerId, role: 'editor' })
+    const publicSharing = { visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true } as const
+    await accessRepository.saveSharing(artifactId, publicSharing, [{ userId: reviewerId, role: 'commenter' }])
+    await accessRepository.saveSharing(artifactId, publicSharing, [{ userId: reviewerId, role: 'editor' }])
 
     const summary = await artifactRepository.findSummary(artifactId)
     expect(summary?.sharing).toEqual({ visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true })
     expect(await accessRepository.listGrants(artifactId)).toEqual([{ artifactId, userId: reviewerId, role: 'editor' }])
     expect((await accessRepository.listGrantsOfUser(reviewerId)).map(grant => grant.artifactId)).toContain(artifactId)
 
-    await accessRepository.removeGrant(artifactId, reviewerId)
+    await accessRepository.saveSharing(artifactId, publicSharing, [])
+    expect(await accessRepository.listGrants(artifactId)).toEqual([])
+  })
+
+  it('saves neither the sharing nor the people when one part of the save fails', async () => {
+    const accessRepository = new CloudflareArtifactAccessRepository(env.DB)
+    const { artifactId } = await createArtifactIn(workspaceId, authorId)
+    const privateSharing = { visibility: 'private', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false } as const
+
+    const duplicatePerson = accessRepository.saveSharing(artifactId, { ...privateSharing, visibility: 'specified' }, [{ userId: reviewerId, role: 'viewer' }, { userId: reviewerId, role: 'editor' }])
+
+    await expect(duplicatePerson).rejects.toThrow()
+    expect((await artifactRepository.findSummary(artifactId))?.sharing.visibility).toBe('workspace')
     expect(await accessRepository.listGrants(artifactId)).toEqual([])
   })
 

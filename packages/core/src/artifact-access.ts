@@ -1,7 +1,7 @@
 import type { AccessTokenScope } from './access-token-repository.ts'
 import type { GrantRole } from './artifact-access-repository.ts'
 import type { ArtifactRemoval } from './artifact-removal.ts'
-import type { ArtifactSummary } from './artifact-repository.ts'
+import type { ArtifactSummary, ArtifactVisibility } from './artifact-repository.ts'
 import type { WorkspaceRole } from './workspace-repository.ts'
 
 export interface ArtifactViewer {
@@ -126,8 +126,13 @@ export class ArtifactAccess {
     return viewer.workspaceRole === 'admin'
   }
 
+  /** Grants are the list of people of a 指定的人 artifact; under any other visibility they are kept but do nothing. */
+  static grantsApplyUnder(visibility: ArtifactVisibility): boolean {
+    return visibility === 'specified'
+  }
+
   #grantPermissions(viewer: ArtifactViewer): ArtifactPermissions {
-    const grantsApply = this.#summary.sharing.visibility !== 'private' && viewer.grantRole !== null
+    const grantsApply = ArtifactAccess.grantsApplyUnder(this.#summary.sharing.visibility) && viewer.grantRole !== null
     return grantsApply ? GRANT_PERMISSIONS[viewer.grantRole as GrantRole] : NO_PERMISSIONS
   }
 
