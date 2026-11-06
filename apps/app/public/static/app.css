@@ -40,7 +40,9 @@
 .artifact-cover__blocks { flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); padding-top: var(--space-1); }
 .artifact-cover__blocks span { background: var(--wash-strong); }
 /* Rendered at four times the card's width and scaled down, so the preview shows a desktop-wide page. */
-.artifact-cover__preview { position: absolute; inset: 0 auto auto 0; width: 400%; height: 400%; border: 0; transform: scale(0.25); transform-origin: 0 0; pointer-events: none; background: var(--paper); }
+/* An artifact page without its own background is written for white paper, whatever theme the app is in. */
+.artifact-cover__preview, .viewer-frame iframe, .viewer-full__frame iframe { color-scheme: light; background: #fff; }
+.artifact-cover__preview { position: absolute; inset: 0 auto auto 0; width: 400%; height: 400%; border: 0; transform: scale(0.25); transform-origin: 0 0; pointer-events: none; }
 .xxd-card__media.artifact-cover { border-bottom: 1px solid var(--line); }
 .artifact-meta { display: flex; flex-wrap: wrap; gap: 0 var(--space-3); margin: 0; }
 .artifact-card__badges { --cluster-gap: var(--space-1-5); margin-top: var(--space-1); }
