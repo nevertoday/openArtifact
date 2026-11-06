@@ -19,6 +19,11 @@ export class HttpError extends Error {
     return new HttpError(403, `you do not have permission to ${action}`)
   }
 
+  /** The person may do this, but the API token they sent was made for publishing only. */
+  static outsideTokenScope(action: string): HttpError {
+    return new HttpError(403, `this token may only publish; to ${action}, create a token with full access in 设置 › Agent 接入, or use the web page`)
+  }
+
   /** Also used when the caller may not know the thing exists, so its existence is not revealed. */
   static notFound(what: string): HttpError {
     return new HttpError(404, `${what} not found`)

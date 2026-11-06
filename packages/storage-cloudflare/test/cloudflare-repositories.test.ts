@@ -191,8 +191,8 @@ describe('artifact access, comments and shared data', () => {
   it('accepts a token only while it is neither revoked nor expired', async () => {
     const tokenRepository = new CloudflareAccessTokenRepository(env.DB)
     const now = Date.now()
-    const activeToken = await tokenRepository.create({ userId: authorId, workspaceId, name: 'Claude Code', tokenHash: 'hash-active', expiresAt: now + 60_000 })
-    await tokenRepository.create({ userId: authorId, workspaceId, name: 'Old CI', tokenHash: 'hash-expired', expiresAt: now - 1 })
+    const activeToken = await tokenRepository.create({ userId: authorId, workspaceId, name: 'Claude Code', tokenHash: 'hash-active', expiresAt: now + 60_000, scope: 'publish' })
+    await tokenRepository.create({ userId: authorId, workspaceId, name: 'Old CI', tokenHash: 'hash-expired', expiresAt: now - 1, scope: 'full' })
 
     const usedToken = await tokenRepository.useActiveToken('hash-active', now)
     const expiredToken = await tokenRepository.useActiveToken('hash-expired', now)
@@ -205,5 +205,17 @@ describe('artifact access, comments and shared data', () => {
     expect(revokedByOwner).toBe(true)
     expect(await tokenRepository.useActiveToken('hash-active', now)).toBeNull()
     expect((await tokenRepository.listForUser(authorId)).map(token => token.name)).toEqual(expect.arrayContaining(['Claude Code', 'Old CI']))
+  })
+
+  it('keeps each token\'s scope, and gives tokens made before scopes existed full access', async () => {
+    const tokenRepository = new CloudflareAccessTokenRepository(env.DB)
+    const now = Date.now()
+    await tokenRepository.create({ userId: authorId, workspaceId, name: 'Publisher', tokenHash: 'hash-publish', expiresAt: null, scope: 'publish' })
+    await env.DB.prepare('INSERT INTO personal_access_tokens (id, user_id, workspace_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind('token-before-scopes', authorId, workspaceId, 'Older laptop', 'hash-before-scopes', now)
+      .run()
+
+    expect(await tokenRepository.useActiveToken('hash-publish', now)).toMatchObject({ name: 'Publisher', scope: 'publish' })
+    expect(await tokenRepository.useActiveToken('hash-before-scopes', now)).toMatchObject({ name: 'Older laptop', scope: 'full' })
   })
 })

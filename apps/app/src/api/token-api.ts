@@ -1,4 +1,4 @@
-import { AccessTokenSecret, type AccessToken } from '@open-artifact/core'
+import { ACCESS_TOKEN_SCOPES, AccessTokenSecret, type AccessToken } from '@open-artifact/core'
 import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { JsonBody } from './json-body.ts'
@@ -31,6 +31,8 @@ export class TokenApi {
       workspaceId: identity.membership.workspace.workspaceId,
       name: requestBody.text('name', MAX_TOKEN_NAME_LENGTH),
       tokenHash: await AccessTokenSecret.hashOf(plaintextToken),
+      // Publishing is what most agents need; changing who can see an artifact takes a deliberate choice.
+      scope: requestBody.oneOf('scope', ACCESS_TOKEN_SCOPES, 'publish'),
       expiresAt: lifetimeDays === null ? null : Date.now() + lifetimeDays * DAY,
     })
     // The plaintext leaves the server this once; only its hash is stored.
@@ -58,6 +60,7 @@ export class TokenApi {
     return {
       tokenId: accessToken.tokenId,
       name: accessToken.name,
+      scope: accessToken.scope,
       workspaceId: accessToken.workspaceId,
       expiresAt: accessToken.expiresAt,
       revokedAt: accessToken.revokedAt,

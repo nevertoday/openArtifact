@@ -1,4 +1,4 @@
-import { AccessTokenSecret, type Membership } from '@open-artifact/core'
+import { AccessTokenSecret, type AccessTokenScope, type Membership } from '@open-artifact/core'
 import { HttpCookies } from '../http-cookies.ts'
 import { RemovedFromWorkspaceError } from '../http-error.ts'
 import { People } from '../people.ts'
@@ -20,6 +20,8 @@ export interface Identity {
   memberships: Membership[]
   /** The agent client behind a token request, e.g. "Claude Code"; null for a person in the browser. */
   agentClient: string | null
+  /** What the token behind the request may do; null for a person in the browser, who may do everything. */
+  tokenScope: AccessTokenScope | null
 }
 
 /** Who is behind a request: a browser session, a personal API token, or nobody. */
@@ -55,7 +57,7 @@ export class RequestIdentity {
     const tokenMembership = memberships.find(membership => membership.workspace.workspaceId === accessToken.workspaceId)
     if (!profile || !tokenMembership) return null
     // A token acts only in the workspace it was created for, even when its owner belongs to others.
-    return { userId: profile.userId, name: People.displayName(profile), email: profile.email, membership: tokenMembership, memberships: [tokenMembership], agentClient: this.#agentClient() }
+    return { userId: profile.userId, name: People.displayName(profile), email: profile.email, membership: tokenMembership, memberships: [tokenMembership], agentClient: this.#agentClient(), tokenScope: accessToken.scope }
   }
 
   async #sessionIdentity(): Promise<Identity | null> {
@@ -65,7 +67,7 @@ export class RequestIdentity {
     const chosenWorkspaceId = HttpCookies.read(this.#request, WORKSPACE_COOKIE)
     const membership = memberships.find(candidate => candidate.workspace.workspaceId === chosenWorkspaceId) ?? memberships[0]
     if (!membership) throw new Error(`User ${signedInUser.userId} has no workspace`)
-    return { userId: signedInUser.userId, name: People.displayName(signedInUser), email: signedInUser.email, membership, memberships, agentClient: null }
+    return { userId: signedInUser.userId, name: People.displayName(signedInUser), email: signedInUser.email, membership, memberships, agentClient: null, tokenScope: null }
   }
 
   // Accounts created before workspaces existed join one on their next visit; a person an admin removed does not.

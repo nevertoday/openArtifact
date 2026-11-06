@@ -98,8 +98,8 @@ export class TestApp {
     return sessionCookie
   }
 
-  async createToken(cookie: string, name = 'Claude Code · laptop'): Promise<string> {
-    const { body } = await this.json<{ token: string }>('/api/tokens', { method: 'POST', cookie, body: { name, expiresInDays: 30 } })
+  async createToken(cookie: string, scope: 'publish' | 'full' = 'publish', name = 'Claude Code · laptop'): Promise<string> {
+    const { body } = await this.json<{ token: string }>('/api/tokens', { method: 'POST', cookie, body: { name, expiresInDays: 30, scope } })
     return body.token
   }
 

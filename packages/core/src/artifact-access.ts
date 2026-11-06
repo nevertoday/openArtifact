@@ -1,3 +1,4 @@
+import type { AccessTokenScope } from './access-token-repository.ts'
 import type { GrantRole } from './artifact-access-repository.ts'
 import type { ArtifactRemoval } from './artifact-removal.ts'
 import type { ArtifactSummary } from './artifact-repository.ts'
@@ -11,6 +12,8 @@ export interface ArtifactViewer {
   grantRole: GrantRole | null
   /** The viewer has entered the public link's password, or the link has none. */
   publicLinkUnlocked: boolean
+  /** The scope of the API token behind the request; null for a person in the browser. */
+  tokenScope: AccessTokenScope | null
 }
 
 export interface ArtifactPermissions {
@@ -26,6 +29,15 @@ export interface ArtifactPermissions {
   canRestore: boolean
   /** The viewer could open the public link after entering its password. */
   needsPublicLinkPassword: boolean
+}
+
+/** Something a viewer may or may not do; the password prompt is a state, not a permission. */
+export type ArtifactPermission = Exclude<keyof ArtifactPermissions, 'needsPublicLinkPassword'>
+
+// An agent with a publish token works on artifacts but never changes who can see them, nor removes or restores them.
+const WITHHELD_BY_TOKEN_SCOPE: Record<AccessTokenScope, readonly ArtifactPermission[]> = {
+  publish: ['canManageSharing', 'canRemove', 'canRestore'],
+  full: [],
 }
 
 const NO_PERMISSIONS: ArtifactPermissions = {
@@ -79,6 +91,19 @@ export class ArtifactAccess {
 
   // A removed artifact is gone for everyone; the only thing left to do with it is restore it.
   permissionsFor(viewer: ArtifactViewer): ArtifactPermissions {
+    const permissions = { ...this.#personPermissions(viewer) }
+    for (const withheldPermission of this.withheldByTokenScope(viewer)) permissions[withheldPermission] = false
+    return permissions
+  }
+
+  /** What the viewer's person may do here but the token they sent may not. */
+  withheldByTokenScope(viewer: ArtifactViewer): ArtifactPermission[] {
+    if (viewer.tokenScope === null) return []
+    const personPermissions = this.#personPermissions(viewer)
+    return WITHHELD_BY_TOKEN_SCOPE[viewer.tokenScope].filter(permission => personPermissions[permission])
+  }
+
+  #personPermissions(viewer: ArtifactViewer): ArtifactPermissions {
     const removal = this.#summary.removal
     if (removal !== null) return { ...NO_PERMISSIONS, canRestore: this.#mayRestore(viewer, removal) }
     if (this.#isAuthor(viewer)) return AUTHOR_PERMISSIONS

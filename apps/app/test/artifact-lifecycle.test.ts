@@ -87,13 +87,18 @@ describe('removing an artifact', () => {
     expect(memberRestore.status).toBe(403)
   })
 
-  it('lets an agent remove and restore its person\'s artifact with a token', async () => {
+  it('lets an agent with a full token remove and restore its person\'s artifact', async () => {
+    const fullToken = await app.createToken(authorCookie, 'full')
     const published = await app.publish({ token: authorToken }, 'Agent draft')
 
-    const removal = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'DELETE', token: authorToken })
-    const restore = await app.request(`/api/artifacts/${published.artifactId}/restore`, { method: 'POST', token: authorToken })
+    const publishTokenRemoval = await app.json<{ error: string }>(`/api/artifacts/${published.artifactId}`, { method: 'DELETE', token: authorToken })
+    const removal = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'DELETE', token: fullToken })
+    const publishTokenRestore = await app.request(`/api/artifacts/${published.artifactId}/restore`, { method: 'POST', token: authorToken })
+    const restore = await app.request(`/api/artifacts/${published.artifactId}/restore`, { method: 'POST', token: fullToken })
 
-    expect([removal.status, restore.status]).toEqual([200, 200])
+    expect(publishTokenRemoval.status).toBe(403)
+    expect(publishTokenRemoval.body.error).toContain('this token may only publish')
+    expect([removal.status, publishTokenRestore.status, restore.status]).toEqual([200, 403, 200])
   })
 
   it('answers 404 for an artifact that was already removed', async () => {

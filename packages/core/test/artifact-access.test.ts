@@ -22,11 +22,11 @@ function artifactWith(sharing: Partial<ArtifactSharing>, removal: ArtifactRemova
   }
 }
 
-const author: ArtifactViewer = { userId: authorId, workspaceRole: 'member', grantRole: null, publicLinkUnlocked: false }
-const member: ArtifactViewer = { userId: 'user-member', workspaceRole: 'member', grantRole: null, publicLinkUnlocked: false }
+const author: ArtifactViewer = { userId: authorId, workspaceRole: 'member', grantRole: null, publicLinkUnlocked: false, tokenScope: null }
+const member: ArtifactViewer = { userId: 'user-member', workspaceRole: 'member', grantRole: null, publicLinkUnlocked: false, tokenScope: null }
 const admin: ArtifactViewer = { ...member, userId: 'user-admin', workspaceRole: 'admin' }
-const outsider: ArtifactViewer = { userId: 'user-outsider', workspaceRole: null, grantRole: null, publicLinkUnlocked: false }
-const anonymous: ArtifactViewer = { userId: null, workspaceRole: null, grantRole: null, publicLinkUnlocked: true }
+const outsider: ArtifactViewer = { userId: 'user-outsider', workspaceRole: null, grantRole: null, publicLinkUnlocked: false, tokenScope: null }
+const anonymous: ArtifactViewer = { userId: null, workspaceRole: null, grantRole: null, publicLinkUnlocked: true, tokenScope: null }
 const lockedAnonymous: ArtifactViewer = { ...anonymous, publicLinkUnlocked: false }
 
 function permissions(sharing: Partial<ArtifactSharing>, viewer: ArtifactViewer, publicLinksEnabled = true) {
@@ -108,5 +108,21 @@ describe('ArtifactAccess', () => {
     expect(expired.permissionsFor(author).canRestore).toBe(false)
     expect(expired.permissionsFor(admin).canRestore).toBe(false)
     expect(ArtifactRemoval.purgeCutoff(now)).toBe(removedAt)
+  })
+
+  it('lets a publish token do everything its person can except change who can see the artifact or remove it', () => {
+    const authorAgent: ArtifactViewer = { ...author, tokenScope: 'publish' }
+    const access = new ArtifactAccess(artifactWith({ visibility: 'workspace' }), true, now)
+
+    expect(access.permissionsFor(authorAgent)).toMatchObject({ canView: true, canComment: true, canEdit: true, canRename: true, canWriteSharedData: true, canManageSharing: false, canRemove: false })
+    expect(access.withheldByTokenScope(authorAgent)).toEqual(['canManageSharing', 'canRemove'])
+    expect(access.permissionsFor({ ...author, tokenScope: 'full' })).toMatchObject({ canManageSharing: true, canRemove: true })
+    expect(access.withheldByTokenScope({ ...author, tokenScope: 'full' })).toEqual([])
+  })
+
+  it('withholds by token scope only what the person could otherwise do', () => {
+    const memberAgent: ArtifactViewer = { ...member, tokenScope: 'publish' }
+
+    expect(new ArtifactAccess(artifactWith({ visibility: 'workspace' }), true, now).withheldByTokenScope(memberAgent)).toEqual([])
   })
 })

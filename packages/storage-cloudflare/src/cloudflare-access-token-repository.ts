@@ -1,12 +1,13 @@
-import type { AccessToken, AccessTokenRepository, NewAccessToken } from '@open-artifact/core'
+import type { AccessToken, AccessTokenRepository, AccessTokenScope, NewAccessToken } from '@open-artifact/core'
 
-const TOKEN_COLUMNS = 'id, user_id, workspace_id, name, expires_at, revoked_at, last_used_at, created_at'
+const TOKEN_COLUMNS = 'id, user_id, workspace_id, name, scope, expires_at, revoked_at, last_used_at, created_at'
 
 interface TokenRow {
   id: string
   user_id: string
   workspace_id: string
   name: string
+  scope: AccessTokenScope
   expires_at: number | null
   revoked_at: number | null
   last_used_at: number | null
@@ -23,10 +24,10 @@ export class CloudflareAccessTokenRepository implements AccessTokenRepository {
   async create(newAccessToken: NewAccessToken): Promise<AccessToken> {
     const tokenRow = await this.#db
       .prepare(
-        `INSERT INTO personal_access_tokens (id, user_id, workspace_id, name, token_hash, expires_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING ${TOKEN_COLUMNS}`,
+        `INSERT INTO personal_access_tokens (id, user_id, workspace_id, name, token_hash, scope, expires_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING ${TOKEN_COLUMNS}`,
       )
-      .bind(crypto.randomUUID(), newAccessToken.userId, newAccessToken.workspaceId, newAccessToken.name, newAccessToken.tokenHash, newAccessToken.expiresAt, Date.now())
+      .bind(crypto.randomUUID(), newAccessToken.userId, newAccessToken.workspaceId, newAccessToken.name, newAccessToken.tokenHash, newAccessToken.scope, newAccessToken.expiresAt, Date.now())
       .first<TokenRow>()
     if (!tokenRow) throw new Error(`Access token for user ${newAccessToken.userId} was not saved`)
     return CloudflareAccessTokenRepository.#tokenOf(tokenRow)
@@ -66,6 +67,7 @@ export class CloudflareAccessTokenRepository implements AccessTokenRepository {
       userId: tokenRow.user_id,
       workspaceId: tokenRow.workspace_id,
       name: tokenRow.name,
+      scope: tokenRow.scope,
       expiresAt: tokenRow.expires_at,
       revokedAt: tokenRow.revoked_at,
       lastUsedAt: tokenRow.last_used_at,
