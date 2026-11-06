@@ -77,6 +77,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: { type: 'object', properties: {} },
   },
   {
+    name: 'list_my_comments',
+    description: 'Find your work: the unresolved comments people addressed to an agent on every artifact you can edit, each with the artifact, its current version, the spot on the page and any replies. Then read the artifact, update it, and reply_comment with resolve.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'list_comments',
     description: 'List comments on an artifact. The default filter "for_agent" returns the unresolved comments people addressed to an agent: act on them, publish with update, then reply_comment with resolve.',
     inputSchema: {
@@ -119,6 +124,8 @@ export class AgentTools {
         return this.#read(toolArguments)
       case 'list':
         return AgentTools.#result(await this.#appClient.call('GET', '/api/artifacts'), 'Artifacts you can see:')
+      case 'list_my_comments':
+        return AgentTools.#result(await this.#appClient.call('GET', '/api/comments?for=me&status=open'), 'Unresolved comments addressed to your agent, oldest first:')
       case 'list_comments':
         return this.#listComments(toolArguments)
       case 'reply_comment':
@@ -156,12 +163,10 @@ export class AgentTools {
 
   async #replyComment(toolArguments: Record<string, unknown>): Promise<ToolResult> {
     const { artifactId, commentId, body } = toolArguments
-    const reply = await this.#appClient.call('POST', `/api/artifacts/${AgentTools.#segment(artifactId)}/comments`, { body, parentId: commentId })
+    const resolve = toolArguments.resolve !== false
+    const reply = await this.#appClient.call('POST', `/api/artifacts/${AgentTools.#segment(artifactId)}/comments`, { body, parentId: commentId, resolve })
     if (reply.status !== 201) return AgentTools.#result(reply, '')
-    const shouldResolve = toolArguments.resolve !== false
-    if (!shouldResolve) return AgentTools.#text('Replied.')
-    const resolution = await this.#appClient.call('PATCH', `/api/comments/${AgentTools.#segment(commentId)}`, { resolved: true })
-    return resolution.status === 200 ? AgentTools.#text('Replied and marked the comment resolved.') : AgentTools.#result(resolution, 'Replied, but resolving failed:')
+    return AgentTools.#text(resolve ? 'Replied and marked the comment resolved.' : 'Replied.')
   }
 
   // An id is sent as one path segment, so a crafted id cannot reach a different API route.

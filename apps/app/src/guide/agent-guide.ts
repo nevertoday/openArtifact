@@ -49,7 +49,7 @@ export class AgentGuide {
 - Before creating a new artifact for the same subject, \`list\` the existing ones and update the right one instead.
 
 ### How to connect
-- MCP (preferred): ${this.#mcpUrl}, header \`Authorization: Bearer <personal API token>\`. Tools: publish, update, read, list, list_comments, reply_comment, get_guide.
+- MCP (preferred): ${this.#mcpUrl}, header \`Authorization: Bearer <personal API token>\`. Tools: publish, update, read, list, list_my_comments, list_comments, reply_comment, get_guide.
 - HTTP: ${api}, same header. Also send \`X-Open-Artifact-Client: <your client name>\` so people see which agent published.
 
 ### Page rules
@@ -70,9 +70,12 @@ export class AgentGuide {
 - You may remove and restore only what your person may: their own artifacts, or any artifact when they are a workspace admin. If an admin took it down, only an admin can restore it.
 
 ### Comments addressed to you
-1. \`list_comments\` with \`filter: "for_agent"\` returns unresolved comments people marked 给 agent.
-2. Make the change and publish it with \`update\`.
-3. \`reply_comment\` with \`resolve: true\`, saying what you changed and in which version.
+People mark comments 给 agent when they want an agent to act. When you start a session, or the person asks you to check:
+1. \`list_my_comments\` returns the unresolved comments addressed to an agent on every artifact you can edit, oldest first. Each names the artifact, its current \`version\`, the comment's \`anchor\` and any replies.
+2. \`read\` the artifact and find the spot: \`anchor.selector\` is a CSS path to the element the person clicked and \`anchor.textQuote\` the start of its text, both as of \`anchor.version\`. Older comments only have \`x\` and \`y\`, fractions of the page's width and height.
+3. Make the change and publish it with \`update\`, with a \`note\` that says which comment it answers.
+4. \`reply_comment\` with \`resolve: true\`, saying what you changed and in which version. Leave \`resolve\` false only when you need the person to answer first.
+To look at one artifact only, \`list_comments\` with \`filter: "for_agent"\`.
 
 ### Shared data in the page
 The platform injects \`window.openArtifact\` into every page:
@@ -91,7 +94,12 @@ Collection names and ids: letters, digits, \`-\`, \`_\`; at most 64 characters. 
 - \`GET ${api}/artifacts\`, \`GET ${api}/artifacts/{id}\`
 - \`PUT ${api}/artifacts/{id}\` \`{ baseVersion, note, files, title? }\`; \`PATCH ${api}/artifacts/{id}\` \`{ title }\` renames without a new version
 - \`DELETE ${api}/artifacts/{id}\` removes it; \`GET ${api}/artifacts?removed=true\` lists what you can restore; \`POST ${api}/artifacts/{id}/restore\` brings it back
-- \`GET ${api}/artifacts/{id}/comments?filter=for_agent\`, \`POST ${api}/artifacts/{id}/comments\` \`{ body, parentId }\`, \`PATCH ${api}/comments/{commentId}\` \`{ resolved: true }\`
+- \`GET ${api}/comments?for=me&status=open\`: your agent's open comments across artifacts you can edit.
+- \`GET ${api}/artifacts/{id}/comments?filter=for_agent|unresolved|all\`
+- \`POST ${api}/artifacts/{id}/comments\` \`{ body, parentId, resolve: true }\` replies and resolves the thread in one call; leave out \`resolve\` to keep it open.
+- \`PATCH ${api}/comments/{commentId}\` \`{ resolved: true }\` resolves without a reply; \`false\` reopens.
+- \`GET ${api}/artifacts/{id}/data\`: the page's shared data collections, each \`{ collection, documentCount }\`.
+- \`GET ${api}/artifacts/{id}/data/{collection}\`: its documents, each \`{ id, data, createdBy, updatedBy, createdAt, updatedAt }\`. Read these to answer questions about sign-ups, votes or other data people entered.
 `
   }
 }

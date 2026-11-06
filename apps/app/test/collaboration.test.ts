@@ -244,6 +244,64 @@ describe('the comment loop with an agent', () => {
   })
 })
 
+describe('the agent inbox', () => {
+  interface InboxComment {
+    commentId: string
+    artifactId: string
+    title: string
+    version: number
+    url: string
+    anchor: unknown
+    body: string
+    author: { name: string }
+    replies: { body: string; postedVia: string | null }[]
+  }
+
+  it('lists open comments for the agent on every artifact the token owner can edit', async () => {
+    const reviewerToken = await app.createToken(reviewerCookie)
+    const mine = await app.publish({ token: agentToken }, 'Inbox: mine')
+    await app.request(`/api/artifacts/${mine.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+    const editable = await app.publish({ token: reviewerToken }, 'Inbox: editable')
+    await app.request(`/api/artifacts/${editable.artifactId}/grants`, { method: 'PUT', cookie: reviewerCookie, body: { email: 'lin@example.com', role: 'editor' } })
+    const readOnly = await app.publish({ token: reviewerToken }, 'Inbox: read only')
+    const comment = async (artifactId: string, body: Record<string, unknown>) =>
+      (await app.json<{ comment: { commentId: string } }>(`/api/artifacts/${artifactId}/comments`, { method: 'POST', cookie: reviewerCookie, body })).body.comment.commentId
+    const pinned = await comment(mine.artifactId, { body: '图例错了', forAgent: true, anchor: { x: 0.5, y: 0.25 } })
+    await comment(mine.artifactId, { body: '还是不对', parentId: pinned })
+    await comment(mine.artifactId, { body: '给人看的', forAgent: false })
+    const settled = await comment(mine.artifactId, { body: '已经好了', forAgent: true })
+    await app.request(`/api/comments/${settled}`, { method: 'PATCH', cookie: reviewerCookie, body: { resolved: true } })
+    await comment(editable.artifactId, { body: '加一节', forAgent: true })
+    await comment(readOnly.artifactId, { body: '看不到我', forAgent: true })
+
+    const inbox = await app.json<{ comments: InboxComment[] }>('/api/comments?for=me&status=open', { token: agentToken })
+    const inboxHere = inbox.body.comments.filter(inboxComment => inboxComment.title.startsWith('Inbox:'))
+
+    expect(inbox.status).toBe(200)
+    expect(inboxHere.map(inboxComment => [inboxComment.title, inboxComment.body])).toEqual([
+      ['Inbox: mine', '图例错了'],
+      ['Inbox: editable', '加一节'],
+    ])
+    expect(inboxHere[0]).toMatchObject({
+      commentId: pinned,
+      artifactId: mine.artifactId,
+      version: 2,
+      url: `http://app.test/a/${mine.artifactId}#comment-${pinned}`,
+      anchor: { x: 0.5, y: 0.25, version: 2 },
+      author: { name: 'zhou' },
+      replies: [{ body: '还是不对', postedVia: null }],
+    })
+  })
+
+  it('refuses an inbox for anyone but the caller, or for closed comments', async () => {
+    const forEveryone = await app.json<{ error: string }>('/api/comments?for=everyone&status=open', { token: agentToken })
+    const closed = await app.json<{ error: string }>('/api/comments?for=me&status=resolved', { token: agentToken })
+
+    expect([forEveryone.status, closed.status]).toEqual([400, 400])
+    expect(forEveryone.body.error).toContain('for=me')
+  })
+})
+
 describe('shared data', () => {
   it('keeps documents per collection with who wrote them, for every member', async () => {
     const published = await app.publish({ token: agentToken }, 'Sign-up sheet')

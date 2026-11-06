@@ -65,7 +65,7 @@ describe('McpEndpoint', () => {
     const initialized = await rpc(endpoint, { jsonrpc: '2.0', method: 'notifications/initialized' }, { 'Mcp-Session-Id': sessionId })
     await callTool(endpoint, 'list', {}, sessionId)
 
-    expect(await initialize.json()).toMatchObject({ result: { protocolVersion: '2025-03-26', serverInfo: { name: 'open-artifact' }, capabilities: { tools: {} } } })
+    expect(await initialize.json()).toMatchObject({ result: { protocolVersion: '2025-03-26', serverInfo: { name: 'open-artifact' }, capabilities: { tools: {} }, instructions: expect.stringContaining('list_my_comments') } })
     expect(initialized.status).toBe(202)
     expect(fakeApp.calls[0]).toMatchObject({ method: 'GET', url: 'http://app.test/api/artifacts', authorization: TOKEN, agentClient: 'Claude Code' })
   })
@@ -76,11 +76,11 @@ describe('McpEndpoint', () => {
     expect(((await response.json()) as { result: { protocolVersion: string } }).result.protocolVersion).toBe('2025-06-18')
   })
 
-  it('lists the seven tools with input schemas', async () => {
+  it('lists the eight tools with input schemas', async () => {
     const response = await rpc(mcpEndpoint(new FakeApp()), { jsonrpc: '2.0', id: 2, method: 'tools/list' })
     const { result } = (await response.json()) as { result: { tools: { name: string; inputSchema: { type: string } }[] } }
 
-    expect(result.tools.map(tool => tool.name)).toEqual(['publish', 'update', 'read', 'list', 'list_comments', 'reply_comment', 'get_guide'])
+    expect(result.tools.map(tool => tool.name)).toEqual(['publish', 'update', 'read', 'list', 'list_my_comments', 'list_comments', 'reply_comment', 'get_guide'])
     expect(result.tools.every(tool => tool.inputSchema.type === 'object')).toBe(true)
   })
 
@@ -127,17 +127,32 @@ describe('McpEndpoint', () => {
     expect(result.content[0]?.text).toContain('"currentVersion": 4')
   })
 
-  it('replies to a comment and resolves it in two calls', async () => {
-    const fakeApp = new FakeApp(Response.json({ comment: {} }, { status: 201 }), Response.json({ resolved: true }))
+  it('finds the open comments addressed to the agent across artifacts', async () => {
+    const fakeApp = new FakeApp(Response.json({ comments: [{ commentId: 'c1', artifactId: 'a1', title: 'Plan', version: 3, body: '加一张图' }] }))
+
+    const result = await callTool(mcpEndpoint(fakeApp), 'list_my_comments', {})
+
+    expect(fakeApp.calls.map(call => [call.method, call.url])).toEqual([['GET', 'http://app.test/api/comments?for=me&status=open']])
+    expect(result.content[0]?.text).toContain('"title": "Plan"')
+  })
+
+  it('replies to a comment and resolves it in one call', async () => {
+    const fakeApp = new FakeApp(Response.json({ comment: {} }, { status: 201 }))
 
     const result = await callTool(mcpEndpoint(fakeApp), 'reply_comment', { artifactId: 'a1', commentId: 'c9', body: '已在 v4 修改' })
 
-    expect(fakeApp.calls.map(call => [call.method, call.url])).toEqual([
-      ['POST', 'http://app.test/api/artifacts/a1/comments'],
-      ['PATCH', 'http://app.test/api/comments/c9'],
-    ])
-    expect(fakeApp.calls[0]?.body).toEqual({ body: '已在 v4 修改', parentId: 'c9' })
+    expect(fakeApp.calls.map(call => [call.method, call.url])).toEqual([['POST', 'http://app.test/api/artifacts/a1/comments']])
+    expect(fakeApp.calls[0]?.body).toEqual({ body: '已在 v4 修改', parentId: 'c9', resolve: true })
     expect(result.content[0]?.text).toBe('Replied and marked the comment resolved.')
+  })
+
+  it('replies without resolving when asked to leave the comment open', async () => {
+    const fakeApp = new FakeApp(Response.json({ comment: {} }, { status: 201 }))
+
+    const result = await callTool(mcpEndpoint(fakeApp), 'reply_comment', { artifactId: 'a1', commentId: 'c9', body: '需要你确认', resolve: false })
+
+    expect(fakeApp.calls[0]?.body).toEqual({ body: '需要你确认', parentId: 'c9', resolve: false })
+    expect(result.content[0]?.text).toBe('Replied.')
   })
 
   it('reports an app refusal as a tool error and keeps ids inside one path segment', async () => {

@@ -75,6 +75,7 @@ const API_ROUTES: ApiRoute[] = [
   route('GET', '/api/notifications', (apis, request) => apis.notifications.list(request)),
   route('POST', '/api/notifications/read-all', apis => apis.notifications.markAllRead()),
   route('POST', '/api/notifications/:notificationId/read', (apis, _request, params) => apis.notifications.markRead(param(params, 'notificationId'))),
+  route('GET', '/api/comments', (apis, request) => apis.comments.listWaitingForMyAgent(request)),
   route('PATCH', '/api/comments/:commentId', (apis, request, params) => apis.comments.setResolved(request, param(params, 'commentId'))),
   route('GET', '/api/artifacts/:artifactId/sharing', (apis, request, params) => apis.sharing.read(request, param(params, 'artifactId'))),
   route('PUT', '/api/artifacts/:artifactId/sharing', (apis, request, params) => apis.sharing.update(request, param(params, 'artifactId'))),

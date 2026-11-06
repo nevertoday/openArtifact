@@ -1,4 +1,6 @@
-import type { ArtifactComment, CommentAnchor } from '@open-artifact/core'
+import { CommentThread, type ArtifactComment, type CommentAnchor } from '@open-artifact/core'
+import type { OpenedArtifact } from '../access/artifact-gate.ts'
+import { NotificationText } from '../notifications/notification-text.ts'
 import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { JsonBody } from './json-body.ts'
@@ -22,6 +24,20 @@ export class CommentApi {
     const shownComments = CommentApi.#threadsMatching(allComments, filter)
     const names = await this.#context.people.namesOf(shownComments.flatMap(comment => [comment.authorId, comment.resolvedBy]))
     return Response.json({ comments: shownComments.map(comment => CommentApi.#commentJson(comment, names)) })
+  }
+
+  /** The agent's inbox: open comments addressed to an agent on every artifact the caller may publish to. */
+  async listWaitingForMyAgent(request: Request): Promise<Response> {
+    const identity = await this.#context.requireIdentity()
+    CommentApi.#requireInboxQuery(request)
+    const [visibleArtifacts, openThreadComments] = await Promise.all([
+      this.#context.gate.listVisible(identity),
+      this.#context.repositories.comments.listInOpenThreads(identity.membership.workspace.workspaceId),
+    ])
+    const editableArtifacts = new Map(visibleArtifacts.filter(openedArtifact => openedArtifact.permissions.canEdit).map(openedArtifact => [openedArtifact.summary.artifactId, openedArtifact]))
+    const threadsForAgent = CommentThread.allOf(openThreadComments).filter(thread => thread.root.forAgent && editableArtifacts.has(thread.root.artifactId))
+    const names = await this.#context.people.namesOf(threadsForAgent.flatMap(thread => thread.comments.map(comment => comment.authorId)))
+    return Response.json({ comments: threadsForAgent.map(thread => this.#inboxJson(thread, editableArtifacts.get(thread.root.artifactId) as OpenedArtifact, names)) })
   }
 
   async add(request: Request, artifactId: string): Promise<Response> {
@@ -79,6 +95,35 @@ export class CommentApi {
     const isFraction = (value: unknown): value is number => typeof value === 'number' && value >= 0 && value <= 1
     if (!isFraction(x) || !isFraction(y)) throw HttpError.badRequest('anchor must be { x, y } with both between 0 and 1')
     return { x: Math.round(x * 10_000) / 10_000, y: Math.round(y * 10_000) / 10_000, version: currentVersion, selector: null, textQuote: null }
+  }
+
+  // Only the caller's own open work is offered, so other values are refused rather than ignored.
+  static #requireInboxQuery(request: Request): void {
+    const searchParams = new URL(request.url).searchParams
+    const asksForOwnOpenWork = searchParams.get('for') === 'me' && searchParams.get('status') === 'open'
+    if (!asksForOwnOpenWork) throw HttpError.badRequest('ask for your agent\'s open comments with for=me&status=open')
+  }
+
+  #inboxJson(thread: CommentThread, openedArtifact: OpenedArtifact, names: Map<string, string>) {
+    const { root, replies } = thread
+    return {
+      commentId: root.commentId,
+      artifactId: root.artifactId,
+      title: openedArtifact.summary.title,
+      version: openedArtifact.summary.version,
+      url: NotificationText.link(this.#context.viewerUrl(root.artifactId), root.commentId),
+      anchor: root.anchor,
+      body: root.body,
+      author: { userId: root.authorId, name: names.get(root.authorId) },
+      createdAt: root.createdAt,
+      replies: replies.map(reply => ({
+        commentId: reply.commentId,
+        author: { userId: reply.authorId, name: names.get(reply.authorId) },
+        body: reply.body,
+        postedVia: reply.postedVia,
+        createdAt: reply.createdAt,
+      })),
+    }
   }
 
   static #filterOf(request: Request): CommentFilter {

@@ -5,7 +5,7 @@ const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05']
 const SERVER_INFO = { name: 'open-artifact', version: '0.1.0' }
 const SESSION_PREFIX = 'oa1.'
 const SERVER_INSTRUCTIONS =
-  'Open Artifact hosts HTML pages for your team. Publish with publish, revise with read then update (pass baseVersion), and handle comments people address to you with list_comments then reply_comment. Call get_guide once for the page rules before your first publish.'
+  'Open Artifact hosts HTML pages for your team. Publish with publish, revise with read then update (pass baseVersion). People leave comments for you: list_my_comments finds them across artifacts, then read the artifact, update it, and reply_comment with resolve: true saying what changed in which version. Call get_guide once for the page rules before your first publish.'
 
 interface JsonRpcRequest {
   jsonrpc: '2.0'
