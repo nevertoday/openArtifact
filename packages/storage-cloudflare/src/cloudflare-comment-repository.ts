@@ -64,19 +64,6 @@ export class CloudflareCommentRepository implements CommentRepository {
     await this.#db.prepare('UPDATE comments SET resolved_at = ?, resolved_by = ? WHERE id = ?').bind(resolvedAt, resolvedBy, commentId).run()
   }
 
-  async countWaitingForAgent(workspaceId: string): Promise<Map<string, number>> {
-    const { results: countRows } = await this.#db
-      .prepare(
-        `SELECT comments.artifact_id, COUNT(*) AS waiting
-         FROM comments JOIN artifacts ON artifacts.id = comments.artifact_id
-         WHERE artifacts.workspace_id = ? AND comments.for_agent = 1 AND comments.resolved_at IS NULL
-         GROUP BY comments.artifact_id`,
-      )
-      .bind(workspaceId)
-      .all<{ artifact_id: string; waiting: number }>()
-    return new Map(countRows.map(countRow => [countRow.artifact_id, countRow.waiting]))
-  }
-
   async listInOpenThreads(workspaceId: string): Promise<ArtifactComment[]> {
     const { results: commentRows } = await this.#db
       .prepare(

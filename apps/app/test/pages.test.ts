@@ -50,19 +50,53 @@ describe('home page', () => {
     await app.request(`/api/artifacts/${designDoc.artifactId}/comments`, { method: 'POST', cookie: reviewerCookie, body: { body: 'fix the diagram', forAgent: true } })
 
     const homeMarkup = await pageText('/', authorCookie)
-    const waitingMarkup = await pageText('/?filter=waiting', authorCookie)
+    const waitingMarkup = await pageText('/?filter=waiting_for_my_agent', authorCookie)
     const codexMarkup = await pageText('/?agent=Codex', authorCookie)
     const searchMarkup = await pageText('/?q=design', authorCookie)
 
     expect(homeMarkup).toContain('&lt;img src=x onerror=alert(1)&gt;')
     expect(homeMarkup).not.toContain(hostileTitle)
-    expect(homeMarkup).toContain('1 条评论待 agent 处理')
+    expect(homeMarkup).toContain('1 条未解决评论')
     expect(homeMarkup).toContain('Claude Code')
     expect(waitingMarkup).toContain('Design doc')
     expect(waitingMarkup).not.toContain('onerror')
     expect(codexMarkup).not.toContain('Design doc')
     expect(searchMarkup).toContain('Design doc')
     expect(searchMarkup).not.toContain('onerror')
+  })
+
+  it('shows who waits for me and for my agent, on my artifacts and in threads I joined', async () => {
+    const reviewerToken = await app.createToken(reviewerCookie)
+    const askedAgent = await app.publish({ token: agentToken }, 'Asked agent')
+    const askedMe = await app.publish({ token: agentToken }, 'Asked me')
+    const answeredMe = await app.publish({ token: reviewerToken }, 'Answered me')
+    const settled = await app.publish({ token: agentToken }, 'Settled')
+    const comment = async (cookie: string, artifactId: string, body: Record<string, unknown>) =>
+      (await app.json<{ comment: { commentId: string } }>(`/api/artifacts/${artifactId}/comments`, { method: 'POST', cookie, body })).body.comment.commentId
+    await comment(reviewerCookie, askedAgent.artifactId, { body: '加一张图', forAgent: true })
+    await comment(reviewerCookie, askedMe.artifactId, { body: '谁来定价？' })
+    await comment(reviewerCookie, askedMe.artifactId, { body: '还有一个问题' })
+    const myQuestion = await comment(authorCookie, answeredMe.artifactId, { body: '数据从哪来？' })
+    await comment(reviewerCookie, answeredMe.artifactId, { body: '财务系统', parentId: myQuestion })
+    const settledQuestion = await comment(reviewerCookie, settled.artifactId, { body: '错别字' })
+    await app.request(`/api/comments/${settledQuestion}`, { method: 'PATCH', cookie: authorCookie, body: { resolved: true } })
+
+    const homeMarkup = await pageText('/', authorCookie)
+    const forMeMarkup = await pageText('/?filter=waiting_for_me', authorCookie)
+    const forMyAgentMarkup = await pageText('/?filter=waiting_for_my_agent', authorCookie)
+    const reviewerForMeMarkup = await pageText('/?filter=waiting_for_me', reviewerCookie)
+
+    expect(homeMarkup).toContain('2 条未解决评论')
+    expect(homeMarkup).toContain('等我处理')
+    expect(homeMarkup).toContain('等我的 agent 处理')
+    expect(homeMarkup).not.toContain('待 agent 处理')
+    expect(forMeMarkup).toContain('Asked me')
+    expect(forMeMarkup).toContain('Answered me')
+    expect(forMeMarkup).not.toContain('Asked agent')
+    expect(forMeMarkup).not.toContain('Settled')
+    expect(forMyAgentMarkup).toContain('Asked agent')
+    expect(forMyAgentMarkup).not.toContain('Asked me')
+    expect(reviewerForMeMarkup).not.toContain('Answered me')
   })
 
   it('shows live previews from the usercontent origin, isolated from the app', async () => {

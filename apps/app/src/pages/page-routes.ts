@@ -1,4 +1,4 @@
-import { PublicLinkPassword, UsercontentSignature } from '@open-artifact/core'
+import { CommentThread, PublicLinkPassword, UsercontentSignature } from '@open-artifact/core'
 import { ArtifactGate, type OpenedArtifact } from '../access/artifact-gate.ts'
 import type { ApiContext } from '../api/api-context.ts'
 import type { Identity } from '../auth/request-identity.ts'
@@ -42,12 +42,12 @@ export class PageRoutes {
     const identity = await this.#context.identity()
     if (!identity) return this.#redirectToLogin(request)
     const searchParams = new URL(request.url).searchParams
-    const [workspaceArtifacts, waitingForAgent, grantsOfUser] = await Promise.all([
+    const [workspaceArtifacts, openThreadComments, grantsOfUser] = await Promise.all([
       this.#context.gate.listWorkspace(identity),
-      this.#context.repositories.comments.countWaitingForAgent(identity.membership.workspace.workspaceId),
+      this.#context.repositories.comments.listInOpenThreads(identity.membership.workspace.workspaceId),
       this.#context.repositories.artifactAccess.listGrantsOfUser(identity.userId),
     ])
-    const listing = new HomeListing(workspaceArtifacts, identity, waitingForAgent, new Set(grantsOfUser.map(grant => grant.artifactId)))
+    const listing = new HomeListing(workspaceArtifacts, identity, CommentThread.allOf(openThreadComments), new Set(grantsOfUser.map(grant => grant.artifactId)))
     const requestedFilter = searchParams.get('filter')
     const query = {
       filter: HOME_FILTERS.find(filter => filter === requestedFilter) ?? ('all' as HomeFilter),

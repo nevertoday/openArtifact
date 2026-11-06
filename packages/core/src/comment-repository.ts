@@ -44,7 +44,6 @@ export interface CommentRepository {
   listForArtifact(artifactId: string): Promise<ArtifactComment[]>
   /** `resolvedBy` null reopens the comment. */
   setResolved(commentId: string, resolvedBy: string | null): Promise<void>
-  countWaitingForAgent(workspaceId: string): Promise<Map<string, number>>
   /** Every comment of the workspace's unresolved threads, oldest first. */
   listInOpenThreads(workspaceId: string): Promise<ArtifactComment[]>
 }

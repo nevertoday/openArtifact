@@ -1,13 +1,23 @@
+import type { CommentThread } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
 import { html, type SafeHtml } from './html.ts'
 import { type IconName, PageShell } from './page-shell.ts'
 
-export const HOME_FILTERS = ['all', 'mine', 'shared', 'waiting', 'removed'] as const
+const ARTIFACT_FILTERS = ['all', 'mine', 'shared', 'removed'] as const
+const WAITING_FILTERS = ['waiting_for_me', 'waiting_for_my_agent'] as const
+export const HOME_FILTERS = [...ARTIFACT_FILTERS, ...WAITING_FILTERS] as const
 export type HomeFilter = (typeof HOME_FILTERS)[number]
 
-const FILTER_LABELS: Record<HomeFilter, string> = { all: '全部', mine: '我发布的', shared: '共享给我', waiting: '待 agent 处理', removed: '最近删除' }
+const FILTER_LABELS: Record<HomeFilter, string> = {
+  all: '全部',
+  mine: '我发布的',
+  shared: '共享给我',
+  removed: '最近删除',
+  waiting_for_me: '等我处理',
+  waiting_for_my_agent: '等我的 agent 处理',
+}
 
 export interface HomeQuery {
   filter: HomeFilter
@@ -23,19 +33,20 @@ export class HomeListing {
   readonly #visibleArtifacts: OpenedArtifact[]
   readonly #restorableArtifacts: OpenedArtifact[]
   readonly #identity: Identity
-  readonly #waitingForAgent: Map<string, number>
+  readonly #openThreadsByArtifact: Map<string, CommentThread[]>
   readonly #grantedArtifactIds: Set<string>
 
-  constructor(workspaceArtifacts: OpenedArtifact[], identity: Identity, waitingForAgent: Map<string, number>, grantedArtifactIds: Set<string>) {
+  constructor(workspaceArtifacts: OpenedArtifact[], identity: Identity, openThreads: CommentThread[], grantedArtifactIds: Set<string>) {
     this.#visibleArtifacts = workspaceArtifacts.filter(openedArtifact => openedArtifact.permissions.canView)
     this.#restorableArtifacts = workspaceArtifacts.filter(openedArtifact => openedArtifact.permissions.canRestore)
     this.#identity = identity
-    this.#waitingForAgent = waitingForAgent
+    this.#openThreadsByArtifact = new Map()
+    for (const thread of openThreads) this.#openThreadsByArtifact.set(thread.root.artifactId, [...this.#openThreadsOf(thread.root.artifactId), thread])
     this.#grantedArtifactIds = grantedArtifactIds
   }
 
-  waitingCount(artifactId: string): number {
-    return this.#waitingForAgent.get(artifactId) ?? 0
+  unresolvedCount(artifactId: string): number {
+    return this.#openThreadsOf(artifactId).length
   }
 
   countFor(filter: HomeFilter): number {
@@ -82,11 +93,17 @@ export class HomeListing {
         return openedArtifact.summary.authorId === this.#identity.userId
       case 'shared':
         return this.#grantedArtifactIds.has(openedArtifact.summary.artifactId)
-      case 'waiting':
-        return this.waitingCount(openedArtifact.summary.artifactId) > 0
+      case 'waiting_for_me':
+        return this.#openThreadsOf(openedArtifact.summary.artifactId).some(thread => thread.isWaitingFor(this.#identity.userId, openedArtifact.summary.authorId))
+      case 'waiting_for_my_agent':
+        return this.#openThreadsOf(openedArtifact.summary.artifactId).some(thread => thread.isWaitingForAgentOf(this.#identity.userId, openedArtifact.summary.authorId))
       case 'removed':
         return openedArtifact.summary.removal !== null
     }
+  }
+
+  #openThreadsOf(artifactId: string): CommentThread[] {
+    return this.#openThreadsByArtifact.get(artifactId) ?? []
   }
 }
 
@@ -103,7 +120,14 @@ export interface HomeModel {
   now: number
 }
 
-const FILTER_ICONS: Record<HomeFilter, IconName> = { all: 'LayoutGrid', mine: 'UserRound', shared: 'Users', waiting: 'MessageSquareText', removed: 'Trash2' }
+const FILTER_ICONS: Record<HomeFilter, IconName> = {
+  all: 'LayoutGrid',
+  mine: 'UserRound',
+  shared: 'Users',
+  removed: 'Trash2',
+  waiting_for_me: 'MessageSquareText',
+  waiting_for_my_agent: 'Bot',
+}
 
 export class HomePage {
   static render(model: HomeModel): Response {
@@ -167,8 +191,8 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     const filterLink = (filter: HomeFilter) => {
       const isCurrent = model.query.filter === filter && model.query.agent === null
       const count = model.listing.countFor(filter)
-      const needsAgent = filter === 'waiting' && count > 0
-      return html`<a class="xxd-sidebar__item" ${filter === 'removed' ? html`data-removed-count` : ''} href="${filter === 'all' ? '/' : `/?filter=${filter}`}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(FILTER_ICONS[filter], 18)}<span>${FILTER_LABELS[filter]}</span><span class="xxd-badge" ${needsAgent ? html`data-tone="warning"` : ''}>${count}</span></a>`
+      const somethingWaits = WAITING_FILTERS.some(waitingFilter => waitingFilter === filter) && count > 0
+      return html`<a class="xxd-sidebar__item" ${filter === 'removed' ? html`data-removed-count` : ''} href="${filter === 'all' ? '/' : `/?filter=${filter}`}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(FILTER_ICONS[filter], 18)}<span>${FILTER_LABELS[filter]}</span><span class="xxd-badge" ${somethingWaits ? html`data-tone="warning"` : ''}>${count}</span></a>`
     }
     const agentLink = ({ agent, count }: { agent: string; count: number }) => {
       const isCurrent = model.query.agent === agent
@@ -176,7 +200,8 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     }
     const agentCounts = model.listing.agentCounts()
     return html`<nav class="xxd-sidebar app-sidebar" aria-label="筛选"><div class="xxd-sidebar__body">
-  <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">ARTIFACT</div>${HOME_FILTERS.map(filterLink)}</div>
+  <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">ARTIFACT</div>${ARTIFACT_FILTERS.map(filterLink)}</div>
+  <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">待处理</div>${WAITING_FILTERS.map(filterLink)}</div>
   ${agentCounts.length > 0 ? html`<div class="xxd-sidebar__group"><div class="xxd-sidebar__label">来源</div>${agentCounts.map(agentLink)}</div>` : ''}
 </div></nav>`
   }
@@ -190,7 +215,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
   }
 
   static #card({ summary }: OpenedArtifact, model: HomeModel): SafeHtml {
-    const waitingCount = model.listing.waitingCount(summary.artifactId)
+    const unresolvedCount = model.listing.unresolvedCount(summary.artifactId)
     return html`<a class="xxd-card" href="/a/${encodeURIComponent(summary.artifactId)}">
   <div class="xxd-card__media artifact-cover" aria-hidden="true">
     <span class="artifact-cover__title"></span><span class="artifact-cover__line"></span><span class="artifact-cover__line"></span>
@@ -207,7 +232,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     </p>
     <div class="xxd-cluster artifact-card__badges">
       <span class="xxd-badge">${ArtifactLabels.visibility(summary.sharing.visibility)}</span>
-      ${waitingCount > 0 ? html`<span class="xxd-badge" data-appearance="dot" data-tone="warning">${waitingCount} 条评论待 agent 处理</span>` : ''}
+      ${unresolvedCount > 0 ? html`<span class="xxd-badge" data-appearance="dot" data-tone="warning">${unresolvedCount} 条未解决评论</span>` : ''}
     </div>
   </div>
 </a>`

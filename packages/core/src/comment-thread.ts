@@ -35,14 +35,14 @@ export class CommentThread {
   }
 
   /**
-   * Someone waits for this person when the thread is open and either it asks them, as the artifact's author,
-   * for something a person must do, or they took part and someone else wrote last.
+   * Someone waits for this person when the thread is open, someone else wrote last, and either the thread asks
+   * them, as the artifact's author, for something a person must do, or they took part in it.
    */
   isWaitingFor(userId: string, artifactAuthorId: string): boolean {
-    const asksTheAuthor = artifactAuthorId === userId && this.root.authorId !== userId && !this.root.forAgent
     const lastComment = this.replies.at(-1) ?? this.root
-    const answeredByOthers = this.participantIds.has(userId) && lastComment.authorId !== userId
-    return this.isOpen && (asksTheAuthor || answeredByOthers)
+    const someoneElseWroteLast = lastComment.authorId !== userId
+    const asksTheAuthor = artifactAuthorId === userId && !this.root.forAgent
+    return this.isOpen && someoneElseWroteLast && (asksTheAuthor || this.participantIds.has(userId))
   }
 
   /** An open thread addressed to an agent waits for the agents of the artifact's author. */
