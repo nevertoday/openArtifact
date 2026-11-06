@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Artifact 页面 JS 读写共享数据：postMessage 代理",
+    "output": ".archify/sequence-artifact-db-postmessage-proxy-20261020-111439/artifact-db-postmessage-proxy.html",
+    "locale": "zh-CN",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    { "id": "viewer", "type": "external", "label": "查看者", "sublabel": "浏览器", "icon": "person" },
+    { "id": "host-page", "type": "frontend", "label": "查看页", "sublabel": "主站 origin" },
+    { "id": "artifact-iframe", "type": "security", "label": "Artifact iframe", "sublabel": "usercontent origin · sandbox", "icon": "frontend" },
+    { "id": "app-api", "type": "backend", "label": "App API", "sublabel": "数据 API" },
+    { "id": "d1", "type": "database", "label": "D1", "sublabel": "共享数据" }
+  ],
+  "segments": [
+    { "from": 150, "to": 270, "label": "加载 artifact" },
+    { "from": 280, "to": 500, "label": "代理一次 db.set" },
+    { "from": 510, "to": 640, "label": "结果回传" }
+  ],
+  "messages": [
+    {
+      "id": "open-artifact",
+      "from": "viewer",
+      "to": "host-page",
+      "y": 175,
+      "label": "打开 artifact（session cookie 或公开链接）",
+      "variant": "default"
+    },
+    {
+      "id": "create-sandbox-iframe",
+      "from": "host-page",
+      "to": "artifact-iframe",
+      "y": 205,
+      "label": "创建 sandbox iframe",
+      "variant": "emphasis",
+      "note": "加载 usercontent/{artifact}/{version}；平台注入的 SDK 提供 window.openArtifact.db"
+    },
+    {
+      "id": "post-db-request",
+      "from": "artifact-iframe",
+      "to": "host-page",
+      "y": 300,
+      "label": "postMessage { requestId, op }",
+      "variant": "emphasis",
+      "note": "页面代码先调用 db.set(collection, doc)；查看页收到后校验 event.origin 与 event.source 是本 iframe"
+    },
+    {
+      "id": "call-data-api",
+      "from": "host-page",
+      "to": "app-api",
+      "y": 380,
+      "label": "带 cookie 调用数据 API",
+      "variant": "security",
+      "note": "权限检查：成员可读写；公开链接访客默认只读，作者开启匿名写入时才可写，并限流"
+    },
+    {
+      "id": "write-record",
+      "from": "app-api",
+      "to": "d1",
+      "y": 465,
+      "label": "写入记录，带 createdBy / updatedBy",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-result",
+      "from": "app-api",
+      "to": "host-page",
+      "y": 530,
+      "label": "结果",
+      "variant": "return"
+    },
+    {
+      "id": "post-db-result",
+      "from": "host-page",
+      "to": "artifact-iframe",
+      "y": 565,
+      "label": "postMessage { requestId, result }",
+      "variant": "return",
+      "note": "Promise resolve。iframe 内的代码拿不到任何 token 或 cookie"
+    }
+  ],
+  "activations": [
+    { "participant": "host-page", "from": 170, "to": 575, "type": "frontend" },
+    { "participant": "artifact-iframe", "from": 200, "to": 620, "type": "security" },
+    { "participant": "app-api", "from": 375, "to": 536, "type": "backend" },
+    { "participant": "d1", "from": 460, "to": 480, "type": "database" }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "凭证隔离",
+      "items": [
+        "iframe 内的代码拿不到任何 token 或 cookie",
+        "artifact 跑在独立的 usercontent origin，sandbox 隔离",
+        "只有查看页带 cookie 调用 App API"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "消息校验",
+      "items": [
+        "查看页只接受 event.origin 与 event.source 都是本 iframe 的消息",
+        "requestId 把结果对回调用方的 Promise"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "写入权限",
+      "items": [
+        "成员可读写",
+        "公开链接访客默认只读",
+        "作者开启匿名写入时才可写，并限流"
+      ]
+    }
+  ]
+}

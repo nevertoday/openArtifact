@@ -1,0 +1,666 @@
+<title>Open Artifact 设计</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600;900&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: sticky left table of contents + one reading column; diagrams break out to the full content width. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #16202c;
+  --muted: #5a6676;
+  --line: #dde2e9;
+  --accent: #1d5bd8;
+  --accent-soft: #e6eefc;
+  --ok: #17784a;
+  --ok-soft: #e3f3ea;
+  --warn: #9a5b00;
+  --warn-soft: #fbf0dc;
+  --no: #8a2f3c;
+  --no-soft: #f7e6e9;
+  --code-bg: #eef1f5;
+  --font-display: "Noto Serif SC", "Songti SC", serif;
+  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141b; --surface: #161d27; --fg: #e3e8ef; --muted: #98a3b3; --line: #2a3442;
+    --accent: #7ba7ff; --accent-soft: #1b2a44; --ok: #6fd3a0; --ok-soft: #15301f;
+    --warn: #f0b860; --warn-soft: #34280f; --no: #f08f9d; --no-soft: #3a1c22; --code-bg: #1c2532;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b; --surface: #161d27; --fg: #e3e8ef; --muted: #98a3b3; --line: #2a3442;
+  --accent: #7ba7ff; --accent-soft: #1b2a44; --ok: #6fd3a0; --ok-soft: #15301f;
+  --warn: #f0b860; --warn-soft: #34280f; --no: #f08f9d; --no-soft: #3a1c22; --code-bg: #1c2532;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15.5px; line-height: 1.75; }
+.page {
+  display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px;
+  max-width: 1280px; margin: 0 auto;
+  padding-block: 40px 96px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 13.5px; }
+nav.toc .label { font-size: 11.5px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: toc; }
+nav.toc li { counter-increment: toc; }
+nav.toc a { display: flex; gap: 8px; color: var(--muted); text-decoration: none; padding: 4px 8px; border-radius: 6px; }
+nav.toc a::before { content: counter(toc); font-family: var(--font-mono); font-size: 12px; min-width: 1.4em; color: var(--line); }
+nav.toc a:hover, nav.toc a.active { color: var(--fg); background: var(--accent-soft); }
+nav.toc a.active::before { color: var(--accent); }
+.theme-switch { margin-top: 20px; display: flex; gap: 4px; }
+.theme-switch button { font: inherit; font-size: 12px; padding: 4px 10px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; cursor: pointer; }
+.theme-switch button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+.theme-switch button:focus-visible, nav.toc a:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { min-width: 0; }
+.prose { max-width: 760px; }
+header.doc-head { margin-bottom: 40px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; color: var(--accent); letter-spacing: .06em; }
+h1 { font-family: var(--font-display); font-weight: 900; font-size: clamp(30px, 4.4vw, 44px); line-height: 1.2; margin: 8px 0 14px; text-wrap: balance; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.meta b { color: var(--fg); font-weight: 500; }
+.lede { font-size: 17px; margin: 20px 0 0; }
+section { padding-top: 28px; margin-top: 28px; scroll-margin-top: 16px; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 25px; line-height: 1.35; margin: 0 0 14px; text-wrap: balance; }
+h2 .num { font-family: var(--font-mono); font-size: 14px; color: var(--accent); margin-right: 10px; font-weight: 400; vertical-align: 3px; }
+h3 { font-size: 17px; font-weight: 700; margin: 28px 0 8px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.4em; }
+li { margin-bottom: 4px; }
+a { color: var(--accent); }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre { margin: 0; overflow-x: auto; background: var(--code-bg); border-radius: 8px; padding: 14px 16px; font-size: 13px; line-height: 1.6; }
+pre code { background: none; padding: 0; font-size: inherit; }
+.code-block { margin: 12px 0 18px; }
+.code-cap { font-size: 12px; color: var(--muted); margin-bottom: 4px; display: flex; justify-content: space-between; gap: 8px; }
+.code-cap .tag { font-family: var(--font-mono); color: var(--warn); }
+.table-wrap { overflow-x: auto; margin: 12px 0 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+th { font-size: 12.5px; color: var(--muted); font-weight: 500; background: var(--bg); white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+td:first-child { white-space: nowrap; font-weight: 500; }
+.pill { display: inline-block; font-size: 12px; padding: 1px 9px; border-radius: 999px; white-space: nowrap; font-weight: 500; }
+.pill.v1 { background: var(--ok-soft); color: var(--ok); }
+.pill.v2 { background: var(--warn-soft); color: var(--warn); }
+.pill.no { background: var(--no-soft); color: var(--no); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 14px 0 20px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.card h4 { margin: 0 0 6px; font-size: 14.5px; }
+.card p { margin: 0; font-size: 14px; color: var(--muted); }
+.callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 14px 0 18px; font-size: 14.5px; }
+.callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+.callout strong { display: block; margin-bottom: 2px; }
+.diagram { margin: 18px 0 24px; }
+.diagram iframe { display: block; width: 100%; height: 1150px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.diagram figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
+.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 14px 0 20px; }
+.col { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.col h4 { margin: 0 0 8px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.col ul { margin: 0; font-size: 14px; }
+.phase { margin: 22px 0 6px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.phase h3 { margin: 0; }
+.phase .deps { font-size: 12.5px; color: var(--muted); }
+.tasks { margin-bottom: 8px; }
+.tasks li { margin-bottom: 6px; }
+.tasks .done-when { color: var(--muted); }
+.critical-path { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13.5px; margin: 10px 0 14px; }
+.critical-path span { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 2px 10px; }
+.critical-path i { font-style: normal; color: var(--muted); }
+.decide { counter-reset: d; list-style: none; padding: 0; display: grid; gap: 10px; }
+.decide li { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+.decide .q { font-weight: 700; }
+.decide .rec { color: var(--muted); font-size: 14px; }
+@media (max-width: 900px) {
+  .page { grid-template-columns: minmax(0, 1fr); gap: 0; padding-block: 24px 64px; }
+  nav.toc { position: static; margin-bottom: 24px; }
+  nav.toc ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+
+<div class="page">
+  <nav class="toc" aria-label="目录">
+    <div class="label">目录</div>
+    <ol>
+      <li><a href="#summary">结论</a></li>
+      <li><a href="#problem">问题与目标</a></li>
+      <li><a href="#architecture">系统架构</a></li>
+      <li><a href="#access">接入层</a></li>
+      <li><a href="#artifact">Artifact 模型</a></li>
+      <li><a href="#loop">协作闭环</a></li>
+      <li><a href="#sandbox">沙箱与共享数据</a></li>
+      <li><a href="#accounts">账号与权限</a></li>
+      <li><a href="#deploy">部署与开源</a></li>
+      <li><a href="#scope">范围与上线</a></li>
+      <li><a href="#tasks">第一版任务</a></li>
+      <li><a href="#progress">实施进展</a></li>
+      <li><a href="#open">待决定的事</a></li>
+    </ol>
+    <div class="theme-switch" role="group" aria-label="主题">
+      <button type="button" id="theme-system" data-theme-choice="system">系统</button>
+      <button type="button" id="theme-light" data-theme-choice="light">浅色</button>
+      <button type="button" id="theme-dark" data-theme-choice="dark">深色</button>
+    </div>
+  </nav>
+
+  <main>
+    <header class="doc-head prose">
+      <div class="eyebrow">DESIGN DOC · 草案</div>
+      <h1>Open Artifact 设计</h1>
+      <div class="meta">
+        <span><b>状态</b> 第一版功能已在本地实现，待部署</span>
+        <span><b>日期</b> 2026-10-20</span>
+        <span><b>依据</b> 2026-10-20 设计讨论中确认的 15 项决策</span>
+      </div>
+      <p class="lede">任何 AI agent 都能发布 artifact，团队成员不需要 Claude 账号就能查看、评论和使用。整个平台部署在团队自己的 Cloudflare 账号里。</p>
+    </header>
+
+    <section id="summary" class="prose">
+      <h2><span class="num">01</span>结论</h2>
+      <p>Open Artifact 是一个与 model 无关的 artifact 平台，面向 Team。第一版的形态如下：</p>
+      <ul>
+        <li><strong>接入</strong>：HTTP API 是基础；远程 MCP server 是 agent 的主入口；不支持 MCP 的 agent 使用指南包加 HTTP API。agent 用个人 API token（PAT）鉴权。</li>
+        <li><strong>能力</strong>：静态单页、多文件资源、版本历史、评论、共享数据存储。平台不编译源码。</li>
+        <li><strong>安全</strong>：artifact 在独立 origin 的沙箱 iframe 里运行；页面代码通过 postMessage 代理读写数据，拿不到任何凭证。</li>
+        <li><strong>部署</strong>：Cloudflare Workers + D1 + R2。自托管是指部署到团队自己的 Cloudflare 账号。</li>
+        <li><strong>开源</strong>：Apache-2.0。先在自己团队内部使用 2 到 4 周，达到成功标准后开源，官方 SaaS 最后做。</li>
+      </ul>
+    </section>
+
+    <section id="problem" class="prose">
+      <h2><span class="num">02</span>问题与目标</h2>
+      <p>Claude Artifact 在两端都绑定 Claude：</p>
+      <div class="cards">
+        <div class="card"><h4>生产端</h4><p>只有 Claude 能创建和发布 artifact。GPT、Gemini、Codex、Cursor 等 agent 没有一个共同的地方可以发布页面。</p></div>
+        <div class="card"><h4>消费端</h4><p>查看、评论、使用 artifact 依赖 claude.ai 账号和 Anthropic 的分享权限。</p></div>
+      </div>
+      <p>Open Artifact 两端都解决，并且以团队协作为中心设计：发布出来的页面默认整个 workspace 可见，评论能回到 agent 手里，页面能存放团队共享的数据。</p>
+      <h3>不做什么</h3>
+      <ul>
+        <li>平台不运行 agent，也不持有任何 LLM key。修改 artifact 的永远是用户自己的 agent。</li>
+        <li>平台不编译 React / JSX / Markdown 源码。model 自己产出能直接运行的 HTML。</li>
+        <li>第一版不支持纯内网或离线部署（原因见 <a href="#deploy">部署与开源</a>）。</li>
+      </ul>
+    </section>
+
+    <section id="architecture">
+      <div class="prose">
+        <h2><span class="num">03</span>系统架构</h2>
+        <p>所有组件都在团队自己的 Cloudflare 账号里。三个 Worker 各管一件事：MCP Worker 把 MCP 调用转成 HTTP API 调用；App Worker 负责主站页面、API、登录和权限；Usercontent Worker 只在独立 origin 上提供 artifact 文件。</p>
+      </div>
+      <!--DIAGRAM:architecture|系统架构-->
+      <div class="prose">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>组件</th><th>职责</th><th>不做</th></tr></thead>
+            <tbody>
+              <tr><td>App Worker</td><td>查看页 UI、HTTP API、Better Auth 登录、PAT 校验、权限检查、postMessage 代理、触发截图和邮件</td><td>不提供 artifact 文件本身</td></tr>
+              <tr><td>MCP Worker</td><td>远程 MCP server，工具定义和使用说明；每个工具调用经 service binding 转成一次 HTTP API 调用，带着 agent 的 PAT 和客户端名</td><td>没有自己的业务逻辑和存储</td></tr>
+              <tr><td>Usercontent Worker</td><td>在 <code>*.usercontent</code> 域上只读提供 artifact 文件，只接受 app 签名的路径；给每个页面注入共享数据 SDK；通过 app 的 RPC 入口 <code>ArtifactFileReader</code> 读取文件</td><td>不读 cookie，不接受写请求，没有 D1 和 R2 绑定</td></tr>
+              <tr><td>D1</td><td>用户、workspace、成员、artifact 元数据和版本号、评论、共享数据（JSON 列）、PAT hash</td><td>不存文件</td></tr>
+              <tr><td>R2</td><td>每个版本的文件、缩略图</td><td>不存元数据</td></tr>
+              <tr><td>Browser Rendering</td><td>发布时为链接预览截一张缩略图</td><td></td></tr>
+              <tr><td>邮件发送</td><td>magic link 登录邮件、评论通知（Resend 或 Cloudflare Email，待选）</td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="access" class="prose">
+      <h2><span class="num">04</span>接入层</h2>
+      <p>“不同 model 都能用”的体验，取决于 model 能不能知道这个平台怎么用。只提供 API 不够：model 不知道什么时候该发布、页面该遵守什么约定、该更新而不是新建。所以接入层由三部分组成。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>入口</th><th>给谁用</th><th>说明从哪来</th><th>版本</th></tr></thead>
+          <tbody>
+            <tr><td>远程 MCP server</td><td>Claude Code、Codex、Cursor、Gemini CLI 等支持 MCP 的 agent</td><td>工具描述自动进入 agent 上下文；<code>get_guide</code> 按需返回页面规范</td><td><span class="pill v1">第一版</span></td></tr>
+            <tr><td>HTTP API</td><td>脚本、CI、不支持 MCP 的 agent</td><td>OpenAPI 规范 + <code>/llms.txt</code></td><td><span class="pill v1">第一版</span></td></tr>
+            <tr><td>指南包</td><td>所有 agent</td><td>一份源文件生成 AGENTS.md 片段、Claude Skill、Cursor rules；设置页一键复制，已填好本实例的 API 地址</td><td><span class="pill v1">第一版</span></td></tr>
+            <tr><td>CLI</td><td>能执行 shell 的 agent、人</td><td>HTTP API 的薄封装</td><td><span class="pill v2">以后</span></td></tr>
+            <tr><td>Chat 网页内接入</td><td>ChatGPT、Gemini 网页版用户</td><td>每个平台单独适配</td><td><span class="pill no">不做</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>MCP 工具</h3>
+      <p>MCP Worker 第一版提供下面的工具。每个工具对应一个 HTTP API 端点，权限和发 token 的用户相同。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>工具</th><th>作用</th></tr></thead>
+          <tbody>
+            <tr><td><code>publish</code></td><td>新建 artifact，上传页面和资源文件，返回 url 和 <code>version</code></td></tr>
+            <tr><td><code>update</code></td><td>基于 <code>baseVersion</code> 发布新版本；版本不一致时被拒绝（见 <a href="#concurrency">版本与并发</a>）</td></tr>
+            <tr><td><code>read</code></td><td>读取当前版本的文件和 <code>version</code></td></tr>
+            <tr><td><code>list</code></td><td>列出当前用户在 workspace 里能看到的 artifact</td></tr>
+            <tr><td><code>list_comments</code></td><td>读取评论，可以只取标记为“给 agent”且未解决的评论</td></tr>
+            <tr><td><code>reply_comment</code></td><td>回复一条评论，可以同时标记为已解决</td></tr>
+            <tr><td><code>get_guide</code></td><td>返回页面规范：标题、主题、CDN 白名单、什么时候更新而不是新建</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>PAT</h3>
+      <ul>
+        <li>用户在设置页生成 PAT。平台只存 hash，明文只在生成时显示一次。</li>
+        <li>每个 PAT 只对一个 workspace 有效，可以设过期时间，可以随时撤销。</li>
+        <li>agent 的权限等于发 PAT 的用户在该 workspace 里的权限，平台没有单独的 agent 角色。</li>
+      </ul>
+    </section>
+
+    <section id="artifact" class="prose">
+      <h2><span class="num">05</span>Artifact 模型</h2>
+      <h3>能力范围</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>档位</th><th>内容</th><th>版本</th></tr></thead>
+          <tbody>
+            <tr><td>静态单页</td><td>一个 HTML，内联 CSS 和 JS，可以引用白名单 CDN</td><td><span class="pill v1">第一版</span></td></tr>
+            <tr><td>多文件 + 资源</td><td>HTML 加 css、js、图片、数据文件；保留全部历史版本，可以查看、对比、回滚</td><td><span class="pill v1">第一版</span></td></tr>
+            <tr><td>评论</td><td>人与人讨论；可以标记为“给 agent”</td><td><span class="pill v1">第一版</span></td></tr>
+            <tr><td>共享数据存储</td><td>页面通过 SDK 读写团队共享的数据，例如 tracker、报名表、投票</td><td><span class="pill v1">第一版</span></td></tr>
+            <tr><td>源码编译</td><td>平台编译 React / JSX / Markdown</td><td><span class="pill no">不做</span></td></tr>
+            <tr><td>页面内调用 LLM</td><td>页面通过平台调 model</td><td><span class="pill no">不做</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>页面版本和共享数据分开存放。回滚页面不回滚数据，团队填进 tracker 的记录不会因为作者回滚页面而丢失。</p>
+
+      <h3 id="concurrency">版本与并发</h3>
+      <p>团队里多个人的 agent 可能同时修改同一个 artifact。平台用乐观锁处理：每次 <code>read</code> 返回 <code>version</code>，<code>update</code> 必须带上 <code>baseVersion</code>。</p>
+      <ol>
+        <li>App API 只在当前版本等于 <code>baseVersion</code> 时写入新版本。</li>
+        <li>版本不一致时，App API 拒绝写入，并在响应里返回最新内容和差异。</li>
+        <li>agent 把自己的修改合并到最新内容上，再次调用 <code>update</code>。</li>
+        <li>只有用户明确要求覆盖时，agent 才可以传 <code>force: true</code>。</li>
+      </ol>
+      <p>存储层（M1 已实现）保证失败或落败的发布不会留下没有文件的版本：</p>
+      <ol>
+        <li>先把文件写到 R2 的一个新上传目录 <code>artifacts/{artifactId}/uploads/{uploadId}/</code>。</li>
+        <li>用一个 D1 batch（事务）更新 <code>artifacts</code>：只有 <code>current_version</code> 仍然等于 <code>baseVersion</code> 时，才把版本号加一，并把 <code>current_upload_id</code> 指向这次上传。</li>
+        <li>同一个 batch 里，版本记录和文件清单只在 <code>current_upload_id</code> 已经指向这次上传时才写入。</li>
+        <li>版本号没有更新成功时，删除这次上传的文件，并返回 <code>conflict</code>（带当前版本号）或 <code>not_found</code>。</li>
+      </ol>
+      <div class="code-block">
+        <div class="code-cap"><span>packages/storage-cloudflare/src/cloudflare-artifact-repository.ts · 50–64</span><span class="tag">逐字摘录</span></div>
+<pre><code>  async publishOnTopOf(artifactId: string, baseVersion: number, authorId: string, files: ArtifactFile[]): Promise&lt;PublishResult&gt; {
+    const nextVersion = baseVersion + 1
+    const publishedAt = Date.now()
+    const { batchResults, uploadId } = await this.#writeVersion(artifactId, files, uploadId =&gt; [
+      this.#db
+        .prepare('UPDATE artifacts SET current_version = ?, current_upload_id = ?, updated_at = ? WHERE id = ? AND current_version = ?')
+        .bind(nextVersion, uploadId, publishedAt, artifactId, baseVersion),
+      ...this.#recordVersionStatements(artifactId, nextVersion, uploadId, authorId, files, publishedAt),
+    ])
+    const versionAdvance = batchResults[0]
+    const claimedNextVersion = versionAdvance?.meta.changes === 1
+    if (claimedNextVersion) return { status: 'published', version: nextVersion }
+    await this.#discardUpload(artifactId, uploadId, files)
+    return this.#rejectionFor(artifactId)
+  }</code></pre>
+      </div>
+      <p>冲突时返回最新内容和差异，是 App API（任务 15）的工作，存储层只返回当前版本号。</p>
+    </section>
+
+    <section id="loop">
+      <div class="prose">
+        <h2><span class="num">06</span>协作闭环</h2>
+        <p>典型流程：作者让 agent 发布一份设计文档，同事在页面上评论，作者让 agent 去处理评论，agent 修改后重新发布并回复评论。agent 不是常驻的，所以第一版靠作者叫 agent 来拉取评论。</p>
+      </div>
+      <!--DIAGRAM:loop|发布、评论、修改闭环-->
+      <div class="prose">
+        <h3>评论的两种用途</h3>
+        <p>评论分两种：人与人的讨论，以及给 agent 的修改意见。评论者把评论标记为“给 agent”后，<code>list_comments</code> 可以只取这类未解决的评论，agent 不会被讨论内容干扰。agent 修改后回复这条评论并标记为已解决，其他人在页面上能看到处理结果。</p>
+        <h3>人收到的通知</h3>
+        <ul>
+          <li><strong>链接预览</strong>：查看页带完整的 Open Graph 元数据和发布时截的缩略图，贴到 Slack、飞书、钉钉时显示卡片。</li>
+          <li><strong>邮件</strong>：有人评论你的 artifact、@你、回复你的评论时，平台发邮件。邮件通道和 magic link 登录共用。</li>
+        </ul>
+        <div class="cols">
+          <div class="col"><h4><span class="pill v1">第一版</span></h4><ul><li>MCP 拉取评论</li><li>“给 agent”标记</li><li>回复并解决</li><li>OG 预览、邮件</li></ul></div>
+          <div class="col"><h4><span class="pill v2">第二版</span></h4><ul><li>Webhook：新评论、新版本事件</li><li>Slack / 飞书 bot（基于 Webhook）</li></ul></div>
+          <div class="col"><h4><span class="pill no">不做</span></h4><ul><li>平台收到 @agent 后自己调 model 修改</li></ul></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="sandbox">
+      <div class="prose">
+        <h2><span class="num">07</span>沙箱与共享数据</h2>
+        <p>artifact 是 model 生成的任意代码。如果 artifact 和主站同 origin，一个恶意或有缺陷的页面就能读取查看者的登录态。所以 artifact 必须由 Usercontent Worker 在独立 origin 上提供，并且放在 sandbox iframe 里运行。这是安全底线，自托管也不能省。</p>
+        <p>独立 origin 带来一个问题：页面代码拿不到主站的 cookie，也就无法直接调用数据 API。解决方法是 postMessage 代理：页面代码通过平台注入的 SDK 发消息给父页面，由查看页代为调用 API。</p>
+      </div>
+      <!--DIAGRAM:proxy|postMessage 代理-->
+      <div class="prose">
+        <div class="code-block">
+          <div class="code-cap"><span>artifact 页面代码使用共享数据</span><span class="tag">示例，SDK 接口尚未定稿</span></div>
+<pre><code>const signupSheet = window.openArtifact.db.collection('signups')
+
+async function joinWorkshop(sessionName) {
+  // The platform stamps createdBy with the viewer; the page never sends an identity.
+  await signupSheet.add({ sessionName })
+  renderSignups(await signupSheet.list())
+}</code></pre>
+        </div>
+        <h3>谁能读写</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>访问者</th><th>读</th><th>写</th></tr></thead>
+            <tbody>
+              <tr><td>能看到这个 artifact 的 workspace 成员</td><td>可以</td><td>可以</td></tr>
+              <tr><td>公开链接访客（匿名）</td><td>可以</td><td>默认不可以。作者为这个 artifact 单独开启匿名写入后才可以，并且有限流</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li>每条记录自动带上 <code>createdBy</code> 和 <code>updatedBy</code>。页面能拿到当前查看者的名字和头像。</li>
+          <li>只有在查看页里打开时，页面才能写数据。直接打开 usercontent 地址时，页面没有父页面代理，数据功能不可用。</li>
+          <li>查看页收到消息后，必须先确认 <code>event.origin</code> 是 usercontent 域，并且 <code>event.source</code> 是它自己创建的那个 iframe，才处理消息。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="accounts" class="prose">
+      <h2><span class="num">08</span>账号与权限</h2>
+      <h3>组织层级</h3>
+      <p>第一版用扁平结构：用户 → Workspace → artifact。一个用户可以加入多个 workspace。以后需要时可以在 workspace 上面加 Organization，现有数据不用迁移。</p>
+      <h3>artifact 的可见范围</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>范围</th><th>谁能看</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>私有</td><td>作者本人</td><td></td></tr>
+            <tr><td>指定的人</td><td>作者指定的成员</td><td>角色分 viewer、commenter、editor</td></tr>
+            <tr><td>Workspace 内</td><td>workspace 全部成员</td><td><strong>默认值</strong>。发布出来就是给同事看的</td></tr>
+            <tr><td>公开链接</td><td>任何拿到链接的人，不需要登录</td><td>可以设过期时间和密码。workspace 管理员可以全局关闭</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>登录</h3>
+      <p>认证用 Better Auth，数据存在 D1。用户数据始终留在部署者自己的 D1 里，自托管实例和官方 SaaS 用同一套代码。</p>
+      <ul>
+        <li>GitHub / Google OAuth</li>
+        <li>邮箱 magic link</li>
+        <li>可配置的通用 OIDC，用于接入公司 SSO（Okta、Azure AD、飞书、钉钉等）</li>
+      </ul>
+      <p>团队可以在实例前面再加一层 Cloudflare Access。这是团队的可选项，平台不依赖它。</p>
+      <div class="callout warn"><strong>未核实</strong>Better Auth 在 Workers + D1 上的运行方式和 OIDC 插件的能力，本文没有核实。实现前要做一次技术验证。</div>
+    </section>
+
+    <section id="deploy" class="prose">
+      <h2><span class="num">09</span>部署与开源</h2>
+      <h3>自托管 = 部署到自己的 Cloudflare 账号</h3>
+      <p>Workers、D1、R2 是 Cloudflare 的托管服务，不能用 docker 在内网运行。所以本项目的“自托管”是指：团队用仓库里的 “Deploy to Cloudflare” 按钮或 <code>wrangler deploy</code>，把整套服务部署到团队自己的 Cloudflare 账号。数据存在团队自己的 D1 和 R2 里，不经过项目方的服务器。官方 SaaS 是同一套代码部署在项目方的账号上。</p>
+      <p>代价：需要纯内网或离线部署的团队，第一版无法使用。</p>
+      <h3>为以后的 Postgres 适配留余地</h3>
+      <p>业务代码必须通过 repository 层访问数据，不直接调用 D1 或 R2 的 API。这样以后社区要加 Postgres + S3 适配时，只替换 repository 的实现。</p>
+      <h3>两个域名</h3>
+      <p>部署者要配置两个域名，或者一个域名加一个子域：主站给 App Worker 和 MCP Worker，<code>*.usercontent</code> 给 Usercontent Worker。部署文档必须写清楚这一点和原因（见 <a href="#sandbox">沙箱与共享数据</a>）。</p>
+      <h3>许可证</h3>
+      <p>Apache-2.0。它和 MIT 一样宽松，另外包含专利授权条款，企业法务更容易接受。宽松许可证意味着任何人都可以用这套代码做竞争的托管服务，这一点在讨论时已经接受。</p>
+      <div class="callout warn"><strong>未核实</strong>Cloudflare 的远程 MCP 方案（<code>agents</code> SDK 的 <code>McpAgent</code>）、Browser Rendering 的额度和价格，本文没有核实。实现前要确认。</div>
+    </section>
+
+    <section id="scope" class="prose">
+      <h2><span class="num">10</span>范围与上线</h2>
+      <div class="cols">
+        <div class="col"><h4><span class="pill v1">第一版</span></h4><ul>
+          <li>HTTP API、远程 MCP server、指南包、PAT</li>
+          <li>静态单页、多文件、版本历史、回滚</li>
+          <li>乐观锁 + <code>force</code></li>
+          <li>评论、“给 agent”标记、回复并解决</li>
+          <li>共享数据存储、postMessage 代理</li>
+          <li>Workspace、四种可见范围</li>
+          <li>OAuth、magic link、OIDC</li>
+          <li>OG 预览 + 缩略图、邮件通知</li>
+        </ul></div>
+        <div class="col"><h4><span class="pill v2">以后</span></h4><ul>
+          <li>Webhook</li>
+          <li>Slack / 飞书 bot</li>
+          <li>CLI</li>
+          <li>Organization 层级</li>
+          <li>Postgres + S3 适配（社区）</li>
+          <li>官方 SaaS</li>
+        </ul></div>
+        <div class="col"><h4><span class="pill no">不做</span></h4><ul>
+          <li>源码编译</li>
+          <li>页面内调用 LLM</li>
+          <li>平台运行 agent</li>
+          <li>Chat 网页内接入</li>
+          <li>实时协同编辑</li>
+        </ul></div>
+      </div>
+      <h3>上线顺序</h3>
+      <ol>
+        <li>部署到自己团队的 Cloudflare 账号，团队内部使用 2 到 4 周。</li>
+        <li>达到下面的成功标准后，补上部署文档和 “Deploy to Cloudflare” 按钮，开源。</li>
+        <li>最后做官方 SaaS。</li>
+      </ol>
+      <h3>第一版的成功标准</h3>
+      <p>三条都满足，才算第一版成功：</p>
+      <ol>
+        <li>团队里至少有 3 种 agent 在用（例如 Claude Code、Codex、Cursor），并且发布出来的页面不需要人工返工。</li>
+        <li>“评论 → agent 修改 → 重新发布”的闭环被实际使用过，而且是有人主动使用。</li>
+        <li>团队不再用 Claude Artifact 分享内部文档。</li>
+      </ol>
+    </section>
+
+    <section id="tasks" class="prose">
+      <h2><span class="num">11</span>第一版任务</h2>
+      <p>第一版分 9 个阶段（M0 到 M8），按依赖顺序排列。M0 的结论会影响 M2 及之后的实现方式，所以 M2 开始前必须完成 M0；M1 不依赖 M0 的结论，可以和 M0 同时开始。M2 完成后，M3 到 M6 可以部分并行。任务编号全文连续，阶段旁边的“依赖”指的是任务编号。</p>
+      <div class="critical-path" aria-label="关键路径">
+        <span>M0 技术验证</span><i>→</i><span>骨架 7–9</span><i>→</i><span>权限服务 13</span><i>→</i><span>发布 API 14–15</span><i>→</i><span>MCP Worker 22</span><i>→</i><span>评论闭环 26–27</span><i>→</i><span>Dogfood</span>
+      </div>
+      <p>共享数据（M6）和通知（28–29）不在关键路径上，可以和评论闭环并行做。</p>
+
+      <div class="phase"><h3>M0 技术验证</h3><span class="deps">无依赖</span></div>
+      <ol class="tasks">
+        <li><strong>Better Auth on Workers + D1</strong>：<span class="done-when">GitHub OAuth、magic link、一个 OIDC 提供方都能登录成功。</span></li>
+        <li><strong>远程 MCP + PAT</strong>：<span class="done-when">用 <code>McpAgent</code> 写一个最小工具，Claude Code、Codex、Cursor 三种客户端都能带 PAT 调通。</span></li>
+        <li><strong>两个域名 + 沙箱</strong>：<span class="done-when">Usercontent Worker 从 R2 提供页面，主站用 sandbox iframe 嵌入；验证 iframe 里读不到主站 cookie。</span></li>
+        <li><strong>Browser Rendering</strong>：<span class="done-when">能对 usercontent 页面截缩略图；确认额度和价格。</span></li>
+        <li><strong>选邮件服务</strong>：<span class="done-when">比较 Resend 和 Cloudflare Email 的发信能力和自托管配置成本，选定一个。</span></li>
+        <li><strong>定数值</strong>：<span class="done-when">单个 artifact 和单个文件的大小上限、CDN 白名单。</span></li>
+      </ol>
+
+      <div class="phase"><h3>M1 骨架</h3><span class="pill v1">已完成</span><span class="deps">无依赖，可以和 M0 同时开始</span></div>
+      <ol class="tasks" start="7">
+        <li><strong>Monorepo</strong>：<span class="done-when">TS + pnpm；三个 Worker（app / mcp / usercontent）各有 wrangler 配置；CI 跑类型检查和测试。</span></li>
+        <li><strong>数据模型和 D1 migration</strong>：<span class="done-when"><code>users</code>（实际改由 Better Auth 创建，见 <a href="#progress">实施进展</a>）、<code>workspaces</code>、<code>memberships</code>、<code>artifacts</code>、<code>artifact_versions</code>、<code>artifact_grants</code>、<code>comments</code>、<code>shared_documents</code>、<code>personal_access_tokens</code>。</span></li>
+        <li><strong>Repository 层</strong>：<span class="done-when">业务代码只依赖 repository 接口；业务代码里搜不到直接调用 D1 或 R2 的地方。</span></li>
+      </ol>
+
+      <div class="phase"><h3>M2 账号与权限</h3><span class="deps">依赖 1、8、9</span></div>
+      <ol class="tasks" start="10">
+        <li><strong>登录</strong>：<span class="done-when">接入 Better Auth；OAuth、magic link、OIDC 可以配置。</span></li>
+        <li><strong>Workspace</strong>：<span class="done-when">能创建 workspace、邀请成员；角色分 admin 和 member；一个用户可以加入多个 workspace。</span></li>
+        <li><strong>PAT</strong>：<span class="done-when">生成时明文只显示一次；只存 hash；有过期时间；可以撤销；只对一个 workspace 有效。</span></li>
+        <li><strong>权限服务</strong>：<span class="done-when">支持四种可见范围、viewer / commenter / editor 三种角色、管理员全局关闭公开链接。API、查看页、数据代理都只通过这个服务判断权限。</span></li>
+      </ol>
+
+      <div class="phase"><h3>M3 发布与查看</h3><span class="deps">依赖 9、13</span></div>
+      <ol class="tasks" start="14">
+        <li><strong>API：publish / read / list</strong>：<span class="done-when">每个版本的文件存 R2，元数据存 D1。</span></li>
+        <li><strong>API：update</strong>：<span class="done-when">带乐观锁（<code>baseVersion</code>）和 <code>force</code>；冲突时返回最新内容和差异。写 R2 失败时，D1 里不能留下没有文件的版本（见 <a href="#concurrency">版本与并发</a>）。</span></li>
+        <li><strong>版本历史</strong>：<span class="done-when">能列出版本、对比两个版本、回滚。回滚是把旧版本作为新版本发布，共享数据不变。</span></li>
+        <li><strong>Usercontent Worker</strong>：<span class="done-when">只读提供文件；按 CDN 白名单设置 CSP；不读 cookie；拒绝写请求。</span></li>
+        <li><strong>查看页</strong>：<span class="done-when">sandbox iframe、版本切换、分享设置。</span></li>
+        <li><strong>公开链接</strong>：<span class="done-when">支持过期时间和密码。</span></li>
+        <li><strong>大小上限</strong>：<span class="done-when">API 按第 6 项定的数值拒绝超限的请求。</span></li>
+        <li><strong>OpenAPI 规范和 <code>/llms.txt</code></strong></li>
+      </ol>
+
+      <div class="phase"><h3>M4 接入层</h3><span class="deps">依赖 2、14、15</span></div>
+      <ol class="tasks" start="22">
+        <li><strong>MCP Worker</strong>：<span class="done-when"><code>publish</code>、<code>update</code>、<code>read</code>、<code>list</code>、<code>get_guide</code>，每个工具转成一次 HTTP API 调用。</span></li>
+        <li><strong>指南源文件</strong>：<span class="done-when">写明页面约定（标题、主题、CDN 白名单）、什么时候更新而不是新建、冲突后怎么合并。</span></li>
+        <li><strong>指南包生成</strong>：<span class="done-when">由第 23 项生成 AGENTS.md 片段、Claude Skill、Cursor rules；设置页一键复制，自动填好本实例的 API 地址。</span></li>
+        <li><strong>记录发布来源</strong>：<span class="done-when">每次发布记下 MCP 客户端名或 User-Agent。dogfood 阶段靠它统计用了几种 agent。</span></li>
+      </ol>
+
+      <div class="phase"><h3>M5 评论与通知</h3><span class="deps">依赖 13、18；第 28 项还依赖 5；第 29 项还依赖 4</span></div>
+      <ol class="tasks" start="26">
+        <li><strong>评论</strong>：<span class="done-when">API 和查看页 UI，支持回复、@成员、标记“给 agent”、标记已解决。</span></li>
+        <li><strong>MCP 工具</strong>：<span class="done-when"><code>list_comments</code> 可以只取“给 agent”且未解决的评论；<code>reply_comment</code> 回复时可以同时标记已解决。</span></li>
+        <li><strong>邮件通知</strong>：<span class="done-when">有人评论你的 artifact、@你、回复你的评论时，你收到邮件。</span></li>
+        <li><strong>链接预览</strong>：<span class="done-when">查看页带 OG 元数据；发布时截缩略图存到 R2。</span></li>
+      </ol>
+
+      <div class="phase"><h3>M6 共享数据</h3><span class="deps">依赖 3、13、17、18</span></div>
+      <ol class="tasks" start="30">
+        <li><strong>数据 API</strong>：<span class="done-when">按 collection 存文档；每条记录自动带 <code>createdBy</code> 和 <code>updatedBy</code>；能返回当前查看者的名字和头像。</span></li>
+        <li><strong>SDK</strong>：<span class="done-when">Usercontent Worker 给页面注入 <code>window.openArtifact.db</code>；接口定稿后写进第 23 项的指南。</span></li>
+        <li><strong>postMessage 代理</strong>：<span class="done-when">查看页先校验 <code>event.origin</code> 和 <code>event.source</code>，再代为调用数据 API；用 <code>requestId</code> 把结果对应回原请求。</span></li>
+        <li><strong>匿名写入</strong>：<span class="done-when">默认关闭；作者可以为单个 artifact 开启；开启后有限流。</span></li>
+      </ol>
+
+      <div class="phase"><h3>M7 Dogfood</h3><span class="deps">依赖 M2 到 M6 全部完成</span></div>
+      <ol class="tasks" start="34">
+        <li><strong>部署</strong>：<span class="done-when">部署到团队自己的 Cloudflare 账号；给团队里 Claude Code、Codex、Cursor 的用户发 PAT 和指南包。</span></li>
+        <li><strong>使用 2 到 4 周</strong>：<span class="done-when">对照 <a href="#scope">第一版的成功标准</a> 记录结果；agent 种类用第 25 项统计。</span></li>
+      </ol>
+
+      <div class="phase"><h3>M8 开源准备</h3><span class="deps">三条成功标准都满足之后才开始</span></div>
+      <ol class="tasks" start="36">
+        <li><strong>“Deploy to Cloudflare”按钮</strong></li>
+        <li><strong>部署文档</strong>：<span class="done-when">必须写清楚为什么需要两个域名。</span></li>
+        <li><strong>README、Apache-2.0 LICENSE、贡献指南</strong></li>
+      </ol>
+    </section>
+
+    <section id="progress" class="prose">
+      <h2><span class="num">12</span>实施进展</h2>
+      <p>截至 2026-10-20：第一版的功能按设计稿在本地全部跑通。还没做的只剩需要团队账号的部分：M0 中需要 Cloudflare 账号和 OAuth 应用的验证，以及部署（M7、M8）。代码只在本地，还没有提交到 git。使用手册已发布在本地实例上。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>阶段</th><th>状态</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>M0 技术验证</td><td><span class="pill v2">部分完成</span></td><td>已验证：Better Auth 在 Workers + D1 上的邮箱链接登录；三种 Worker 用 service binding 互相调用；沙箱 iframe 拿不到 cookie 和 localStorage。还没验证：GitHub / Google / OIDC 登录、Browser Rendering、选邮件服务。这几项需要 Cloudflare 账号和 OAuth 应用</td></tr>
+            <tr><td>M1 骨架</td><td><span class="pill v1">已完成</span></td><td>monorepo、migration、repository 层、存储边界检查</td></tr>
+            <tr><td>M2 账号与权限</td><td><span class="pill v1">已完成</span></td><td>邮箱链接登录、注册白名单、workspace、PAT、权限服务（四种可见范围、三种角色、管理员关闭公开链接）</td></tr>
+            <tr><td>M3 发布与查看</td><td><span class="pill v1">已完成</span></td><td>发布、读取、更新（乐观锁 + force）、版本历史和恢复、签名的 usercontent 地址、查看页、公开链接的过期时间和密码、大小上限（每版最多 500 个文件，单个文件 10 MB，一次请求 25 MB）</td></tr>
+            <tr><td>M4 接入层</td><td><span class="pill v1">已完成</span></td><td>远程 MCP server（7 个工具）、指南包（AGENTS.md、Claude Skill、Cursor rules、<code>/llms.txt</code>）、记录发布来源</td></tr>
+            <tr><td>M5 评论与通知</td><td><span class="pill v1">已完成</span></td><td>评论、“给 agent”、回复、解决、评论锚定到页面位置、邮件通知（本地输出到终端）、OG 元数据。首页卡片用页面本身的实时缩略预览代替截图；聊天软件里的链接预览图仍需要 Browser Rendering（M0）</td></tr>
+            <tr><td>M6 共享数据</td><td><span class="pill v1">已完成</span></td><td>数据 API、页面 SDK、postMessage 代理、匿名写入开关</td></tr>
+            <tr><td>M7、M8</td><td>未开始</td><td>需要部署到团队的 Cloudflare 账号</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>页面</h3>
+      <p>设计稿里的 5 个页面都已实现：首页（带实时缩略预览）、查看页（评论 / 版本 / 数据三个标签，评论可以锚定到页面上的位置，页面里显示编号标记）、分享对话框、设置（Agent 接入、个人资料、成员、Workspace 设置）、登录页。另外加了公开链接的密码页。</p>
+
+      <h3>和设计不同的地方</h3>
+      <ul>
+        <li><strong>注册有白名单。</strong>登录就会加入团队 workspace，所以开放注册等于把内容交给任何人。部署时用 <code>ALLOWED_EMAIL_DOMAINS</code> 设置允许的邮箱域名；不设置时，只有第一个人（创建者）能注册。</li>
+        <li><strong>usercontent 用签名地址提供文件。</strong>usercontent 不读 cookie，所以查看页给每个查看者签发一个 6 小时有效的版本路径前缀；页面里的相对链接沿用这个前缀。</li>
+        <li><strong>usercontent 没有存储权限。</strong>它通过 app 的 RPC 入口 <code>ArtifactFileReader</code>（只能经 service binding 调用）读取文件，自己没有 D1 和 R2 绑定。</li>
+        <li><strong>沙箱靠两层：</strong>iframe 的 <code>sandbox</code> 属性，加上 usercontent 响应头里的 CSP <code>sandbox</code> 指令，所以在新标签页单独打开也有隔离。</li>
+        <li><strong>postMessage 的来源校验改为检查窗口。</strong>沙箱页面的 origin 是 <code>null</code>，查看页改为确认消息来自自己创建的 iframe 窗口；SDK 只把消息发给 app 的 origin，代理只接受安全的集合名和文档 id。</li>
+        <li><strong>评论只有一层回复。</strong>回复一条回复时，它挂到所在讨论串的第一条评论下。</li>
+        <li><strong>PAT 只在创建它的 workspace 里生效</strong>，即使它的主人也在别的 workspace。</li>
+        <li><strong>公开链接的密码尝试有限流：</strong>每个访客地址每个 artifact 每分钟 10 次。</li>
+        <li><strong>没有配置邮件服务时，发送登录邮件直接报错</strong>，不会把登录链接写进生产日志。本地开发用 <code>MAILER=console</code>。</li>
+        <li><strong>界面字体用系统中文字体</strong>，不依赖 Google Fonts，在国内网络下也能直接显示。</li>
+      </ul>
+
+      <h3>验证结果</h3>
+      <ul>
+        <li><code>pnpm run check</code> 全部通过：存储边界检查、5 个包的类型检查、100 个测试。测试在 Workers 运行时里对本地 D1 和 R2 运行，登录走真实的 Better Auth 邮箱链接流程。</li>
+        <li>独立代码评审找到 2 个严重问题（任何人登录都能加入团队、<code>next</code> 参数可以借制表符跳转到外站）和 6 个重要问题，都已修复，每个都有回归测试。</li>
+        <li>本地端到端：用 MCP 以 Claude Code 身份连接，发布带共享数据的报名页；同事留“给 agent”的评论；agent 读评论、更新、遇到过期版本时收到合并提示、回复并解决。全部成功。</li>
+        <li>浏览器（Chrome）实测：沙箱页面里的 SDK 以当前查看者身份读写数据，页面拿不到 cookie 和 localStorage；分享对话框设置公开链接和密码；匿名访客输入密码后能用页面但不能评论；设置页创建 token。1440px、390px 和深色模式下截图检查，页面不横向滚动，控制台没有错误。</li>
+      </ul>
+
+      <h3>在本地运行</h3>
+      <div class="code-block">
+        <div class="code-cap"><span>在仓库根目录执行</span></div>
+<pre><code>pnpm install
+pnpm dev:setup
+pnpm dev</code></pre>
+      </div>
+      <p>打开 <code>http://localhost:8787</code>，用 <code>@example.com</code> 邮箱登录，登录链接打印在运行 <code>pnpm dev</code> 的终端里。详细说明见仓库的 README。</p>
+
+      <h3>下一步</h3>
+      <ol>
+        <li>拿到 Cloudflare 账号授权、两个域名和 OAuth 应用后，完成 M0 剩下的验证，选定邮件服务。</li>
+        <li>部署到团队账号，开始 2 到 4 周的内部使用（M7）。</li>
+        <li>拿到 Browser Rendering 后，为聊天软件里的链接预览生成截图。</li>
+      </ol>
+    </section>
+
+    <section id="open" class="prose">
+      <h2><span class="num">13</span>待决定的事</h2>
+      <p>第 2、3、4 项在 M0 技术验证时决定（任务 5、6）。</p>
+      <ol class="decide">
+        <li><div class="q">MIT 还是 Apache-2.0</div><div class="rec">讨论时选了宽松许可证，本文默认 Apache-2.0（多了专利授权）。建议保持 Apache-2.0。</div></li>
+        <li><div class="q">单个 artifact 和单个文件的大小上限</div><div class="rec">讨论中没有定。建议参考 D1 和 R2 的限制，在技术验证时定数值。</div></li>
+        <li><div class="q">CDN 白名单</div><div class="rec">讨论中没有定。建议第一版沿用 cdnjs、jsDelivr、unpkg，并允许 workspace 管理员增加。</div></li>
+        <li><div class="q">邮件服务用 Resend 还是 Cloudflare Email</div><div class="rec">建议在技术验证时比较发信能力和自托管配置成本后再选。</div></li>
+        <li><div class="q">SaaS 上公开内容的滥用治理</div><div class="rec">只影响官方 SaaS，建议在 SaaS 阶段再定。</div></li>
+        <li><div class="q">共享数据 SDK 的接口</div><div class="rec">本文示例中的 <code>window.openArtifact.db</code> 只是示意。建议在实现时和指南包一起定稿。</div></li>
+      </ol>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+  const root = document.documentElement
+  const themeButtons = document.querySelectorAll('[data-theme-choice]')
+  const darkQuery = matchMedia('(prefers-color-scheme: dark)')
+
+  function effectiveTheme() {
+    const chosen = root.getAttribute('data-theme')
+    if (chosen === 'light' || chosen === 'dark') return chosen
+    return darkQuery.matches ? 'dark' : 'light'
+  }
+
+  // Diagrams follow the document; each diagram's own toolbar can still switch it afterwards.
+  // The srcdoc frame shares this origin, so the viewer's own toggle keeps its toolbar label in step.
+  function syncDiagramTheme(frame) {
+    try {
+      const diagramRoot = frame.contentDocument.documentElement
+      const diagramTheme = frame.contentWindow.Archify && frame.contentWindow.Archify.theme
+      const themeDiffers = diagramRoot.getAttribute('data-theme') !== effectiveTheme()
+      if (diagramTheme && themeDiffers) diagramTheme.toggle()
+    } catch (e) {}
+  }
+  function syncAllDiagrams() { document.querySelectorAll('.diagram iframe').forEach(syncDiagramTheme) }
+
+  function chooseTheme(choice) {
+    if (choice === 'system') root.removeAttribute('data-theme')
+    else root.setAttribute('data-theme', choice)
+    themeButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themeChoice === choice)))
+    try { localStorage.setItem('oa-doc-theme', choice) } catch (e) {}
+    syncAllDiagrams()
+  }
+
+  let savedChoice = null
+  try { savedChoice = localStorage.getItem('oa-doc-theme') } catch (e) {}
+  const initialChoice = savedChoice || root.getAttribute('data-theme') || 'system'
+  themeButtons.forEach(b => b.addEventListener('click', () => chooseTheme(b.dataset.themeChoice)))
+  chooseTheme(initialChoice)
+
+  darkQuery.addEventListener('change', syncAllDiagrams)
+  // The host viewer can set data-theme on the root at any time.
+  new MutationObserver(syncAllDiagrams).observe(root, { attributes: true, attributeFilter: ['data-theme'] })
+  document.querySelectorAll('.diagram iframe').forEach(frame => frame.addEventListener('load', () => syncDiagramTheme(frame)))
+
+  const tocLinks = [...document.querySelectorAll('nav.toc a')]
+  const sections = tocLinks.map(a => document.querySelector(a.getAttribute('href')))
+  const sectionObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return
+      tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + entry.target.id))
+    })
+  }, { rootMargin: '-20% 0px -70% 0px' })
+  sections.forEach(s => s && sectionObserver.observe(s))
+})()
+</script>

@@ -1,0 +1,8 @@
+{
+  "name": "open-artifact-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-20",
+  // Each tool call becomes one request to the app Worker with the agent's own token.
+  "services": [{ "binding": "APP", "service": "open-artifact-app" }],
+  "vars": { "APP_ORIGIN": "http://localhost:8787" }
+}

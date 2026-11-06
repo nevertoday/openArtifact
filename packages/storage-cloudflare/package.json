@@ -1,0 +1,18 @@
+{
+  "name": "@open-artifact/storage-cloudflare",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@open-artifact/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.22.0",
+    "vitest": "4.1.12",
+    "wrangler": "4.147.0"
+  }
+}

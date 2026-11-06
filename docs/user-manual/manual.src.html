@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open Artifact 使用手册</title>
+<style>
+/* Layout: a table of contents beside one reading column on wide screens; stacked on narrow ones. */
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --fg: #16202c; --muted: #5a6676; --line: #dde2e9; --line-soft: #eef1f5;
+  --accent: #1d5bd8; --accent-soft: #e6eefc; --agent: #7a4800; --agent-soft: #fbf0dc; --agent-line: #f0d9ad;
+  --ok: #17784a; --ok-soft: #e3f3ea; --code-bg: #0f141b; --code-fg: #e3e8ef;
+  --font-body: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f141b; --surface: #161d27; --fg: #e3e8ef; --muted: #98a3b3; --line: #2a3442; --line-soft: #1f2833;
+    --accent: #7ba7ff; --accent-soft: #1b2a44; --agent: #f0b860; --agent-soft: #34280f; --agent-line: #5a4419;
+    --ok: #6fd3a0; --ok-soft: #15301f; --code-bg: #0b0f14; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.75; }
+a { color: var(--accent); }
+.page { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px; max-width: 1180px; margin: 0 auto; padding: 32px max(16px, 3vw) 80px; }
+nav.toc { position: sticky; top: 16px; align-self: start; font-size: 13.5px; }
+nav.toc .toc-label { font-size: 12px; color: var(--muted); letter-spacing: 0.08em; margin-bottom: 6px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+nav.toc a { display: block; padding: 4px 8px; border-radius: 6px; color: var(--muted); text-decoration: none; }
+nav.toc a:hover { background: var(--accent-soft); color: var(--fg); }
+main { min-width: 0; max-width: 780px; }
+header.doc-head { padding-bottom: 24px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; color: var(--accent); letter-spacing: 0.06em; }
+h1 { font-size: clamp(28px, 4vw, 38px); line-height: 1.25; margin: 8px 0 12px; text-wrap: balance; }
+.lede { font-size: 16.5px; color: var(--muted); margin: 0; }
+section { padding-top: 28px; scroll-margin-top: 12px; }
+h2 { font-size: 22px; margin: 0 0 12px; text-wrap: balance; }
+h2 .num { font-family: var(--font-mono); font-size: 13px; color: var(--accent); margin-right: 8px; font-weight: 400; vertical-align: 3px; }
+h3 { font-size: 16px; margin: 22px 0 6px; }
+p { margin: 0 0 12px; }
+ul, ol { margin: 0 0 12px; padding-left: 1.4em; }
+li { margin-bottom: 4px; }
+code { font-family: var(--font-mono); font-size: 0.88em; background: var(--line-soft); padding: 1px 5px; border-radius: 4px; }
+pre { margin: 10px 0 16px; padding: 14px 16px; background: var(--code-bg); color: var(--code-fg); border-radius: 10px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.65; }
+pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; margin: 14px 0 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.card .step { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+.card h4 { margin: 2px 0 6px; font-size: 15px; }
+.card p { margin: 0; font-size: 14px; color: var(--muted); }
+.table-wrap { overflow-x: auto; margin: 10px 0 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); position: relative; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line-soft); }
+th { font-size: 12.5px; color: var(--muted); font-weight: 500; background: var(--bg); white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+td:first-child { white-space: nowrap; font-weight: 500; }
+.note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 12px 0 16px; font-size: 14.5px; }
+.note.agent { border-color: var(--agent); background: var(--agent-soft); }
+.tag { display: inline-block; font-size: 12px; padding: 0 8px; border-radius: 6px; background: var(--agent-soft); color: var(--agent); }
+.tag.ok { background: var(--ok-soft); color: var(--ok); }
+.prompt { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 6px 0; font-size: 14px; }
+.diagram { margin: 14px 0 20px; }
+.diagram iframe { display: block; width: 100%; height: 1150px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.diagram figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
+details.faq { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0; }
+details.faq summary { cursor: pointer; font-weight: 500; }
+details.faq p { margin: 8px 0 2px; font-size: 14.5px; }
+.feedback { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.feedback .choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.feedback button { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: inherit; cursor: pointer; }
+.feedback button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+.feedback textarea { min-height: 72px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); font: inherit; resize: vertical; }
+.feedback .status { font-size: 13.5px; color: var(--muted); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 860px) {
+  .page { grid-template-columns: minmax(0, 1fr); gap: 0; padding-top: 20px; }
+  nav.toc { position: static; margin-bottom: 16px; }
+  nav.toc ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .diagram iframe { height: 1150px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="toc" aria-label="目录">
+    <div class="toc-label">目录</div>
+    <ol>
+      <li><a href="#what">是什么</a></li>
+      <li><a href="#login">登录</a></li>
+      <li><a href="#home">首页</a></li>
+      <li><a href="#view">查看 artifact</a></li>
+      <li><a href="#comments">评论和给 agent</a></li>
+      <li><a href="#versions">版本</a></li>
+      <li><a href="#sharing">分享</a></li>
+      <li><a href="#connect">连接你的 agent</a></li>
+      <li><a href="#workflow">和 agent 协作</a></li>
+      <li><a href="#data">页面里的共享数据</a></li>
+      <li><a href="#settings">设置</a></li>
+      <li><a href="#faq">常见问题</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="doc-head">
+      <div class="eyebrow">USER MANUAL</div>
+      <h1>Open Artifact 使用手册</h1>
+      <p class="lede">让任何 AI agent 把文档、报告、看板发布成网页，整个团队打开就能看、能评论、能用；再让 agent 按评论去改。</p>
+    </header>
+
+    <section id="what">
+      <h2><span class="num">01</span>Open Artifact 是什么</h2>
+      <p>你平时让 Claude Code、Codex、Cursor 这类 agent 写设计文档、分析报告或数据看板。Open Artifact 把这些结果发布成一个个网页，叫作 <strong>artifact</strong>。同事不需要任何 AI 账号，用团队账号登录就能打开。</p>
+      <div class="cards">
+        <div class="card"><div class="step">1</div><h4>agent 发布</h4><p>你对 agent 说“发布到 Open Artifact”，它把页面发上来并给你一个链接。</p></div>
+        <div class="card"><div class="step">2</div><h4>团队查看和评论</h4><p>同事打开链接，在旁边写评论；需要 agent 改的，勾选「给 agent 处理」。</p></div>
+        <div class="card"><div class="step">3</div><h4>agent 修改</h4><p>你让 agent 处理评论，它改完发布新版本，再回复评论并标记已解决。</p></div>
+      </div>
+    </section>
+
+    <section id="login">
+      <h2><span class="num">02</span>登录</h2>
+      <ol>
+        <li>打开 Open Artifact 的地址，输入工作邮箱，点「发送登录链接」。</li>
+        <li>打开邮件里的链接，就登录了。链接 5 分钟内有效，只能用一次。</li>
+      </ol>
+      <ul>
+        <li>只有管理员允许的邮箱域名可以注册。用了别的邮箱，页面会提示允许哪些域名。</li>
+        <li>第一个登录的人成为团队 workspace 的<strong>管理员</strong>，之后登录的人自动成为<strong>成员</strong>。</li>
+        <li>如果团队配置了公司 SSO、GitHub 或 Google，登录页会多出对应的按钮。</li>
+      </ul>
+      <p class="note">本地试用时没有邮件服务，登录链接打印在运行 <code>pnpm dev</code> 的终端里，搜索 <code>[mail]</code>。</p>
+    </section>
+
+    <section id="home">
+      <h2><span class="num">03</span>首页</h2>
+      <p>首页列出你能看到的 artifact，最近更新的在前面。每张卡片上有：</p>
+      <ul>
+        <li>页面的实时缩略预览（最前面的 12 张卡片）。</li>
+        <li>标题和可见范围（例如「Workspace 内可见」「公开链接」）。</li>
+        <li>作者、<strong>发布来源</strong>（哪个 agent 发布的，圆点颜色区分 agent）、版本号、更新时间。</li>
+        <li><span class="tag">N 条评论待 agent 处理</span>：有人留了给 agent 的评论，还没解决。</li>
+      </ul>
+      <p>左侧可以筛选：全部、我发布的、共享给我（别人单独授权给你的）、待 agent 处理，以及按发布来源筛选。顶部可以按标题搜索。你属于多个 workspace 时，顶部可以切换。</p>
+    </section>
+
+    <section id="view">
+      <h2><span class="num">04</span>查看 artifact</h2>
+      <p>点开一张卡片进入查看页：左边是页面本身，右边是「评论」「版本」「数据」三个标签。</p>
+      <ul>
+        <li>页面在<strong>沙箱</strong>里运行，和 Open Artifact 不在同一个网站。页面里的代码拿不到你的登录信息，所以 agent 写的任何页面都可以放心打开。</li>
+        <li>「新标签页打开」会单独打开页面本身。这个地址 6 小时内有效，过期后回到 Open Artifact 重新打开即可。</li>
+        <li>作者能看到「分享」按钮，用来改谁能看到（见 <a href="#sharing">分享</a>）。</li>
+      </ul>
+    </section>
+
+    <section id="comments">
+      <h2><span class="num">05</span>评论和「给 agent」</h2>
+      <p>能评论的人在右侧「评论」标签底部写评论。</p>
+      <ul>
+        <li><strong>在页面上标注位置</strong>：写评论前点「在页面上标注位置」，再点左边页面上要说的地方。页面上会出现带编号的标记，评论旁边显示同样的编号；点页面上的标记，右边会跳到对应的评论。已解决的评论不再显示标记。</li>
+        <li><strong>勾选「给 agent 处理」</strong>：这条评论是给 agent 的修改意见。agent 读取评论时只会拿到这类未解决的评论，不会被普通讨论干扰。这类评论用黄色底标出。</li>
+        <li><strong>回复</strong>：每条评论下面可以回复。agent 的回复会标出是哪个 agent，例如「Claude Code（代 林舟）」。</li>
+        <li><strong>标记已解决 / 重新打开</strong>：处理完的评论标记为已解决，需要时可以重新打开。</li>
+        <li>上方的筛选：未解决、给 agent、全部。</li>
+      </ul>
+      <p><strong>邮件通知</strong>：有人评论你发布的 artifact，或者回复你的评论时，你会收到邮件。自己的操作不会通知自己。</p>
+    </section>
+
+    <section id="versions">
+      <h2><span class="num">06</span>版本</h2>
+      <ul>
+        <li>agent 每次修改都会发布一个新版本，旧版本全部保留。「版本」标签列出每个版本、发布人、发布来源和时间。</li>
+        <li>点「查看」打开旧版本，页面顶部会提示你在看旧版本。</li>
+        <li>能编辑的人可以点「恢复为当前版本」：旧版本的内容会作为一个<strong>新版本</strong>发布，历史不会被改写。</li>
+        <li>页面里存的共享数据（例如报名记录）和版本分开保存，恢复旧版本不会丢数据。</li>
+      </ul>
+    </section>
+
+    <section id="sharing">
+      <h2><span class="num">07</span>分享</h2>
+      <p>只有作者可以修改分享设置。在查看页点「分享」，选择谁能看到：</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>范围</th><th>谁能看到</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>私有</td><td>只有你</td><td>单独授权也不生效</td></tr>
+          <tr><td>指定的人</td><td>你单独授权的人</td><td>每个人按角色获得权限</td></tr>
+          <tr><td>整个 workspace</td><td>workspace 全部成员</td><td><strong>默认</strong>。成员可以查看、评论、读写页面里的共享数据</td></tr>
+          <tr><td>任何拿到链接的人</td><td>不需要登录</td><td>访客只读，不能评论；成员照常评论</td></tr>
+        </tbody>
+      </table></div>
+      <h3>单独授权</h3>
+      <p>输入对方的邮箱，选择角色。对方需要<strong>先登录过一次</strong>，才能被添加。</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>角色</th><th>可以做什么</th></tr></thead>
+        <tbody>
+          <tr><td>可查看</td><td>打开页面，使用页面（包括读写共享数据）</td></tr>
+          <tr><td>可评论</td><td>以上全部，再加评论</td></tr>
+          <tr><td>可编辑</td><td>以上全部，再加发布新版本、恢复旧版本</td></tr>
+        </tbody>
+      </table></div>
+      <h3>公开链接</h3>
+      <ul>
+        <li><strong>过期时间</strong>：7 天、30 天或永不过期。过期后访客打不开，成员不受影响。</li>
+        <li><strong>访问密码</strong>：可选。访客先输入密码才能打开；同一个访客每分钟最多试 10 次。改密码后，之前输入过的人需要重新输入。</li>
+        <li><strong>允许匿名访客写入共享数据</strong>：默认关闭。适合对外的报名表、问卷。</li>
+        <li>workspace 管理员可以在「Workspace 设置」里关闭公开链接；关闭后，现有的公开链接立即失效。</li>
+      </ul>
+    </section>
+
+    <section id="connect">
+      <h2><span class="num">08</span>连接你的 agent</h2>
+      <p>只需要做一次。打开右上角头像菜单里的「Agent 接入」：</p>
+      <ol>
+        <li><strong>新建 token</strong>：起个名字（例如「Claude Code · 工作机」），选有效期（30 天、90 天、1 年或永不过期）。token 只显示这一次，马上复制。</li>
+        <li><strong>连接 MCP server</strong>：页面上有 Claude Code、Codex、Cursor、Gemini CLI 四种配置，选你用的那个，复制后把 <code>oa_pat_…</code> 换成刚才的 token。例如 Claude Code：</li>
+      </ol>
+      <pre><code>claude mcp add --transport http open-artifact http://localhost:8788/mcp \
+  --header "Authorization: Bearer oa_pat_…"</code></pre>
+      <ol start="3">
+        <li><strong>不支持 MCP 的 agent</strong>：复制「指南包」（AGENTS.md 片段、Claude Skill 或 Cursor rules），它告诉 agent 怎么用 HTTP API 发布。</li>
+      </ol>
+      <ul>
+        <li>agent 用你的身份工作，权限和你在这个 workspace 里一样，只在创建 token 的 workspace 里有效。</li>
+        <li>token 丢了或不用了，在同一页点「撤销」，立即失效。</li>
+      </ul>
+    </section>
+
+    <section id="workflow">
+      <h2><span class="num">09</span>和 agent 协作</h2>
+      <p>连接好以后，直接用自然语言告诉 agent 要做什么，例如：</p>
+      <span class="prompt">把这份设计文档整理成网页，发布到 Open Artifact。</span>
+      <span class="prompt">去看看「Q4 迁移看板」上给 agent 的评论，改好后重新发布并回复。</span>
+      <span class="prompt">把「报名表」改成只让设计组的人看到。</span>
+      <p>完整的协作流程：</p>
+      <!--DIAGRAM:workflow|和 agent 协作一份文档-->
+      <h3>agent 能用的工具</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>工具</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td><code>publish</code></td><td>发布新的 artifact，返回链接</td></tr>
+          <tr><td><code>update</code></td><td>基于读到的版本发布新版本；中间有人发布过时，拿到最新内容合并后再发</td></tr>
+          <tr><td><code>read</code></td><td>读取页面文件和当前版本</td></tr>
+          <tr><td><code>list</code></td><td>列出你能看到的 artifact</td></tr>
+          <tr><td><code>list_comments</code></td><td>读取评论，默认只取未解决的「给 agent」评论</td></tr>
+          <tr><td><code>reply_comment</code></td><td>回复评论，并标记为已解决</td></tr>
+          <tr><td><code>get_guide</code></td><td>读取完整的页面规范</td></tr>
+        </tbody>
+      </table></div>
+      <p class="note agent">agent 不会自己盯着评论。同事留了「给 agent」的评论后，需要你让 agent 去处理。</p>
+    </section>
+
+    <section id="data">
+      <h2><span class="num">10</span>页面里的共享数据</h2>
+      <p>这一节给写页面的 agent 和开发者看。页面可以通过平台注入的 <code>window.openArtifact</code> 保存团队共享的数据，例如报名、投票、待办：</p>
+      <pre><code>const signups = window.openArtifact.db.collection('signups')
+await signups.put('lin', { session: '周三上午' })  // 按 id 新建或替换
+await signups.add({ session: '周四下午' })         // 自动生成 id
+const records = await signups.list()               // [{ id, data, createdBy, updatedBy, ... }]
+await signups.delete('lin')
+const viewer = await window.openArtifact.viewer()  // { userId, name }；匿名访客为 null</code></pre>
+      <ul>
+        <li>每条记录自动记下谁创建、谁最后修改。查看页的「数据」标签可以看到所有记录。</li>
+        <li>集合名和 id 只能用字母、数字、<code>-</code>、<code>_</code>，最多 64 个字符；每条记录最多 64 KB。</li>
+        <li>发布的页面：每个版本最多 500 个文件，单个文件最多 10 MB，一次发布最多 25 MB。</li>
+        <li>页面在沙箱里运行，<code>localStorage</code> 和 cookie 都用不了，需要保存的东西都放共享数据里。</li>
+        <li>共享数据只有在 Open Artifact 的查看页里打开时才能用，「新标签页打开」时不可用。</li>
+      </ul>
+    </section>
+
+    <section id="settings">
+      <h2><span class="num">11</span>设置</h2>
+      <ul>
+        <li><strong>个人资料</strong>：修改显示名称。没设置时显示邮箱 @ 前面的部分。</li>
+        <li><strong>Agent 接入</strong>：token、MCP 配置、指南包（见 <a href="#connect">连接你的 agent</a>）。</li>
+        <li><strong>成员</strong>：查看 workspace 里的所有人和管理员。</li>
+        <li><strong>Workspace 设置</strong>：管理员可以开关公开链接。</li>
+      </ul>
+    </section>
+
+    <section id="faq">
+      <h2><span class="num">12</span>常见问题</h2>
+      <details class="faq"><summary>收不到登录邮件</summary><p>先看垃圾邮件，再点「再发一次」。链接 5 分钟内有效。本地试用时链接在终端里，不会真的发邮件。</p></details>
+      <details class="faq"><summary>提示「只有这些邮箱域名可以注册」</summary><p>你的邮箱域名不在允许列表里。请管理员在部署配置 <code>ALLOWED_EMAIL_DOMAINS</code> 里加上你的域名。</p></details>
+      <details class="faq"><summary>看不到同事说的某个 artifact</summary><p>它可能是私有的，或者只授权给了指定的人。请作者在「分享」里把你加进去，或者改成整个 workspace 可见。</p></details>
+      <details class="faq"><summary>agent 说发布时遇到了冲突</summary><p>说明它读取之后，有人发布了新版本。agent 会拿到最新内容，把自己的修改合并进去再发布，不需要你处理。只有你明确要求时，它才会直接覆盖。</p></details>
+      <details class="faq"><summary>新标签页打开的页面提示「链接已过期或无效」</summary><p>单独打开的地址 6 小时内有效。回到 Open Artifact 重新打开这个 artifact 即可。</p></details>
+      <details class="faq"><summary>首页缩略图是空白的</summary><p>缩略图就是页面本身的缩小预览。页面需要登录后的数据才能显示内容时，预览里不会有这些数据；点开卡片就能看到完整页面。</p></details>
+      <details class="faq"><summary>token 不小心泄露了</summary><p>在「Agent 接入」里撤销它，立即失效，再新建一个。</p></details>
+    </section>
+
+    <section id="feedback">
+      <h2><span class="num">13</span>这份手册有帮助吗？</h2>
+      <div class="feedback" id="feedback">
+        <div class="choices" role="group" aria-label="是否有帮助">
+          <button type="button" data-verdict="helpful" aria-pressed="false">有帮助</button>
+          <button type="button" data-verdict="needs-more" aria-pressed="false">还需要补充</button>
+        </div>
+        <label for="feedback-note" class="status">想补充什么？（可选）</label>
+        <textarea id="feedback-note" maxlength="500" placeholder="例如：想看部署到 Cloudflare 的步骤"></textarea>
+        <span class="status" id="feedback-status" role="status">你的回答会保存在这份手册的共享数据里，作者可以在「数据」标签里看到。</span>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+(() => {
+  // Diagrams follow the reader's colour scheme; their own toolbar can still switch them.
+  const darkQuery = matchMedia('(prefers-color-scheme: dark)')
+  function syncDiagramTheme(frame) {
+    try {
+      const diagramRoot = frame.contentDocument.documentElement
+      const diagramTheme = frame.contentWindow.Archify && frame.contentWindow.Archify.theme
+      const wantedTheme = darkQuery.matches ? 'dark' : 'light'
+      if (diagramTheme && diagramRoot.getAttribute('data-theme') !== wantedTheme) diagramTheme.toggle()
+    } catch (error) {}
+  }
+  const diagramFrames = [...document.querySelectorAll('.diagram iframe')]
+  diagramFrames.forEach(frame => frame.addEventListener('load', () => syncDiagramTheme(frame)))
+  darkQuery.addEventListener('change', () => diagramFrames.forEach(syncDiagramTheme))
+
+  // Feedback is kept in shared data, one document per reader, so answering again replaces the earlier answer.
+  const feedbackStatus = document.getElementById('feedback-status')
+  const feedbackNote = document.getElementById('feedback-note')
+  const verdictButtons = [...document.querySelectorAll('[data-verdict]')]
+  const sharedData = window.openArtifact && window.openArtifact.db
+  if (!sharedData) {
+    feedbackStatus.textContent = '在 Open Artifact 的查看页里打开这份手册，才能留下反馈。'
+    verdictButtons.forEach(button => { button.disabled = true })
+    return
+  }
+  const feedback = sharedData.collection('feedback')
+  async function showTotals() {
+    const answers = await feedback.list()
+    const helpfulCount = answers.filter(answer => answer.data.verdict === 'helpful').length
+    return `目前 ${answers.length} 人回答，其中 ${helpfulCount} 人觉得有帮助。`
+  }
+  async function saveVerdict(verdict) {
+    const viewer = await window.openArtifact.viewer()
+    const documentId = viewer ? viewer.userId : 'guest-' + Date.now().toString(36)
+    await feedback.put(documentId, { verdict, note: feedbackNote.value.trim() })
+    verdictButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.verdict === verdict)))
+    feedbackStatus.textContent = '谢谢！' + (await showTotals())
+  }
+  verdictButtons.forEach(button => button.addEventListener('click', () => {
+    saveVerdict(button.dataset.verdict).catch(error => { feedbackStatus.textContent = '没有保存成功：' + error.message })
+  }))
+  showTotals().then(totals => { feedbackStatus.textContent += ' ' + totals }).catch(() => {})
+})()
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "8b02670a-0f59-4502-8591-868f2f0043d8",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/Users/devin/Codes/Devin/open-artifact/.archify/workflow-agent-collab-doc-20261020-153233/candidate.json",
+  "output": "/Users/devin/Codes/Devin/open-artifact/.archify/workflow-agent-collab-doc-20261020-153233/agent-collab-doc.html",
+  "specification": {
+    "sha256": "e11f26f1082867f045b53321ae36cac86f3683f9f1c6fac35ceb5529a71be0cf",
+    "bytes": 4830
+  },
+  "artifact": {
+    "sha256": "85160d3af28fb560534234ed89e0c22d8ce319d9a0c9c831fc8db297a8057a6a",
+    "bytes": 826133
+  }
+}

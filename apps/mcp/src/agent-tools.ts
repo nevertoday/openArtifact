@@ -1,0 +1,172 @@
+import type { AppClient, AppResponse } from './app-client.ts'
+
+export interface ToolResult {
+  content: { type: 'text'; text: string }[]
+  isError?: boolean
+}
+
+interface ToolDefinition {
+  name: string
+  description: string
+  inputSchema: Record<string, unknown>
+}
+
+const FILES_SCHEMA = {
+  type: 'array',
+  description: 'The complete set of files of the version. Must include index.html; link other files with relative paths.',
+  minItems: 1,
+  items: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'Relative path, e.g. "index.html" or "assets/chart.js".' },
+      content: { type: 'string', description: 'File content: text, or base64 when encoding is "base64".' },
+      encoding: { type: 'string', enum: ['utf8', 'base64'], default: 'utf8' },
+      contentType: { type: 'string', description: 'Optional; inferred from the extension.' },
+    },
+    required: ['path', 'content'],
+  },
+}
+
+const ARTIFACT_ID = { type: 'string', description: 'The artifactId returned by publish or list.' }
+
+export const TOOL_DEFINITIONS: ToolDefinition[] = [
+  {
+    name: 'publish',
+    description: 'Publish a new HTML artifact for the team and get its link. Before publishing, call list and update an existing artifact on the same subject instead of creating another.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Short name people will recognize, at most 200 characters.' },
+        files: FILES_SCHEMA,
+        visibility: { type: 'string', enum: ['private', 'specified', 'workspace', 'public_link'], default: 'workspace' },
+      },
+      required: ['title', 'files'],
+    },
+  },
+  {
+    name: 'update',
+    description: 'Publish a new version of an artifact. Pass baseVersion = the version you read. If someone published in between, the result is a conflict with the latest files: merge your change into them and update again with baseVersion = currentVersion. Use force only when the person explicitly asks to overwrite.',
+    inputSchema: {
+      type: 'object',
+      properties: { artifactId: ARTIFACT_ID, baseVersion: { type: 'integer', minimum: 1 }, files: FILES_SCHEMA, force: { type: 'boolean', default: false } },
+      required: ['artifactId', 'files'],
+    },
+  },
+  {
+    name: 'read',
+    description: 'Read the files and current version of an artifact, or of an older version.',
+    inputSchema: { type: 'object', properties: { artifactId: ARTIFACT_ID, version: { type: 'integer', minimum: 1 } }, required: ['artifactId'] },
+  },
+  {
+    name: 'list',
+    description: 'List the artifacts you can see in your workspace, most recently updated first.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'list_comments',
+    description: 'List comments on an artifact. The default filter "for_agent" returns the unresolved comments people addressed to an agent: act on them, publish with update, then reply_comment with resolve.',
+    inputSchema: {
+      type: 'object',
+      properties: { artifactId: ARTIFACT_ID, filter: { type: 'string', enum: ['for_agent', 'unresolved', 'all'], default: 'for_agent' } },
+      required: ['artifactId'],
+    },
+  },
+  {
+    name: 'reply_comment',
+    description: 'Reply to a comment, saying what you changed and in which version. Set resolve to mark the comment done.',
+    inputSchema: {
+      type: 'object',
+      properties: { artifactId: ARTIFACT_ID, commentId: { type: 'string' }, body: { type: 'string', description: 'The reply, in the language of the comment.' }, resolve: { type: 'boolean', default: true } },
+      required: ['artifactId', 'commentId', 'body'],
+    },
+  },
+  {
+    name: 'get_guide',
+    description: 'Read the full guide: page rules, the CDN allowlist, the shared data SDK, and the update and comment workflows.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+]
+
+/** Each tool is one call to the app's HTTP API, so the app's permission checks apply unchanged. */
+export class AgentTools {
+  readonly #appClient: AppClient
+
+  constructor(appClient: AppClient) {
+    this.#appClient = appClient
+  }
+
+  async call(toolName: string, toolArguments: Record<string, unknown>): Promise<ToolResult> {
+    switch (toolName) {
+      case 'publish':
+        return this.#publish(toolArguments)
+      case 'update':
+        return this.#update(toolArguments)
+      case 'read':
+        return this.#read(toolArguments)
+      case 'list':
+        return AgentTools.#result(await this.#appClient.call('GET', '/api/artifacts'), 'Artifacts you can see:')
+      case 'list_comments':
+        return this.#listComments(toolArguments)
+      case 'reply_comment':
+        return this.#replyComment(toolArguments)
+      case 'get_guide':
+        return AgentTools.#result(await this.#appClient.call('GET', '/llms.txt'), '')
+      default:
+        return AgentTools.#error(`Unknown tool ${toolName}. Available: ${TOOL_DEFINITIONS.map(tool => tool.name).join(', ')}`)
+    }
+  }
+
+  async #publish(toolArguments: Record<string, unknown>): Promise<ToolResult> {
+    const { title, files, visibility } = toolArguments
+    const published = await this.#appClient.call('POST', '/api/artifacts', { title, files, visibility })
+    return AgentTools.#result(published, 'Published. Share the url with the person:')
+  }
+
+  async #update(toolArguments: Record<string, unknown>): Promise<ToolResult> {
+    const { artifactId, baseVersion, files, force } = toolArguments
+    const updated = await this.#appClient.call('PUT', `/api/artifacts/${AgentTools.#segment(artifactId)}`, { baseVersion, files, force })
+    if (updated.status === 409) return AgentTools.#text(`Conflict: someone published in between. Merge your change into latestFiles and call update again with baseVersion = currentVersion.\n\n${JSON.stringify(updated.body, null, 2)}`)
+    return AgentTools.#result(updated, 'Published a new version:')
+  }
+
+  async #read(toolArguments: Record<string, unknown>): Promise<ToolResult> {
+    const versionQuery = toolArguments.version === undefined ? '' : `?version=${encodeURIComponent(String(toolArguments.version))}`
+    return AgentTools.#result(await this.#appClient.call('GET', `/api/artifacts/${AgentTools.#segment(toolArguments.artifactId)}${versionQuery}`), 'Artifact:')
+  }
+
+  async #listComments(toolArguments: Record<string, unknown>): Promise<ToolResult> {
+    const filter = typeof toolArguments.filter === 'string' ? toolArguments.filter : 'for_agent'
+    const comments = await this.#appClient.call('GET', `/api/artifacts/${AgentTools.#segment(toolArguments.artifactId)}/comments?filter=${encodeURIComponent(filter)}`)
+    return AgentTools.#result(comments, filter === 'for_agent' ? 'Unresolved comments addressed to an agent (replies included):' : 'Comments:')
+  }
+
+  async #replyComment(toolArguments: Record<string, unknown>): Promise<ToolResult> {
+    const { artifactId, commentId, body } = toolArguments
+    const reply = await this.#appClient.call('POST', `/api/artifacts/${AgentTools.#segment(artifactId)}/comments`, { body, parentId: commentId })
+    if (reply.status !== 201) return AgentTools.#result(reply, '')
+    const shouldResolve = toolArguments.resolve !== false
+    if (!shouldResolve) return AgentTools.#text('Replied.')
+    const resolution = await this.#appClient.call('PATCH', `/api/comments/${AgentTools.#segment(commentId)}`, { resolved: true })
+    return resolution.status === 200 ? AgentTools.#text('Replied and marked the comment resolved.') : AgentTools.#result(resolution, 'Replied, but resolving failed:')
+  }
+
+  // An id is sent as one path segment, so a crafted id cannot reach a different API route.
+  static #segment(value: unknown): string {
+    return encodeURIComponent(String(value ?? ''))
+  }
+
+  static #result(appResponse: AppResponse, heading: string): ToolResult {
+    const isSuccess = appResponse.status >= 200 && appResponse.status < 300
+    const detail = typeof appResponse.body === 'string' ? appResponse.body : JSON.stringify(appResponse.body, null, 2)
+    if (!isSuccess) return AgentTools.#error(`Open Artifact answered ${appResponse.status}: ${detail}`)
+    return AgentTools.#text(heading ? `${heading}\n\n${detail}` : detail)
+  }
+
+  static #text(text: string): ToolResult {
+    return { content: [{ type: 'text', text }] }
+  }
+
+  static #error(text: string): ToolResult {
+    return { content: [{ type: 'text', text }], isError: true }
+  }
+}

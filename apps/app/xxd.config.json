@@ -1,0 +1,4 @@
+{
+  "vendorDir": "public/static/vendor/xxd",
+  "vendorFiles": ["boot.js", "xxd.css", "icons.js", "xxd.js"]
+}

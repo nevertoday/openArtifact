@@ -1,0 +1,17 @@
+{
+  "name": "open-artifact",
+  "private": true,
+  "packageManager": "pnpm@9.14.2",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "check:storage-boundary": "node scripts/check-storage-boundary.mjs",
+    "check": "pnpm check:storage-boundary && pnpm typecheck && pnpm test",
+    "dev:setup": "node scripts/setup-local.mjs",
+    "dev": "node scripts/dev.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261005.1",
+    "typescript": "6.0.3"
+  }
+}

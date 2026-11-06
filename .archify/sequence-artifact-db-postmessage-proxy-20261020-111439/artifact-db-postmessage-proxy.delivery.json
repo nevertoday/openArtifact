@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "59bfcd17-8046-430b-ab6f-ceb4bde44817",
+  "status": "current",
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/devin/Codes/Devin/open-artifact/.archify/sequence-artifact-db-postmessage-proxy-20261020-111439/candidate.json",
+  "output": "/Users/devin/Codes/Devin/open-artifact/.archify/sequence-artifact-db-postmessage-proxy-20261020-111439/artifact-db-postmessage-proxy.html",
+  "specification": {
+    "sha256": "a9cbf9ed0b90c7d23b17780cff3d0c2b9a3bd35148686d2003e41fe02d44fa0e",
+    "bytes": 3948
+  },
+  "artifact": {
+    "sha256": "3a70f9428fbf30439a21965a3f2a977497fa0b2e681cb44932a45c7431a082ce",
+    "bytes": 812777
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "open-artifact-usercontent",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-20",
+  "vars": { "APP_ORIGIN": "http://localhost:8787" },
+  // Files are read through the app's RPC entrypoint; this Worker has no database or bucket binding.
+  "services": [{ "binding": "ARTIFACT_FILES", "service": "open-artifact-app", "entrypoint": "ArtifactFileReader" }]
+}

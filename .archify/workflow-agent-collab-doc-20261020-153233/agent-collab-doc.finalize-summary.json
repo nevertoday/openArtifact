@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "workflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "/Users/devin/Codes/Devin/open-artifact/.archify/workflow-agent-collab-doc-20261020-153233/candidate.json",
+    "sha256": "e11f26f1082867f045b53321ae36cac86f3683f9f1c6fac35ceb5529a71be0cf",
+    "bytes": 4830
+  },
+  "artifact": {
+    "path": "/Users/devin/Codes/Devin/open-artifact/.archify/workflow-agent-collab-doc-20261020-153233/agent-collab-doc.html",
+    "sha256": "85160d3af28fb560534234ed89e0c22d8ce319d9a0c9c831fc8db297a8057a6a",
+    "bytes": 826133
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/Users/devin/Codes/Devin/open-artifact/.archify/workflow-agent-collab-doc-20261020-153233/agent-collab-doc.finalize.json",
+    "summaryReceipt": "/Users/devin/Codes/Devin/open-artifact/.archify/workflow-agent-collab-doc-20261020-153233/agent-collab-doc.finalize-summary.json",
+    "browserCheckReceipt": "/Users/devin/Codes/Devin/open-artifact/.archify/workflow-agent-collab-doc-20261020-153233/agent-collab-doc.browser-check.json"
+  },
+  "update": {
+    "status": "update_available",
+    "installedVersion": "3.1.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": "https://github.com/tt-a1i/archify/releases/tag/v3.2.0",
+    "severity": "normal",
+    "checkedAt": "2026-10-20T03:15:19.837Z",
+    "source": "cache",
+    "noticeRequired": true,
+    "noticeText": "Archify update: 3.1.0 → 3.2.0. A previous check at 2026-10-20T03:15:19.837Z found a newer release. Release notes: https://github.com/tt-a1i/archify/releases/tag/v3.2.0. The installed Skill has not changed; ask to snooze or ignore this reminder.",
+    "eventKey": "archify@sha256:70e210265c59f24dcbdf2a502ff671104b5454e7ee7d3554aecd86bad32384f5"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2820
+}

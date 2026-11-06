@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "sequence",
+  "quality": "showcase",
+  "specification": {
+    "path": "/Users/devin/Codes/Devin/open-artifact/.archify/sequence-publish-comment-agent-loop-20261020-111445/candidate.json",
+    "sha256": "46c958c8bd9923b21232beb7c584bc6f1c106a5cd804cc412f93c4cb55f894d5",
+    "bytes": 6396
+  },
+  "artifact": {
+    "path": "/Users/devin/Codes/Devin/open-artifact/.archify/sequence-publish-comment-agent-loop-20261020-111445/publish-comment-agent-loop.html",
+    "sha256": "86325dcbd23afff4b89b34320da219c26f8fa0518e5cf9a1c512cdc098a2b231",
+    "bytes": 829302
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/Users/devin/Codes/Devin/open-artifact/.archify/sequence-publish-comment-agent-loop-20261020-111445/publish-comment-agent-loop.finalize.json",
+    "summaryReceipt": "/Users/devin/Codes/Devin/open-artifact/.archify/sequence-publish-comment-agent-loop-20261020-111445/publish-comment-agent-loop.finalize-summary.json",
+    "browserCheckReceipt": "/Users/devin/Codes/Devin/open-artifact/.archify/sequence-publish-comment-agent-loop-20261020-111445/publish-comment-agent-loop.browser-check.json"
+  },
+  "update": {
+    "status": "update_available",
+    "installedVersion": "3.1.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": "https://github.com/tt-a1i/archify/releases/tag/v3.2.0",
+    "severity": "normal",
+    "checkedAt": "2026-10-20T03:15:19.837Z",
+    "source": "network",
+    "noticeRequired": true,
+    "noticeText": "Archify update: 3.1.0 → 3.2.0. A newer release is available. Release notes: https://github.com/tt-a1i/archify/releases/tag/v3.2.0. The installed Skill has not changed; ask to snooze or ignore this reminder.",
+    "eventKey": "archify@sha256:70e210265c59f24dcbdf2a502ff671104b5454e7ee7d3554aecd86bad32384f5"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3230
+}

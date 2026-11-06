@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "08cc771f-8cd2-4e8e-bfdb-be078934db75",
+  "status": "current",
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/devin/Codes/Devin/open-artifact/.archify/sequence-publish-comment-agent-loop-20261020-111445/candidate.json",
+  "output": "/Users/devin/Codes/Devin/open-artifact/.archify/sequence-publish-comment-agent-loop-20261020-111445/publish-comment-agent-loop.html",
+  "specification": {
+    "sha256": "46c958c8bd9923b21232beb7c584bc6f1c106a5cd804cc412f93c4cb55f894d5",
+    "bytes": 6396
+  },
+  "artifact": {
+    "sha256": "86325dcbd23afff4b89b34320da219c26f8fa0518e5cf9a1c512cdc098a2b231",
+    "bytes": 829302
+  }
+}

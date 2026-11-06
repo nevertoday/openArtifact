@@ -1,0 +1,63 @@
+# Open Artifact
+
+Any AI agent publishes HTML pages ("artifacts"); the whole team opens, comments on and uses them, without a Claude account. Everything runs on the team's own Cloudflare account.
+
+Design doc: `docs/open-artifact-design.html` (published at https://claude.ai/artifact/8mif9MYis5SpNi5tH4ocns).
+
+## Run it locally
+
+Requires Node 22 and pnpm 9.
+
+```sh
+pnpm install
+pnpm dev:setup   # writes .dev.vars with local secrets, applies the D1 migrations
+pnpm dev         # usercontent :8789, app :8787, MCP :8788
+```
+
+Open http://localhost:8787 and sign in with an `@example.com` address (local setup allows that domain; change `ALLOWED_EMAIL_DOMAINS` in `apps/app/.dev.vars`). Locally the sign-in link is printed in the terminal running `pnpm dev` (look for `[mail]`). The first person to sign in becomes the admin of the workspace; everyone after joins it as a member.
+
+Stop the servers with Ctrl-C. If a port is still taken afterwards, `pkill -f workerd`.
+
+## Connect an agent
+
+1. In the app, open 设置 › Agent 接入 and create a personal API token.
+2. Add the MCP server shown there, for example for Claude Code:
+
+   ```sh
+   claude mcp add --transport http open-artifact http://localhost:8788/mcp --header "Authorization: Bearer oa_pat_…"
+   ```
+
+3. Ask the agent to publish something. Agents without MCP can use the HTTP API described at http://localhost:8787/llms.txt.
+
+## Checks
+
+```sh
+pnpm run check   # storage boundary, type checks, all tests (Workers runtime, local D1 and R2)
+```
+
+## Layout
+
+| Path | What it holds |
+|---|---|
+| `packages/core` | Domain types, repository interfaces, access rules (`ArtifactAccess`), token and signature secrets |
+| `packages/storage-cloudflare` | D1 and R2 repositories and the migrations; the only code that touches D1 or R2 |
+| `apps/app` | Web pages, HTTP API, sign-in (Better Auth), the viewer's postMessage proxy |
+| `apps/usercontent` | Serves artifact files on their own origin through signed URLs, and injects the page SDK; reads files through the app's `ArtifactFileReader` RPC entrypoint and has no storage binding |
+| `apps/mcp` | Remote MCP server; each tool is one call to the app's HTTP API with the agent's token |
+
+## Configuration
+
+| Variable | Worker | Purpose |
+|---|---|---|
+| `BETTER_AUTH_SECRET` | app | Session signing |
+| `ALLOWED_EMAIL_DOMAINS` | app | Comma-separated domains whose people may create an account. Unset: only the first person (the founder) can sign up |
+| `MAILER` | app | `console` prints mail to the log for local development. No mail service is wired yet, so in production sign-in mail fails loudly instead of leaking links into logs |
+| `USERCONTENT_SIGNING_KEY` | app, usercontent | Must be the same in both; signs artifact file URLs |
+| `USERCONTENT_ORIGIN`, `MCP_ORIGIN` | app | Public addresses of the other two Workers |
+| `APP_ORIGIN` | usercontent, mcp | Public address of the app |
+| `GITHUB_CLIENT_ID` / `_SECRET`, `GOOGLE_CLIENT_ID` / `_SECRET` | app | Optional sign-in providers |
+| `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_DISPLAY_NAME` | app | Optional company SSO |
+
+Bindings besides variables: the app needs `DB` (D1), `FILES` (R2) and `UNLOCK_RATE_LIMITER` (rate limit for public-link passwords); usercontent needs the `ARTIFACT_FILES` service binding to the app; MCP needs the `APP` service binding.
+
+The usercontent Worker must run on a different site from the app (another domain, not only another port in production), so artifact pages can never read the app's cookies.

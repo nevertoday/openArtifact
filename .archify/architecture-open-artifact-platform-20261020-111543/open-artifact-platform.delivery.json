@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "27c23176-8537-42dc-a6dc-5c01b5a56bc7",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Users/devin/Codes/Devin/open-artifact/.archify/architecture-open-artifact-platform-20261020-111543/candidate.json",
+  "output": "/Users/devin/Codes/Devin/open-artifact/.archify/architecture-open-artifact-platform-20261020-111543/open-artifact-platform.html",
+  "specification": {
+    "sha256": "74895197a2aeb3b67a28f83af9bd8d4de308f23c1f3560ce6a5e7d52bfcd0d75",
+    "bytes": 6870
+  },
+  "artifact": {
+    "sha256": "d81dcd267e0e2833bf00506ebe94d18c640683517c852e146fd00f8ad550e4ed",
+    "bytes": 833832
+  }
+}

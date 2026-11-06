@@ -1,0 +1,150 @@
+import { describe, expect, it } from 'vitest'
+import { APP_ORIGIN, TestApp } from './test-app.ts'
+
+const app = new TestApp()
+
+describe('signing in', () => {
+  it('signs a person in through the emailed link and puts them in a workspace', async () => {
+    const founderCookie = await app.signIn('lin@example.com')
+    const colleagueCookie = await app.signIn('zhou@example.com')
+
+    const founder = await app.json<{ user: { name: string; email: string }; workspace: { name: string; role: string } }>('/api/me', { cookie: founderCookie })
+    const colleague = await app.json<{ workspace: { name: string; role: string } }>('/api/me', { cookie: colleagueCookie })
+
+    expect(founder.body.user).toEqual(expect.objectContaining({ name: 'lin', email: 'lin@example.com' }))
+    expect(founder.body.workspace).toMatchObject({ name: '我的团队', role: 'admin' })
+    expect(colleague.body.workspace).toMatchObject({ name: '我的团队', role: 'member' })
+  })
+
+  it('lets a person choose their display name', async () => {
+    const cookie = await app.signIn('chen@example.com')
+
+    const renameResponse = await app.request('/api/me', { method: 'PATCH', cookie, body: { name: '陈默' } })
+    const me = await app.json<{ user: { name: string } }>('/api/me', { cookie })
+
+    expect(renameResponse.status).toBe(200)
+    expect(me.body.user.name).toBe('陈默')
+  })
+
+  it('answers 401 without a session or token, and sends pages to the login page', async () => {
+    const apiResponse = await app.request('/api/artifacts')
+    const homeResponse = await app.request('/')
+
+    expect(apiResponse.status).toBe(401)
+    expect(homeResponse.status).toBe(302)
+    expect(homeResponse.headers.get('Location')).toBe(`${APP_ORIGIN}/login?next=%2F`)
+  })
+
+  it('refuses a write that carries the session cookie but comes from another site', async () => {
+    const cookie = await app.signIn('lin@example.com')
+
+    const crossSiteWrite = await app.request('/api/tokens', { method: 'POST', cookie, origin: 'https://evil.example', body: { name: 'stolen', expiresInDays: 30 } })
+    const missingOrigin = await app.request('/api/tokens', { method: 'POST', cookie, origin: null, body: { name: 'stolen', expiresInDays: 30 } })
+
+    expect([crossSiteWrite.status, missingOrigin.status]).toEqual([403, 403])
+  })
+})
+
+describe('personal API tokens', () => {
+  it('shows the token once, stores only what it needs, and lets an agent act as its person', async () => {
+    const cookie = await app.signIn('lin@example.com')
+    const created = await app.json<{ token: string; name: string; expiresAt: number }>('/api/tokens', { method: 'POST', cookie, body: { name: 'Claude Code · laptop', expiresInDays: 30 } })
+
+    const published = await app.publish({ token: created.body.token, agentClient: 'Claude Code' }, 'Design doc')
+    const listed = await app.json<{ tokens: { name: string; lastUsedAt: number | null }[] }>('/api/tokens', { cookie })
+    const read = await app.json<{ publishedVia: string; author: { name: string } }>(`/api/artifacts/${published.artifactId}`, { cookie })
+
+    expect(created.status).toBe(201)
+    expect(created.body.token).toMatch(/^oa_pat_/)
+    expect(created.body.expiresAt).toBeGreaterThan(Date.now() + 29 * 24 * 60 * 60 * 1000)
+    expect(JSON.stringify(listed.body)).not.toContain(created.body.token)
+    expect(listed.body.tokens.find(token => token.name === 'Claude Code · laptop')?.lastUsedAt).not.toBeNull()
+    expect(read.body).toMatchObject({ publishedVia: 'Claude Code', author: { name: 'lin' } })
+  })
+
+  it('names direct API calls "API" when the agent does not say who it is', async () => {
+    const cookie = await app.signIn('lin@example.com')
+    const token = await app.createToken(cookie)
+
+    const published = await app.publish({ token }, 'Script output')
+    const read = await app.json<{ publishedVia: string }>(`/api/artifacts/${published.artifactId}`, { token })
+
+    expect(read.body.publishedVia).toBe('API')
+  })
+
+  it('keeps token management out of reach of a token', async () => {
+    const cookie = await app.signIn('lin@example.com')
+    const token = await app.createToken(cookie)
+
+    const mintWithToken = await app.request('/api/tokens', { method: 'POST', token, body: { name: 'escalate', expiresInDays: 30 } })
+
+    expect(mintWithToken.status).toBe(403)
+  })
+
+  it('stops a revoked token at once, and only its owner can revoke it', async () => {
+    const ownerCookie = await app.signIn('lin@example.com')
+    const strangerCookie = await app.signIn('zhou@example.com')
+    const created = await app.json<{ token: string; tokenId: string }>('/api/tokens', { method: 'POST', cookie: ownerCookie, body: { name: 'CI', expiresInDays: null } })
+
+    const strangerRevoke = await app.request(`/api/tokens/${created.body.tokenId}`, { method: 'DELETE', cookie: strangerCookie })
+    const ownerRevoke = await app.request(`/api/tokens/${created.body.tokenId}`, { method: 'DELETE', cookie: ownerCookie })
+    const afterRevoke = await app.request('/api/artifacts', { token: created.body.token })
+
+    expect([strangerRevoke.status, ownerRevoke.status, afterRevoke.status]).toEqual([404, 204, 401])
+  })
+
+  it('rejects a token lifetime it does not offer', async () => {
+    const cookie = await app.signIn('lin@example.com')
+
+    const tooLong = await app.request('/api/tokens', { method: 'POST', cookie, body: { name: 'forever-ish', expiresInDays: 5000 } })
+
+    expect(tooLong.status).toBe(400)
+  })
+})
+
+describe('who may sign up', () => {
+  it('refuses an email outside the allowed domains before sending any link', async () => {
+    const refused = await app.json<{ message: string }>('/api/auth/sign-in/magic-link', { method: 'POST', body: { email: 'stranger@other.org', callbackURL: '/' } })
+
+    expect(refused.status).toBe(403)
+    expect(refused.body.message).toContain('example.com')
+    expect(app.mailer.lastTo('stranger@other.org')).toBeUndefined()
+  })
+
+  it('lets only the founder sign up when no domains are allowed, while existing people still sign in', async () => {
+    const founderOnlyApp = new TestApp({})
+    await app.signIn('lin@example.com')
+
+    const newcomer = await founderOnlyApp.request('/api/auth/sign-in/magic-link', { method: 'POST', body: { email: 'newcomer@example.com', callbackURL: '/' } })
+    const existingPerson = await founderOnlyApp.signIn('lin@example.com')
+
+    expect(newcomer.status).toBe(403)
+    expect(existingPerson).toContain('session_token')
+  })
+})
+
+describe('mail', () => {
+  it('fails loudly instead of logging sign-in links when no mail service is configured', async () => {
+    const { Mailers } = await import('../src/auth/mailer.ts')
+
+    await expect(Mailers.fromSetting(undefined).send({ to: 'lin@example.com', subject: 's', text: 't' })).rejects.toThrow('No mail service is configured')
+  })
+})
+
+describe('tokens and workspaces', () => {
+  it('limits a token to the workspace it was created for', async () => {
+    const { env } = await import('cloudflare:workers')
+    const ownerCookie = await app.signIn('lin@example.com')
+    const token = await app.createToken(ownerCookie)
+    const me = await app.json<{ user: { userId: string } }>('/api/me', { cookie: ownerCookie })
+    await env.DB.prepare('INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?)').bind('workspace-other', 'Other team', Date.now()).run()
+    await env.DB.prepare("INSERT INTO memberships (workspace_id, user_id, role, created_at) VALUES ('workspace-other', ?, 'member', ?)").bind(me.body.user.userId, Date.now()).run()
+    const otherArtifact = await app.repositories.artifacts.create({ workspaceId: 'workspace-other', authorId: 'someone-else', title: 'Other team plan', visibility: 'workspace', publishedVia: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+
+    const withCookie = await app.request(`/api/artifacts/${otherArtifact.artifactId}`, { cookie: ownerCookie })
+    const withToken = await app.request(`/api/artifacts/${otherArtifact.artifactId}`, { token })
+
+    expect(withCookie.status).toBe(200)
+    expect(withToken.status).toBe(404)
+  })
+})
