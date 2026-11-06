@@ -14,6 +14,8 @@
     }
   ],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "open-artifact-files" }],
+  // Daily purge of artifacts removed more than 30 days ago.
+  "triggers": { "crons": ["30 3 * * *"] },
   // Public-link password attempts per visitor address and artifact.
   "ratelimits": [{ "name": "UNLOCK_RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
   // Secrets (BETTER_AUTH_SECRET, USERCONTENT_SIGNING_KEY, optional OAuth client ids) live in .dev.vars locally
