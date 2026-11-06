@@ -1,4 +1,4 @@
-import { ApiError, api, element, initialOf, readJsonData, timeAgo } from './common.js'
+import { ApiError, api, confirmArtifactRemoval, element, initialOf, readJsonData, removalWord, removeArtifact, timeAgo } from './common.js'
 import { SharedDataProxy } from './shared-data-proxy.js'
 
 const viewerConfig = readJsonData('viewer-config')
@@ -438,6 +438,51 @@ class VersionOverwrite {
   }
 }
 
+function showTitle(title) {
+  viewerConfig.title = title
+  document.title = `${title} · Open Artifact`
+  document.querySelector('.viewer-heading__title').textContent = title
+  const shareSubtitle = document.querySelector('[data-share-subtitle]')
+  if (shareSubtitle) shareSubtitle.textContent = title
+}
+
+async function renameArtifact() {
+  const titleInput = element('input', { id: 'rename-title', className: 'xxd-input', value: viewerConfig.title, maxlength: '200', required: true, autocomplete: 'off' })
+  const titleField = element('div', { className: 'xxd-field' }, element('label', { className: 'xxd-label', for: 'rename-title' }, '标题'), titleInput)
+  // Enter would submit the dialog's first button, its close button, so it confirms explicitly.
+  titleInput.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+    titleInput.closest('dialog')?.querySelector('button[value="confirm"]')?.click()
+  })
+  const renameConfirmation = Xxd.confirmDialog({ title: '重命名', message: titleField, confirmLabel: '保存', cancelLabel: '取消', closeLabel: '关闭' })
+  titleInput.select()
+  const confirmed = await renameConfirmation
+  const newTitle = titleInput.value.trim()
+  const titleChanged = newTitle !== '' && newTitle !== viewerConfig.title
+  if (!confirmed || !titleChanged) return
+  try {
+    const { title } = await api(artifactPath, { method: 'PATCH', body: { title: newTitle } })
+    showTitle(title)
+    Xxd.toast('已重命名', { tone: 'success' })
+  } catch (error) {
+    Xxd.toast(`重命名失败：${error.message}`, { tone: 'danger' })
+  }
+}
+
+// After removing, home offers 撤销 for this artifact.
+async function removeThisArtifact() {
+  const takesDown = viewerConfig.removalTakesDown
+  const confirmed = await confirmArtifactRemoval(viewerConfig.title, takesDown)
+  if (!confirmed) return
+  try {
+    await removeArtifact(viewerConfig.artifactId)
+    location.href = `/?removed=${encodeURIComponent(viewerConfig.artifactId)}`
+  } catch (error) {
+    Xxd.toast(`${removalWord(takesDown)}失败：${error.message}`, { tone: 'danger' })
+  }
+}
+
 class ShareDialog {
   constructor(dialog) {
     this.dialog = dialog
@@ -607,6 +652,8 @@ if (shareDialogElement) {
   const shareDialog = new ShareDialog(shareDialogElement)
   document.querySelector('[data-open-share]')?.addEventListener('click', () => shareDialog.open())
 }
+document.querySelector('[data-rename-artifact]')?.addEventListener('click', renameArtifact)
+document.querySelector('[data-remove-artifact]')?.addEventListener('click', removeThisArtifact)
 for (const overwriteButton of document.querySelectorAll('[data-overwrite-with-version]')) {
   overwriteButton.addEventListener('click', () => versionOverwrite.confirmAndOverwrite(Number(overwriteButton.dataset.overwriteWithVersion)))
 }

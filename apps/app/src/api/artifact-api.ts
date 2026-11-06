@@ -1,5 +1,6 @@
-import type { ArtifactFile, ArtifactVisibility, PublishResult, VersionOrigin } from '@open-artifact/core'
+import { ArtifactRemoval, type ArtifactFile, type ArtifactSummary, type ArtifactVisibility, type PublishResult, type VersionOrigin } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
+import type { Identity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { ArtifactFileJson } from './artifact-file-json.ts'
@@ -10,7 +11,7 @@ const MAX_TITLE_LENGTH = 200
 const MAX_NOTE_LENGTH = 200
 const BASE_VERSION_HINT = 'pass the version you read; pass force: true only when told to overwrite'
 
-/** Publishing, reading and versions of artifacts: what agents call through MCP or the HTTP API. */
+/** Publishing, reading, versions, renaming and removal of artifacts: what agents call through MCP or the HTTP API. */
 export class ArtifactApi {
   readonly #context: ApiContext
 
@@ -33,11 +34,18 @@ export class ArtifactApi {
     return Response.json({ ...createdArtifact, url: this.#context.viewerUrl(createdArtifact.artifactId) }, { status: 201 })
   }
 
-  async list(): Promise<Response> {
+  /** `?removed=true` lists the removed artifacts the caller may restore instead of the ones they can view. */
+  async list(request: Request): Promise<Response> {
     const identity = await this.#context.requireIdentity()
-    const visibleArtifacts = await this.#context.gate.listVisible(identity)
-    const authorNames = await this.#context.people.namesOf(visibleArtifacts.map(openedArtifact => openedArtifact.summary.authorId))
-    return Response.json({ artifacts: visibleArtifacts.map(openedArtifact => this.#summaryJson(openedArtifact, authorNames)) })
+    const listsRemoved = new URL(request.url).searchParams.get('removed') === 'true'
+    const listedArtifacts = listsRemoved ? await this.#context.gate.listRestorable(identity) : await this.#context.gate.listVisible(identity)
+    return this.#listResponse(listedArtifacts)
+  }
+
+  /** Every artifact of the workspace for its admin, as metadata only: a private one comes without a link. */
+  async listWorkspace(): Promise<Response> {
+    const identity = await this.#context.requireWorkspaceAdmin('see every artifact of the workspace')
+    return this.#listResponse(await this.#context.gate.listWorkspace(identity))
   }
 
   async read(request: Request, artifactId: string): Promise<Response> {
@@ -46,8 +54,8 @@ export class ArtifactApi {
     const version = requestedVersion === null ? openedArtifact.summary.version : Number(requestedVersion)
     const versionContent = await this.#context.repositories.artifacts.readVersion(artifactId, version)
     if (!versionContent) throw HttpError.notFound(`version ${requestedVersion} of artifact ${artifactId}`)
-    const authorNames = await this.#context.people.namesOf([openedArtifact.summary.authorId])
-    return Response.json({ ...this.#summaryJson(openedArtifact, authorNames), version, files: versionContent.files.map(file => ArtifactFileJson.toJson(file)) })
+    const names = await this.#namesOf([openedArtifact])
+    return Response.json({ ...this.#summaryJson(openedArtifact, names), version, files: versionContent.files.map(file => ArtifactFileJson.toJson(file)) })
   }
 
   async update(request: Request, artifactId: string): Promise<Response> {
@@ -55,6 +63,7 @@ export class ArtifactApi {
     const openedArtifact = await this.#context.gate.require(artifactId, identity, request, 'canEdit', 'publish a new version of this artifact')
     const requestBody = await JsonBody.of(request)
     const files = ArtifactFileJson.filesFrom(requestBody.raw('files'))
+    const newTitle = requestBody.optionalText('title', MAX_TITLE_LENGTH)
     const baseVersion = requestBody.boolean('force', false) ? openedArtifact.summary.version : requestBody.positiveInteger('baseVersion', BASE_VERSION_HINT)
     const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
       authorId: identity.userId,
@@ -63,7 +72,52 @@ export class ArtifactApi {
       note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
       files,
     })
+    const renamesWithVersion = publishResult.status === 'published' && newTitle !== null
+    if (renamesWithVersion) await this.#rename(identity, openedArtifact.summary, newTitle)
     return this.#publishResponse(artifactId, publishResult)
+  }
+
+  async rename(request: Request, artifactId: string): Promise<Response> {
+    const identity = await this.#context.requireIdentity()
+    const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canRename', 'rename this artifact')
+    const requestBody = await JsonBody.of(request)
+    const title = requestBody.text('title', MAX_TITLE_LENGTH)
+    await this.#rename(identity, summary, title)
+    return Response.json({ artifactId, title })
+  }
+
+  /** Hides the artifact from everyone at once; it can be restored for 30 days, then it is purged. */
+  async remove(request: Request, artifactId: string): Promise<Response> {
+    const identity = await this.#context.requireIdentity()
+    const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canRemove', 'remove this artifact')
+    const removal = ArtifactRemoval.by(identity.userId, summary.authorId, Date.now())
+    const removedNow = await this.#context.repositories.artifacts.remove(artifactId, removal)
+    if (!removedNow) throw HttpError.notFound(`artifact ${artifactId}`)
+    await this.#context.repositories.auditLog.record({
+      workspaceId: summary.workspaceId,
+      actorId: identity.userId,
+      action: 'artifact.removed',
+      targetType: 'artifact',
+      targetId: artifactId,
+      detail: { title: summary.title, removedAsAdmin: removal.removedAsAdmin },
+    })
+    return Response.json({ artifactId, removal: { removedAt: removal.removedAt, removedAsAdmin: removal.removedAsAdmin, purgeAt: removal.purgeAt } })
+  }
+
+  async restoreRemoved(request: Request, artifactId: string): Promise<Response> {
+    const identity = await this.#context.requireIdentity()
+    const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canRestore', 'restore this artifact')
+    const restoredNow = await this.#context.repositories.artifacts.restore(artifactId)
+    if (!restoredNow) throw HttpError.notFound(`removed artifact ${artifactId}`)
+    await this.#context.repositories.auditLog.record({
+      workspaceId: summary.workspaceId,
+      actorId: identity.userId,
+      action: 'artifact.restored',
+      targetType: 'artifact',
+      targetId: artifactId,
+      detail: { title: summary.title },
+    })
+    return Response.json({ artifactId, title: summary.title, url: this.#context.viewerUrl(artifactId) })
   }
 
   async listVersions(request: Request, artifactId: string): Promise<Response> {
@@ -85,7 +139,7 @@ export class ArtifactApi {
    * Publishes the files of an older version as a new version; history is never rewritten. Undoing a restore
    * is one more restore, of the version it replaced.
    */
-  async restore(request: Request, artifactId: string, version: number): Promise<Response> {
+  async restoreVersion(request: Request, artifactId: string, version: number): Promise<Response> {
     const identity = await this.#context.requireIdentity()
     await this.#context.gate.require(artifactId, identity, request, 'canEdit', 'restore a version of this artifact')
     const requestBody = await JsonBody.of(request)
@@ -134,18 +188,57 @@ export class ArtifactApi {
     return Response.json(conflictBody, { status: 409 })
   }
 
-  #summaryJson(openedArtifact: OpenedArtifact, authorNames: Map<string, string>) {
+  async #rename(identity: Identity, summary: ArtifactSummary, title: string): Promise<void> {
+    if (title === summary.title) return
+    await this.#context.repositories.artifacts.rename(summary.artifactId, title)
+    await this.#context.repositories.auditLog.record({
+      workspaceId: summary.workspaceId,
+      actorId: identity.userId,
+      action: 'artifact.renamed',
+      targetType: 'artifact',
+      targetId: summary.artifactId,
+      detail: { from: summary.title, to: title },
+    })
+  }
+
+  async #listResponse(listedArtifacts: OpenedArtifact[]): Promise<Response> {
+    const names = await this.#namesOf(listedArtifacts)
+    return Response.json({ artifacts: listedArtifacts.map(openedArtifact => this.#summaryJson(openedArtifact, names)) })
+  }
+
+  #namesOf(openedArtifacts: OpenedArtifact[]): Promise<Map<string, string>> {
+    return this.#context.people.namesOf(openedArtifacts.flatMap(({ summary }) => [summary.authorId, summary.removal?.removedBy ?? null]))
+  }
+
+  #summaryJson(openedArtifact: OpenedArtifact, names: Map<string, string>) {
     const { summary, permissions } = openedArtifact
     return {
       artifactId: summary.artifactId,
       title: summary.title,
       version: summary.version,
       visibility: summary.sharing.visibility,
-      author: { userId: summary.authorId, name: authorNames.get(summary.authorId) },
+      author: { userId: summary.authorId, name: names.get(summary.authorId) },
       publishedVia: summary.publishedVia,
       updatedAt: summary.updatedAt,
-      url: this.#context.viewerUrl(summary.artifactId),
-      permissions: { canEdit: permissions.canEdit, canComment: permissions.canComment, canManageSharing: permissions.canManageSharing },
+      removal: summary.removal === null ? null : ArtifactApi.#removalJson(summary.removal, names),
+      url: permissions.canView ? this.#context.viewerUrl(summary.artifactId) : null,
+      permissions: {
+        canEdit: permissions.canEdit,
+        canComment: permissions.canComment,
+        canManageSharing: permissions.canManageSharing,
+        canRename: permissions.canRename,
+        canRemove: permissions.canRemove,
+        canRestore: permissions.canRestore,
+      },
+    }
+  }
+
+  static #removalJson(removal: ArtifactRemoval, names: Map<string, string>) {
+    return {
+      removedAt: removal.removedAt,
+      removedBy: { userId: removal.removedBy, name: names.get(removal.removedBy) },
+      removedAsAdmin: removal.removedAsAdmin,
+      purgeAt: removal.purgeAt,
     }
   }
 }

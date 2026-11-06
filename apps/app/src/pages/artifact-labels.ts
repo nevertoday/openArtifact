@@ -1,4 +1,4 @@
-import type { ArtifactVisibility } from '@open-artifact/core'
+import type { ArtifactVisibility, WorkspaceRole } from '@open-artifact/core'
 
 const VISIBILITY_LABELS: Record<ArtifactVisibility, string> = {
   private: '私有',
@@ -9,6 +9,8 @@ const VISIBILITY_LABELS: Record<ArtifactVisibility, string> = {
 
 const WEB_PAGE_LABEL = '网页'
 
+const ROLE_LABELS: Record<WorkspaceRole, string> = { admin: '管理员', member: '成员' }
+
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
@@ -17,6 +19,20 @@ const DAY = 24 * HOUR
 export class ArtifactLabels {
   static visibility(visibility: ArtifactVisibility): string {
     return VISIBILITY_LABELS[visibility]
+  }
+
+  /** 下架 is an admin removing someone else's artifact; 删除 is the author removing their own. */
+  static removal(removedAsAdmin: boolean): string {
+    return removedAsAdmin ? '下架' : '删除'
+  }
+
+  static purgeIn(purgeAt: number, now: number): string {
+    const daysLeft = Math.max(1, Math.ceil((purgeAt - now) / DAY))
+    return `${daysLeft} 天后彻底删除`
+  }
+
+  static role(role: WorkspaceRole): string {
+    return ROLE_LABELS[role]
   }
 
   static publishedVia(publishedVia: string | null): string {

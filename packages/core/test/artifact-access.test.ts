@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { ArtifactAccess } from '../src/artifact-access.ts'
+import { ArtifactRemoval } from '../src/artifact-removal.ts'
 import type { ArtifactViewer } from '../src/artifact-access.ts'
 import type { ArtifactSharing, ArtifactSummary } from '../src/artifact-repository.ts'
 
 const now = 1_800_000_000_000
+const DAY = 24 * 60 * 60 * 1000
 const authorId = 'user-author'
 
-function artifactWith(sharing: Partial<ArtifactSharing>): ArtifactSummary {
+function artifactWith(sharing: Partial<ArtifactSharing>, removal: ArtifactRemoval | null = null): ArtifactSummary {
   return {
     artifactId: 'artifact-1',
     workspaceId: 'workspace-1',
@@ -16,6 +18,7 @@ function artifactWith(sharing: Partial<ArtifactSharing>): ArtifactSummary {
     version: 1,
     publishedVia: null,
     updatedAt: now,
+    removal,
   }
 }
 
@@ -38,6 +41,9 @@ describe('ArtifactAccess', () => {
       canEdit: true,
       canManageSharing: true,
       canWriteSharedData: true,
+      canRename: true,
+      canRemove: true,
+      canRestore: false,
       needsPublicLinkPassword: false,
     })
   })
@@ -75,5 +81,32 @@ describe('ArtifactAccess', () => {
     expect(permissions({ visibility: 'public_link', publicLinkExpiresAt: now + 1 }, anonymous).canView).toBe(true)
     expect(permissions({ visibility: 'public_link' }, anonymous, false).canView).toBe(false)
     expect(permissions({ visibility: 'public_link' }, member, false).canView).toBe(true)
+  })
+
+  it('lets whoever may edit rename, and only the author or an admin remove', () => {
+    expect(permissions({ visibility: 'specified' }, { ...member, grantRole: 'editor' })).toMatchObject({ canRename: true, canRemove: false })
+    expect(permissions({ visibility: 'workspace' }, member)).toMatchObject({ canRename: false, canRemove: false })
+    expect(permissions({ visibility: 'private' }, admin)).toMatchObject({ canView: false, canRename: false, canRemove: true })
+  })
+
+  it('shuts a removed artifact for everyone, and lets the author restore it unless an admin took it down', () => {
+    const removedByAuthor = new ArtifactAccess(artifactWith({}, new ArtifactRemoval(now, authorId, false)), true, now)
+    const takenDown = new ArtifactAccess(artifactWith({ visibility: 'public_link' }, new ArtifactRemoval(now, 'user-admin', true)), true, now)
+
+    expect(removedByAuthor.permissionsFor(author)).toMatchObject({ canView: false, canEdit: false, canRemove: false, canRestore: true })
+    expect(removedByAuthor.permissionsFor(member)).toMatchObject({ canView: false, canRestore: false })
+    expect(removedByAuthor.permissionsFor(admin).canRestore).toBe(true)
+    expect(takenDown.permissionsFor(author).canRestore).toBe(false)
+    expect(takenDown.permissionsFor(admin).canRestore).toBe(true)
+    expect(takenDown.permissionsFor(anonymous).canView).toBe(false)
+  })
+
+  it('stops restoring once the 30 days are over', () => {
+    const removedAt = now - 30 * DAY
+    const expired = new ArtifactAccess(artifactWith({}, new ArtifactRemoval(removedAt, authorId, false)), true, now)
+
+    expect(expired.permissionsFor(author).canRestore).toBe(false)
+    expect(expired.permissionsFor(admin).canRestore).toBe(false)
+    expect(ArtifactRemoval.purgeCutoff(now)).toBe(removedAt)
   })
 })

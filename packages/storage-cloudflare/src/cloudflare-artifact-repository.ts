@@ -1,21 +1,23 @@
-import type {
-  ArtifactFile,
-  ArtifactRepository,
-  ArtifactSummary,
-  ArtifactVersionContent,
-  ArtifactVersionRecord,
-  ArtifactVisibility,
-  CreatedArtifact,
-  NewArtifact,
-  Publication,
-  PublishResult,
-  VersionOrigin,
+import {
+  ArtifactRemoval,
+  type ArtifactFile,
+  type ArtifactRepository,
+  type ArtifactSummary,
+  type ArtifactVersionContent,
+  type ArtifactVersionRecord,
+  type ArtifactVisibility,
+  type CreatedArtifact,
+  type NewArtifact,
+  type Publication,
+  type PublishResult,
+  type VersionOrigin,
 } from '@open-artifact/core'
 
 const SUMMARY_SELECT = `
   SELECT artifacts.id, artifacts.workspace_id, artifacts.title, artifacts.author_id, artifacts.visibility,
          artifacts.public_link_expires_at, artifacts.public_link_password_hash, artifacts.anonymous_write_enabled,
-         artifacts.current_version, artifacts.updated_at, artifact_versions.published_via
+         artifacts.current_version, artifacts.updated_at, artifact_versions.published_via,
+         artifacts.removed_at, artifacts.removed_by, artifacts.removed_as_admin
   FROM artifacts
   JOIN artifact_versions ON artifact_versions.artifact_id = artifacts.id AND artifact_versions.version = artifacts.current_version`
 
@@ -31,6 +33,9 @@ interface SummaryRow {
   current_version: number
   updated_at: number
   published_via: string | null
+  removed_at: number | null
+  removed_by: string | null
+  removed_as_admin: number | null
 }
 
 const VERSION_SELECT = 'SELECT version, upload_id, author_id, published_via, origin, restored_from, note, created_at FROM artifact_versions'
@@ -119,6 +124,7 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
       .prepare(
         `SELECT artifact_files.upload_id, artifact_files.path, artifact_files.content_type
          FROM artifact_versions
+         JOIN artifacts ON artifacts.id = artifact_versions.artifact_id AND artifacts.removed_at IS NULL
          JOIN artifact_files ON artifact_files.artifact_id = artifact_versions.artifact_id AND artifact_files.upload_id = artifact_versions.upload_id
          WHERE artifact_versions.artifact_id = ? AND artifact_versions.version = ? AND artifact_files.path = ?`,
       )
@@ -154,6 +160,45 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
       note: versionRow.note,
       createdAt: versionRow.created_at,
     }))
+  }
+
+  async rename(artifactId: string, title: string): Promise<void> {
+    await this.#db.prepare('UPDATE artifacts SET title = ? WHERE id = ?').bind(title, artifactId).run()
+  }
+
+  async remove(artifactId: string, removal: ArtifactRemoval): Promise<boolean> {
+    const removalUpdate = await this.#db
+      .prepare('UPDATE artifacts SET removed_at = ?, removed_by = ?, removed_as_admin = ? WHERE id = ? AND removed_at IS NULL')
+      .bind(removal.removedAt, removal.removedBy, removal.removedAsAdmin ? 1 : 0, artifactId)
+      .run()
+    return removalUpdate.meta.changes === 1
+  }
+
+  async restore(artifactId: string): Promise<boolean> {
+    const restoreUpdate = await this.#db
+      .prepare('UPDATE artifacts SET removed_at = NULL, removed_by = NULL, removed_as_admin = NULL WHERE id = ? AND removed_at IS NOT NULL')
+      .bind(artifactId)
+      .run()
+    return restoreUpdate.meta.changes === 1
+  }
+
+  // Files go first and the row last, so a crash leaves the artifact listed for the next run. Deleting the row
+  // cascades to its versions, file rows, comments, grants and shared data.
+  async purgeRemovedBefore(cutoff: number): Promise<void> {
+    const { results: purgedRows } = await this.#db.prepare('SELECT id FROM artifacts WHERE removed_at <= ?').bind(cutoff).all<{ id: string }>()
+    for (const { id: artifactId } of purgedRows) {
+      await this.#deleteStoredFiles(artifactId)
+      await this.#db.prepare('DELETE FROM artifacts WHERE id = ? AND removed_at <= ?').bind(artifactId, cutoff).run()
+    }
+  }
+
+  async #deleteStoredFiles(artifactId: string): Promise<void> {
+    let listing: R2Objects | null = null
+    do {
+      listing = await this.#files.list({ prefix: CloudflareArtifactRepository.#artifactPrefix(artifactId), ...(listing?.truncated ? { cursor: listing.cursor } : {}) })
+      const objectKeys = listing.objects.map(storedObject => storedObject.key)
+      if (objectKeys.length > 0) await this.#files.delete(objectKeys)
+    } while (listing.truncated)
   }
 
   async #versionRow(artifactId: string, version: number): Promise<VersionRow | null> {
@@ -252,6 +297,7 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
       version: summaryRow.current_version,
       publishedVia: summaryRow.published_via,
       updatedAt: summaryRow.updated_at,
+      removal: CloudflareArtifactRepository.#removalOf(summaryRow),
     }
   }
 
@@ -274,7 +320,16 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     }
   }
 
+  static #removalOf(summaryRow: SummaryRow): ArtifactRemoval | null {
+    if (summaryRow.removed_at === null || summaryRow.removed_by === null) return null
+    return new ArtifactRemoval(summaryRow.removed_at, summaryRow.removed_by, summaryRow.removed_as_admin === 1)
+  }
+
   static #objectKey(artifactId: string, uploadId: string, path: string): string {
-    return `artifacts/${artifactId}/uploads/${uploadId}/${path}`
+    return `${CloudflareArtifactRepository.#artifactPrefix(artifactId)}uploads/${uploadId}/${path}`
+  }
+
+  static #artifactPrefix(artifactId: string): string {
+    return `artifacts/${artifactId}/`
   }
 }

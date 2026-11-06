@@ -182,6 +182,8 @@ describe('settings', () => {
 
     expect(llmsTxt).toContain(`${APP_ORIGIN}/api/artifacts`)
     expect(llmsTxt).toContain('window.openArtifact.db')
-    expect(llmsTxt).toContain('{ baseVersion, note, files }')
+    expect(llmsTxt).toContain('{ baseVersion, note, files, title? }')
+    expect(llmsTxt).toContain(`DELETE ${APP_ORIGIN}/api/artifacts/{id}`)
+    expect(llmsTxt).toContain(`POST ${APP_ORIGIN}/api/artifacts/{id}/restore`)
   })
 })

@@ -1,6 +1,7 @@
 export { CloudflareAccessTokenRepository } from './cloudflare-access-token-repository.ts'
 export { CloudflareArtifactAccessRepository } from './cloudflare-artifact-access-repository.ts'
 export { CloudflareArtifactRepository } from './cloudflare-artifact-repository.ts'
+export { CloudflareAuditLog } from './cloudflare-audit-log.ts'
 export { CloudflareCommentRepository } from './cloudflare-comment-repository.ts'
 export { CloudflareSharedDataRepository } from './cloudflare-shared-data-repository.ts'
 export { CloudflareUserDirectory, CloudflareWorkspaceRepository } from './cloudflare-workspace-repository.ts'

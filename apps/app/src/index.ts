@@ -1,4 +1,4 @@
-import type { ArtifactFile } from '@open-artifact/core'
+import { ArtifactRemoval, type ArtifactFile } from '@open-artifact/core'
 import { cloudflareRepositories } from '@open-artifact/storage-cloudflare'
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import { AppRoutes } from './app-routes.ts'
@@ -24,5 +24,10 @@ export default {
       mcpUrl: `${env.MCP_ORIGIN}/mcp`,
     })
     return appRoutes.respond(request)
+  },
+
+  // Daily: artifacts removed more than 30 days ago are deleted for good.
+  async scheduled(_controller: ScheduledController, env: AppEnv): Promise<void> {
+    await cloudflareRepositories(env.DB, env.FILES).artifacts.purgeRemovedBefore(ArtifactRemoval.purgeCutoff(Date.now()))
   },
 } satisfies ExportedHandler<AppEnv>

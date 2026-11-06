@@ -52,6 +52,7 @@
 .token-form__name { flex: 1 1 220px; }
 .token-created { --stack-gap: var(--space-2); min-width: 0; flex: 1; }
 .profile-form { max-width: 400px; }
+.member-reason { margin: var(--space-1) 0 0; }
 
 /* Viewer: the artifact on the left, comments, versions and data on the right. */
 .viewer-page { display: flex; flex-direction: column; height: 100dvh; }

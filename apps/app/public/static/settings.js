@@ -1,4 +1,4 @@
-import { api, element, readJsonData, timeAgo } from './common.js'
+import { api, confirmArtifactRemoval, element, readJsonData, removalWord, removeArtifact, restoreArtifact, timeAgo } from './common.js'
 
 const settingsConfig = readJsonData('settings-config')
 
@@ -117,6 +117,73 @@ function wirePublicLinksSwitch() {
   })
 }
 
+function wireMemberAdministration() {
+  for (const roleSelect of document.querySelectorAll('[data-member-role]')) {
+    let savedRole = roleSelect.value
+    roleSelect.addEventListener('change', async () => {
+      const memberName = roleSelect.dataset.name
+      try {
+        await api(`/api/workspace/members/${encodeURIComponent(roleSelect.dataset.memberRole)}`, { method: 'PATCH', body: { role: roleSelect.value } })
+        savedRole = roleSelect.value
+        Xxd.toast(`已把 ${memberName} 设为${roleSelect.selectedOptions[0].textContent}`, { tone: 'success' })
+      } catch (error) {
+        roleSelect.value = savedRole
+        Xxd.toast(`修改角色失败：${error.message}`, { tone: 'danger' })
+      }
+    })
+  }
+  for (const removeButton of document.querySelectorAll('[data-remove-member]')) {
+    removeButton.addEventListener('click', () => removeMember(removeButton))
+  }
+}
+
+async function removeMember(removeButton) {
+  const memberName = removeButton.dataset.name
+  const confirmed = await Xxd.confirmDialog({
+    title: `移除 ${memberName}？`,
+    message: 'TA 会立即失去访问权限，个人 API token 也会被撤销，再次登录也不会自动加入。TA 发布的 artifact 会留在 workspace 里。',
+    confirmLabel: '移除',
+    cancelLabel: '取消',
+    closeLabel: '关闭',
+    tone: 'danger',
+  })
+  if (!confirmed) return
+  try {
+    await api(`/api/workspace/members/${encodeURIComponent(removeButton.dataset.removeMember)}`, { method: 'DELETE' })
+    removeButton.closest('tr')?.remove()
+    Xxd.toast(`已移除 ${memberName}`, { tone: 'success' })
+  } catch (error) {
+    Xxd.toast(`移除失败：${error.message}`, { tone: 'danger' })
+  }
+}
+
+// The table and the audit log below it both change, so the page reloads after each action.
+function wireContentAdministration() {
+  for (const removeButton of document.querySelectorAll('[data-remove-artifact]')) {
+    removeButton.addEventListener('click', async () => {
+      const takesDown = 'takesDown' in removeButton.dataset
+      const confirmed = await confirmArtifactRemoval(removeButton.dataset.title, takesDown)
+      if (!confirmed) return
+      try {
+        await removeArtifact(removeButton.dataset.removeArtifact)
+        location.reload()
+      } catch (error) {
+        Xxd.toast(`${removalWord(takesDown)}失败：${error.message}`, { tone: 'danger' })
+      }
+    })
+  }
+  for (const restoreButton of document.querySelectorAll('[data-restore-artifact]')) {
+    restoreButton.addEventListener('click', async () => {
+      try {
+        await restoreArtifact(restoreButton.dataset.restoreArtifact)
+        location.reload()
+      } catch (error) {
+        Xxd.toast(`恢复失败：${error.message}`, { tone: 'danger' })
+      }
+    })
+  }
+}
+
 const tokenTableContainer = document.getElementById('token-table')
 if (tokenTableContainer) {
   const tokenTable = new TokenTable(tokenTableContainer)
@@ -125,3 +192,5 @@ if (tokenTableContainer) {
 }
 wireProfileForm()
 wirePublicLinksSwitch()
+wireMemberAdministration()
+wireContentAdministration()

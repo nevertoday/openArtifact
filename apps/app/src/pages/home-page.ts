@@ -4,10 +4,10 @@ import { ArtifactLabels } from './artifact-labels.ts'
 import { html, type SafeHtml } from './html.ts'
 import { type IconName, PageShell } from './page-shell.ts'
 
-export const HOME_FILTERS = ['all', 'mine', 'shared', 'waiting'] as const
+export const HOME_FILTERS = ['all', 'mine', 'shared', 'waiting', 'removed'] as const
 export type HomeFilter = (typeof HOME_FILTERS)[number]
 
-const FILTER_LABELS: Record<HomeFilter, string> = { all: '全部', mine: '我发布的', shared: '共享给我', waiting: '待 agent 处理' }
+const FILTER_LABELS: Record<HomeFilter, string> = { all: '全部', mine: '我发布的', shared: '共享给我', waiting: '待 agent 处理', removed: '最近删除' }
 
 export interface HomeQuery {
   filter: HomeFilter
@@ -15,15 +15,20 @@ export interface HomeQuery {
   search: string
 }
 
-/** The artifacts the home page shows for one query, and the counts its side navigation needs. */
+/**
+ * The artifacts the home page shows for one query, and the counts its side navigation needs. 最近删除 holds the
+ * removed artifacts the person may restore; every other filter holds only the ones they can view.
+ */
 export class HomeListing {
   readonly #visibleArtifacts: OpenedArtifact[]
+  readonly #restorableArtifacts: OpenedArtifact[]
   readonly #identity: Identity
   readonly #waitingForAgent: Map<string, number>
   readonly #grantedArtifactIds: Set<string>
 
-  constructor(visibleArtifacts: OpenedArtifact[], identity: Identity, waitingForAgent: Map<string, number>, grantedArtifactIds: Set<string>) {
-    this.#visibleArtifacts = visibleArtifacts
+  constructor(workspaceArtifacts: OpenedArtifact[], identity: Identity, waitingForAgent: Map<string, number>, grantedArtifactIds: Set<string>) {
+    this.#visibleArtifacts = workspaceArtifacts.filter(openedArtifact => openedArtifact.permissions.canView)
+    this.#restorableArtifacts = workspaceArtifacts.filter(openedArtifact => openedArtifact.permissions.canRestore)
     this.#identity = identity
     this.#waitingForAgent = waitingForAgent
     this.#grantedArtifactIds = grantedArtifactIds
@@ -34,7 +39,17 @@ export class HomeListing {
   }
 
   countFor(filter: HomeFilter): number {
-    return this.#visibleArtifacts.filter(openedArtifact => this.#matchesFilter(openedArtifact, filter)).length
+    return this.#artifactsFor(filter).filter(openedArtifact => this.#matchesFilter(openedArtifact, filter)).length
+  }
+
+  /** The artifact just removed on the viewer page, when the person may still restore it. */
+  restorable(artifactId: string | null): OpenedArtifact | null {
+    return this.#restorableArtifacts.find(openedArtifact => openedArtifact.summary.artifactId === artifactId) ?? null
+  }
+
+  /** Everyone named on the page: authors, and who removed what. */
+  peopleIds(): (string | null)[] {
+    return [...this.#visibleArtifacts, ...this.#restorableArtifacts].flatMap(({ summary }) => [summary.authorId, summary.removal?.removedBy ?? null])
   }
 
   agentCounts(): { agent: string; count: number }[] {
@@ -48,11 +63,15 @@ export class HomeListing {
 
   matching(query: HomeQuery): OpenedArtifact[] {
     const searchText = query.search.trim().toLowerCase()
-    return this.#visibleArtifacts.filter(openedArtifact => {
+    return this.#artifactsFor(query.filter).filter(openedArtifact => {
       const matchesAgent = query.agent === null || ArtifactLabels.publishedVia(openedArtifact.summary.publishedVia) === query.agent
       const matchesSearch = searchText === '' || openedArtifact.summary.title.toLowerCase().includes(searchText)
       return this.#matchesFilter(openedArtifact, query.filter) && matchesAgent && matchesSearch
     })
+  }
+
+  #artifactsFor(filter: HomeFilter): OpenedArtifact[] {
+    return filter === 'removed' ? this.#restorableArtifacts : this.#visibleArtifacts
   }
 
   #matchesFilter(openedArtifact: OpenedArtifact, filter: HomeFilter): boolean {
@@ -65,6 +84,8 @@ export class HomeListing {
         return this.#grantedArtifactIds.has(openedArtifact.summary.artifactId)
       case 'waiting':
         return this.waitingCount(openedArtifact.summary.artifactId) > 0
+      case 'removed':
+        return openedArtifact.summary.removal !== null
     }
   }
 }
@@ -76,17 +97,26 @@ export interface HomeModel {
   authorNames: Map<string, string>
   /** Signed preview addresses of the cards that show a live thumbnail. */
   previewUrls: Map<string, string>
+  /** Removed on the viewer page a moment ago; the page offers to undo it. */
+  justRemoved: OpenedArtifact | null
   usercontentOrigin: string
   now: number
 }
 
-const FILTER_ICONS: Record<HomeFilter, IconName> = { all: 'LayoutGrid', mine: 'UserRound', shared: 'Users', waiting: 'MessageSquareText' }
+const FILTER_ICONS: Record<HomeFilter, IconName> = { all: 'LayoutGrid', mine: 'UserRound', shared: 'Users', waiting: 'MessageSquareText', removed: 'Trash2' }
 
 export class HomePage {
   static render(model: HomeModel): Response {
     const shownArtifacts = model.listing.matching(model.query)
     const topBarMiddle = html`${PageShell.workspaceSwitcher(model.identity)}${HomePage.#searchBox(model.query)}<a class="xxd-btn app-topbar__action" data-variant="ghost" data-size="sm" href="/settings/agents">${PageShell.icon('Bot')}Agent 接入</a>`
-    const main = html`<header class="xxd-page-header">
+    const main = model.query.filter === 'removed' ? HomePage.#removedSection(shownArtifacts, model) : HomePage.#artifactsSection(shownArtifacts, model)
+    const body = html`${PageShell.topBar(model.identity, topBarMiddle)}${PageShell.withSidebar(HomePage.#sidebar(model), main)}
+${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(model.justRemoved) })}`
+    return PageShell.render({ title: 'Open Artifact', body, scripts: ['common.js', 'home.js'], frameOrigin: model.usercontentOrigin })
+  }
+
+  static #artifactsSection(shownArtifacts: OpenedArtifact[], model: HomeModel): SafeHtml {
+    return html`<header class="xxd-page-header">
   <div class="xxd-page-header__row">
     <h1 class="xxd-page-header__title">${model.identity.membership.workspace.name}的 artifact</h1>
     <div class="xxd-page-header__actions"><a class="xxd-btn" data-variant="primary" href="/settings/agents">让 agent 发布</a></div>
@@ -94,8 +124,35 @@ export class HomePage {
   <p class="xxd-page-header__desc">由团队成员的 agent 发布，默认整个 workspace 可见</p>
 </header>
 ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#emptyState(model)}`
-    const body = html`${PageShell.topBar(model.identity, topBarMiddle)}${PageShell.withSidebar(HomePage.#sidebar(model), main)}`
-    return PageShell.render({ title: 'Open Artifact', body, scripts: ['common.js'], frameOrigin: model.usercontentOrigin })
+  }
+
+  // Removed artifacts have no page to open; the list offers only 恢复 until they are purged.
+  static #removedSection(removedArtifacts: OpenedArtifact[], model: HomeModel): SafeHtml {
+    const header = html`<header class="xxd-page-header">
+  <div class="xxd-page-header__row"><h1 class="xxd-page-header__title">最近删除</h1></div>
+  <p class="xxd-page-header__desc">删除后所有人都看不到。30 天内可以恢复，之后彻底删除。</p>
+</header>`
+    if (removedArtifacts.length === 0) return html`${header}<section class="xxd-empty">${PageShell.icon('Trash2', 24)}<h2 class="xxd-empty__title">没有可以恢复的 artifact</h2></section>`
+    const row = ({ summary }: OpenedArtifact) => {
+      const removal = summary.removal
+      if (removal === null) throw new Error(`Artifact ${summary.artifactId} is listed as removed but has no removal`)
+      return html`<tr data-removed-row="${summary.artifactId}">
+    <td>${summary.title}</td>
+    <td><span class="xxd-text" data-variant="secondary">${model.authorNames.get(removal.removedBy)} ${ArtifactLabels.removal(removal.removedAsAdmin)} · ${ArtifactLabels.updatedAgo(removal.removedAt, model.now)}</span></td>
+    <td><span class="xxd-text" data-variant="secondary">${ArtifactLabels.purgeIn(removal.purgeAt, model.now)}</span></td>
+    <td class="xxd-table__actions"><button type="button" class="xxd-btn" data-size="xs" data-restore-artifact="${summary.artifactId}" data-title="${summary.title}">${PageShell.icon('RotateCcw', 14)}恢复</button></td>
+  </tr>`
+    }
+    return html`${header}<div class="xxd-table-wrap"><table class="xxd-table">
+  <thead><tr><th>标题</th><th>删除</th><th>保留</th><th class="xxd-table__actions"><span class="xxd-sr-only">操作</span></th></tr></thead>
+  <tbody>${removedArtifacts.map(row)}</tbody>
+</table></div>`
+  }
+
+  static #justRemovedJson(justRemoved: OpenedArtifact | null) {
+    if (justRemoved === null) return null
+    const { summary } = justRemoved
+    return { artifactId: summary.artifactId, title: summary.title, removedAsAdmin: summary.removal?.removedAsAdmin ?? false }
   }
 
   static #searchBox(query: HomeQuery): SafeHtml {
@@ -111,7 +168,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
       const isCurrent = model.query.filter === filter && model.query.agent === null
       const count = model.listing.countFor(filter)
       const needsAgent = filter === 'waiting' && count > 0
-      return html`<a class="xxd-sidebar__item" href="${filter === 'all' ? '/' : `/?filter=${filter}`}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(FILTER_ICONS[filter], 18)}<span>${FILTER_LABELS[filter]}</span><span class="xxd-badge" ${needsAgent ? html`data-tone="warning"` : ''}>${count}</span></a>`
+      return html`<a class="xxd-sidebar__item" ${filter === 'removed' ? html`data-removed-count` : ''} href="${filter === 'all' ? '/' : `/?filter=${filter}`}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(FILTER_ICONS[filter], 18)}<span>${FILTER_LABELS[filter]}</span><span class="xxd-badge" ${needsAgent ? html`data-tone="warning"` : ''}>${count}</span></a>`
     }
     const agentLink = ({ agent, count }: { agent: string; count: number }) => {
       const isCurrent = model.query.agent === agent

@@ -1,4 +1,4 @@
-import type { UserDirectory } from '@open-artifact/core'
+import type { AuditEvent, UserDirectory } from '@open-artifact/core'
 
 export interface PersonRef {
   userId: string
@@ -16,6 +16,15 @@ export class People {
   static displayName(profile: { name: string; email: string }): string {
     const chosenName = profile.name.trim()
     return chosenName.length > 0 ? chosenName : (profile.email.split('@')[0] ?? profile.email)
+  }
+
+  /** Names of each event's actor and, for a membership change, of the member. */
+  namesInAuditEvents(auditEvents: AuditEvent[]): Promise<Map<string, string>> {
+    return this.namesOf(auditEvents.flatMap(auditEvent => [auditEvent.actorId, People.memberIdOf(auditEvent)]))
+  }
+
+  static memberIdOf(auditEvent: AuditEvent): string | null {
+    return auditEvent.targetType === 'member' ? auditEvent.targetId : null
   }
 
   /** Names for every id; an id whose account was deleted shows as 已删除的用户. */
