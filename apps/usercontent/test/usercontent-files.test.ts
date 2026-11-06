@@ -106,6 +106,18 @@ describe('UsercontentFiles', () => {
     expect([servedBefore.status, servedAfterRemoval.status, servedAfterRestore.status]).toEqual([200, 404, 200])
   })
 
+  it('answers every parent message of the anchor protocol and reports picks with the element and its place', async () => {
+    const sdkScript = await (await fetchPath(SDK_PATH)).text()
+    const handledParentMessages = [...sdkScript.matchAll(/message\.type === '(open-artifact:[a-z-]+)'/g)].map(match => match[1])
+    const framePostedMessages = [...sdkScript.matchAll(/type: '(open-artifact:[a-z-]+)'/g)].map(match => match[1])
+
+    expect(handledParentMessages).toEqual(['open-artifact:pins', 'open-artifact:pick-anchor', 'open-artifact:cancel-pick', 'open-artifact:measure-anchor', 'open-artifact:track-scroll'])
+    expect(new Set(framePostedMessages)).toEqual(new Set(['open-artifact:request', 'open-artifact:anchor-measured', 'open-artifact:frame-scrolled', 'open-artifact:pin-selected', 'open-artifact:anchor-picked', 'open-artifact:anchor-cancelled']))
+    expect(sdkScript).toContain('version: SHOWN_VERSION')
+    expect(sdkScript).toContain('const placement = { rect: pageGeometry.viewportRect(element), scroll: pageGeometry.scroll() }')
+    expect(sdkScript).toContain('/\\/v(\\d+)\\//.exec(location.pathname)')
+  })
+
   it('answers 404 for a file the version does not have, and refuses writes', async () => {
     const removedFile = await fetchPath(await signedPath(2, 'assets/app.css'))
     const malformedEscape = await fetchPath(await signedPath(1, '%E0%A4%A'))

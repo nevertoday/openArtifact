@@ -368,10 +368,18 @@ class PagePins {
     }
   }
 
-  // The page is untrusted; anything but two fractions becomes no anchor.
+  // The page is untrusted: without two fractions there is no anchor, and the element fields are cut to what the API accepts.
   static #validAnchor(anchor) {
     const isFraction = value => typeof value === 'number' && value >= 0 && value <= 1
-    return anchor && isFraction(anchor.x) && isFraction(anchor.y) ? { x: anchor.x, y: anchor.y } : null
+    if (!anchor || !isFraction(anchor.x) || !isFraction(anchor.y)) return null
+    const textOrNull = (value, maxLength) => (typeof value === 'string' && value.length > 0 && value.length <= maxLength ? value : null)
+    return {
+      x: anchor.x,
+      y: anchor.y,
+      version: viewerConfig.shownVersion,
+      selector: textOrNull(anchor.selector, 512),
+      textQuote: typeof anchor.textQuote === 'string' ? textOrNull(anchor.textQuote.slice(0, 120), 120) : null,
+    }
   }
 
   #send(message) {

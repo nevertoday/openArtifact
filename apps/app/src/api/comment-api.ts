@@ -6,6 +6,8 @@ import type { ApiContext } from './api-context.ts'
 import { JsonBody } from './json-body.ts'
 
 const MAX_COMMENT_LENGTH = 5000
+const MAX_ANCHOR_SELECTOR_LENGTH = 512
+const MAX_ANCHOR_QUOTE_LENGTH = 120
 const COMMENT_FILTERS = ['all', 'unresolved', 'for_agent'] as const
 type CommentFilter = (typeof COMMENT_FILTERS)[number]
 
@@ -87,14 +89,38 @@ export class CommentApi {
     return threadRoot
   }
 
-  // Only a top-level comment points at the page; x and y are fractions of the page's width and height.
+  // Only a top-level comment points at the page. x and y are fractions of the page's width and height; the
+  // element's CSS path and text let the pin find its spot again after the page changes.
   static #anchorOf(requestBody: JsonBody, currentVersion: number): CommentAnchor | null {
     const anchor = requestBody.raw('anchor')
     if (anchor === undefined || anchor === null) return null
-    const { x, y } = (typeof anchor === 'object' ? anchor : {}) as Record<string, unknown>
+    const anchorFields = (typeof anchor === 'object' ? anchor : {}) as Record<string, unknown>
+    const { x, y } = anchorFields
     const isFraction = (value: unknown): value is number => typeof value === 'number' && value >= 0 && value <= 1
     if (!isFraction(x) || !isFraction(y)) throw HttpError.badRequest('anchor must be { x, y } with both between 0 and 1')
-    return { x: Math.round(x * 10_000) / 10_000, y: Math.round(y * 10_000) / 10_000, version: currentVersion, selector: null, textQuote: null }
+    return {
+      x: Math.round(x * 10_000) / 10_000,
+      y: Math.round(y * 10_000) / 10_000,
+      version: CommentApi.#anchorVersionOf(anchorFields.version, currentVersion),
+      selector: CommentApi.#anchorTextOf(anchorFields, 'selector', MAX_ANCHOR_SELECTOR_LENGTH),
+      textQuote: CommentApi.#anchorTextOf(anchorFields, 'textQuote', MAX_ANCHOR_QUOTE_LENGTH),
+    }
+  }
+
+  /** A pin placed without a version was placed on the current one. */
+  static #anchorVersionOf(version: unknown, currentVersion: number): number {
+    if (version === undefined || version === null) return currentVersion
+    const isPublishedVersion = Number.isInteger(version) && (version as number) >= 1 && (version as number) <= currentVersion
+    if (!isPublishedVersion) throw HttpError.badRequest(`anchor.version must be a published version, 1 to ${currentVersion}`)
+    return version as number
+  }
+
+  static #anchorTextOf(anchorFields: Record<string, unknown>, field: 'selector' | 'textQuote', maxLength: number): string | null {
+    const value = anchorFields[field]
+    if (value === undefined || value === null || value === '') return null
+    const isValidText = typeof value === 'string' && value.length <= maxLength
+    if (!isValidText) throw HttpError.badRequest(`anchor.${field} must be text of at most ${maxLength} characters`)
+    return value
   }
 
   // Only the caller's own open work is offered, so other values are refused rather than ignored.

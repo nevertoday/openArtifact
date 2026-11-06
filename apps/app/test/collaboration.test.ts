@@ -233,6 +233,24 @@ describe('the comment loop with an agent', () => {
     expect(reply.body.comment.anchor).toBeNull()
   })
 
+  it('remembers the element and text a pin was placed on, and the version it was placed in', async () => {
+    const published = await app.publish({ token: agentToken }, 'Pinned element')
+    await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+    const commentsPath = `/api/artifacts/${published.artifactId}/comments`
+    const pin = (anchor: Record<string, unknown>) => app.json<{ comment: { anchor: unknown }; error?: string }>(commentsPath, { method: 'POST', cookie: reviewerCookie, body: { body: '这里', anchor } })
+
+    const onElement = await pin({ x: 0.2, y: 0.3, version: 1, selector: '#pricing > table > tr:nth-of-type(2)', textQuote: '专业版 ¥99' })
+    const onCurrentVersion = await pin({ x: 0.2, y: 0.3 })
+    const futureVersion = await pin({ x: 0.2, y: 0.3, version: 3 })
+    const longQuote = await pin({ x: 0.2, y: 0.3, textQuote: 'x'.repeat(121) })
+    const selectorNumber = await pin({ x: 0.2, y: 0.3, selector: 42 })
+
+    expect(onElement.body.comment.anchor).toEqual({ x: 0.2, y: 0.3, version: 1, selector: '#pricing > table > tr:nth-of-type(2)', textQuote: '专业版 ¥99' })
+    expect(onCurrentVersion.body.comment.anchor).toEqual({ x: 0.2, y: 0.3, version: 2, selector: null, textQuote: null })
+    expect([futureVersion.status, longQuote.status, selectorNumber.status]).toEqual([400, 400, 400])
+    expect(futureVersion.body.error).toContain('version')
+  })
+
   it('refuses a reply to a comment on another artifact', async () => {
     const first = await app.publish({ token: agentToken }, 'First')
     const second = await app.publish({ token: agentToken }, 'Second')
