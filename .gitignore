@@ -4,3 +4,4 @@ node_modules/
 *.log
 .archify/**/review-*/
 .claude/scheduled_tasks.lock
+.claude/worktrees/
