@@ -6,7 +6,8 @@ import type { Mailer } from './auth/mailer.ts'
 import { OpenArtifactAuth } from './auth/open-artifact-auth.ts'
 import { RequestIdentity } from './auth/request-identity.ts'
 import type { AppEnv } from './env.ts'
-import { HttpError } from './http-error.ts'
+import { HttpError, RemovedFromWorkspaceError } from './http-error.ts'
+import { MessagePages } from './pages/message-pages.ts'
 import { PageRoutes } from './pages/page-routes.ts'
 import { People } from './people.ts'
 import type { Repositories } from '@open-artifact/core'
@@ -40,7 +41,12 @@ export class AppRoutes {
     if (requestUrl.pathname.startsWith('/api/auth/')) return context.auth.handle(request)
     if (this.#isCrossSiteWrite(request, context)) return HttpError.forbidden('send this request from the Open Artifact page').toResponse()
     if (requestUrl.pathname.startsWith('/api/')) return ApiRoutes.respond(request, context)
-    return this.#page(request, requestUrl, context)
+    try {
+      return await this.#page(request, requestUrl, context)
+    } catch (error) {
+      if (error instanceof RemovedFromWorkspaceError) return MessagePages.removedFromWorkspace()
+      throw error
+    }
   }
 
   async #page(request: Request, requestUrl: URL, context: ApiContext): Promise<Response> {

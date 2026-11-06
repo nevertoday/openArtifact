@@ -1,4 +1,4 @@
-import type { AuditEvent } from '@open-artifact/core'
+import { WORKSPACE_ROLES, type AuditEvent, type MembershipChange } from '@open-artifact/core'
 import { WORKSPACE_COOKIE } from '../auth/request-identity.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { HttpError } from '../http-error.ts'
@@ -51,6 +51,32 @@ export class WorkspaceApi {
     return Response.json({ members: members.map(member => ({ userId: member.userId, name: People.displayName(member), email: member.email, role: member.role })) })
   }
 
+  async changeRole(request: Request, userId: string): Promise<Response> {
+    const identity = await this.#context.requireWorkspaceAdmin('change member roles')
+    const requestBody = await JsonBody.of(request)
+    const role = requestBody.oneOf('role', WORKSPACE_ROLES)
+    const workspaceId = identity.membership.workspace.workspaceId
+    const members = await this.#context.repositories.workspaces.listMembers(workspaceId)
+    const member = members.find(candidate => candidate.userId === userId)
+    if (!member) throw HttpError.notFound(`member ${userId}`)
+    if (member.role === role) return Response.json({ userId, role })
+    const roleChange = await this.#context.repositories.workspaces.changeRole(workspaceId, userId, role)
+    WorkspaceApi.#refuseUnless(roleChange, userId)
+    await this.#context.repositories.auditLog.record({ workspaceId, actorId: identity.userId, action: 'member.role_changed', targetType: 'member', targetId: userId, detail: { from: member.role, to: role } })
+    return Response.json({ userId, role })
+  }
+
+  /** The person loses access at once; their artifacts stay in the workspace. */
+  async removeMember(userId: string): Promise<Response> {
+    const identity = await this.#context.requireWorkspaceAdmin('remove members')
+    if (userId === identity.userId) throw HttpError.badRequest('you cannot remove yourself; ask another admin')
+    const workspaceId = identity.membership.workspace.workspaceId
+    const removal = await this.#context.repositories.workspaces.removeMember(workspaceId, userId, Date.now())
+    WorkspaceApi.#refuseUnless(removal, userId)
+    await this.#context.repositories.auditLog.record({ workspaceId, actorId: identity.userId, action: 'member.removed', targetType: 'member', targetId: userId, detail: {} })
+    return new Response(null, { status: 204 })
+  }
+
   /** The latest content and membership changes of the workspace, newest first. */
   async audit(): Promise<Response> {
     const identity = await this.#context.requireWorkspaceAdmin('read the audit log')
@@ -69,6 +95,17 @@ export class WorkspaceApi {
         createdAt: auditEvent.createdAt,
       })),
     })
+  }
+
+  static #refuseUnless(membershipChange: MembershipChange, userId: string): void {
+    switch (membershipChange) {
+      case 'changed':
+        return
+      case 'last_admin':
+        throw HttpError.badRequest('a workspace needs at least one admin; make someone else admin first')
+      case 'not_member':
+        throw HttpError.notFound(`member ${userId}`)
+    }
   }
 
   async updateSettings(request: Request): Promise<Response> {

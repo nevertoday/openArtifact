@@ -1,5 +1,6 @@
 import { AccessTokenSecret, type Membership } from '@open-artifact/core'
 import { HttpCookies } from '../http-cookies.ts'
+import { RemovedFromWorkspaceError } from '../http-error.ts'
 import { People } from '../people.ts'
 import type { Repositories } from '@open-artifact/core'
 import type { OpenArtifactAuth } from './open-artifact-auth.ts'
@@ -67,11 +68,13 @@ export class RequestIdentity {
     return { userId: signedInUser.userId, name: People.displayName(signedInUser), email: signedInUser.email, membership, memberships, agentClient: null }
   }
 
-  // Accounts created before workspaces existed join one on their next visit.
+  // Accounts created before workspaces existed join one on their next visit; a person an admin removed does not.
   async #membershipsOf(userId: string): Promise<Membership[]> {
     const memberships = await this.#repositories.workspaces.membershipsOf(userId)
     if (memberships.length > 0) return memberships
-    return [await this.#repositories.workspaces.joinFirstWorkspace(userId, '我的团队')]
+    const joinedMembership = await this.#repositories.workspaces.joinFirstWorkspace(userId, '我的团队')
+    if (joinedMembership === null) throw new RemovedFromWorkspaceError()
+    return [joinedMembership]
   }
 
   #agentClient(): string {

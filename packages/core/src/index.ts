@@ -22,5 +22,6 @@ export type { ArtifactComment, CommentAnchor, CommentRepository, NewComment } fr
 export { AccessTokenSecret, PublicLinkPassword, SigningKey, UsercontentSignature } from './secrets.ts'
 export type { UsercontentRequest } from './secrets.ts'
 export type { SharedCollection, SharedDataRepository, SharedDocument } from './shared-data-repository.ts'
-export type { Membership, UserDirectory, UserProfile, Workspace, WorkspaceMember, WorkspaceRepository, WorkspaceRole } from './workspace-repository.ts'
+export { WORKSPACE_ROLES } from './workspace-repository.ts'
+export type { Membership, MembershipChange, UserDirectory, UserProfile, Workspace, WorkspaceMember, WorkspaceRepository, WorkspaceRole } from './workspace-repository.ts'
 export type { Repositories } from './repositories.ts'

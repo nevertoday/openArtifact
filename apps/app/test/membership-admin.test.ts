@@ -1,0 +1,141 @@
+import { beforeAll, describe, expect, it } from 'vitest'
+import { TestApp } from './test-app.ts'
+
+const app = new TestApp()
+let adminCookie = ''
+let adminId = ''
+
+interface MemberJson {
+  userId: string
+  name: string
+  role: string
+}
+
+interface AuditEventJson {
+  action: string
+  actor: { name: string }
+  member: { name: string } | null
+  detail: Record<string, unknown>
+}
+
+beforeAll(async () => {
+  adminCookie = await app.signIn('admin@example.com')
+  adminId = await userIdOf(adminCookie)
+})
+
+async function userIdOf(cookie: string): Promise<string> {
+  const { body } = await app.json<{ user: { userId: string } }>('/api/me', { cookie })
+  return body.user.userId
+}
+
+async function members(): Promise<MemberJson[]> {
+  const { body } = await app.json<{ members: MemberJson[] }>('/api/workspace/members', { cookie: adminCookie })
+  return body.members
+}
+
+async function setRole(userId: string, role: string, cookie = adminCookie): Promise<Response> {
+  return app.request(`/api/workspace/members/${userId}`, { method: 'PATCH', cookie, body: { role } })
+}
+
+async function latestAuditEvent(): Promise<AuditEventJson | undefined> {
+  const { body } = await app.json<{ events: AuditEventJson[] }>('/api/workspace/audit', { cookie: adminCookie })
+  return body.events[0]
+}
+
+describe('changing a member\'s role', () => {
+  it('lets an admin make a member admin and back, and records each change', async () => {
+    const colleagueCookie = await app.signIn('lin@example.com')
+    const colleagueId = await userIdOf(colleagueCookie)
+
+    const promotion = await setRole(colleagueId, 'admin')
+    const asAdmin = await app.json<{ workspace: { role: string } }>('/api/me', { cookie: colleagueCookie })
+    const promotionEvent = await latestAuditEvent()
+    const demotion = await setRole(colleagueId, 'member')
+
+    expect([promotion.status, demotion.status]).toEqual([200, 200])
+    expect(asAdmin.body.workspace.role).toBe('admin')
+    expect(promotionEvent).toMatchObject({ action: 'member.role_changed', actor: { name: 'admin' }, member: { name: 'lin' }, detail: { from: 'member', to: 'admin' } })
+    expect((await members()).find(member => member.userId === colleagueId)?.role).toBe('member')
+  })
+
+  it('refuses a member, a token and an unknown role', async () => {
+    const memberCookie = await app.signIn('zhou@example.com')
+    const memberId = await userIdOf(memberCookie)
+    const adminToken = await app.createToken(adminCookie)
+
+    const byMember = await setRole(memberId, 'admin', memberCookie)
+    const byToken = await app.request(`/api/workspace/members/${memberId}`, { method: 'PATCH', token: adminToken, body: { role: 'admin' } })
+    const unknownRole = await setRole(memberId, 'owner')
+    const unknownPerson = await setRole('no-such-user', 'admin')
+
+    expect([byMember.status, byToken.status, unknownRole.status, unknownPerson.status]).toEqual([403, 403, 400, 404])
+  })
+
+  it('never leaves the workspace without an admin', async () => {
+    const lastAdminDemotion = await app.json<{ error: string }>(`/api/workspace/members/${adminId}`, { method: 'PATCH', cookie: adminCookie, body: { role: 'member' } })
+    const deputyCookie = await app.signIn('deputy@example.com')
+    const deputyId = await userIdOf(deputyCookie)
+    await setRole(deputyId, 'admin')
+    const deputySteppingDown = await setRole(deputyId, 'member', deputyCookie)
+
+    expect(lastAdminDemotion.status).toBe(400)
+    expect(lastAdminDemotion.body.error).toContain('at least one admin')
+    expect(deputySteppingDown.status).toBe(200)
+  })
+})
+
+describe('removing a member', () => {
+  it('ends their access at once: session, tokens and grants, and records it', async () => {
+    const leaverCookie = await app.signIn('leaver@example.com')
+    const leaverId = await userIdOf(leaverCookie)
+    const leaverToken = await app.createToken(leaverCookie)
+    const authorCookie = await app.signIn('author@example.com')
+    const specified = await app.publish({ cookie: authorCookie }, 'Need to know', '<h1>x</h1>', 'specified')
+    await app.request(`/api/artifacts/${specified.artifactId}/grants`, { method: 'PUT', cookie: authorCookie, body: { email: 'leaver@example.com', role: 'viewer' } })
+
+    const removal = await app.request(`/api/workspace/members/${leaverId}`, { method: 'DELETE', cookie: adminCookie })
+    const sessionAfter = await app.json<{ error: string }>('/api/me', { cookie: leaverCookie })
+    const tokenAfter = await app.request('/api/artifacts', { token: leaverToken })
+    const homeAfter = await app.request('/', { cookie: leaverCookie })
+    const grantsAfter = await app.json<{ grants: { userId: string }[] }>(`/api/artifacts/${specified.artifactId}/sharing`, { cookie: authorCookie })
+    const leaverTokens = await app.repositories.accessTokens.listForUser(leaverId)
+
+    expect(removal.status).toBe(204)
+    expect(sessionAfter.status).toBe(403)
+    expect(sessionAfter.body.error).toContain('removed from this workspace')
+    expect(tokenAfter.status).toBe(401)
+    expect(homeAfter.status).toBe(403)
+    expect(await homeAfter.text()).toContain('你已被移出这个 workspace，请联系管理员')
+    expect(grantsAfter.body.grants.map(grant => grant.userId)).not.toContain(leaverId)
+    expect(leaverTokens.every(accessToken => accessToken.revokedAt !== null)).toBe(true)
+    expect((await members()).map(member => member.userId)).not.toContain(leaverId)
+    expect(await latestAuditEvent()).toMatchObject({ action: 'member.removed', actor: { name: 'admin' }, member: { name: 'leaver' } })
+  })
+
+  it('does not let a removed person back in by signing in again', async () => {
+    await app.signIn('gone@example.com')
+    const goneId = await userIdOf(await app.signIn('gone@example.com'))
+    await app.request(`/api/workspace/members/${goneId}`, { method: 'DELETE', cookie: adminCookie })
+
+    const freshCookie = await app.signIn('gone@example.com')
+    const me = await app.request('/api/me', { cookie: freshCookie })
+    const loginPage = await app.request('/login', { cookie: freshCookie })
+
+    expect(me.status).toBe(403)
+    expect(await loginPage.text()).toContain('你已被移出这个 workspace，请联系管理员')
+    expect((await members()).map(member => member.userId)).not.toContain(goneId)
+  })
+
+  it('refuses an admin removing themselves, a member removing anyone, and an unknown person', async () => {
+    const memberCookie = await app.signIn('bystander@example.com')
+
+    const selfRemoval = await app.json<{ error: string }>(`/api/workspace/members/${adminId}`, { method: 'DELETE', cookie: adminCookie })
+    const byMember = await app.request(`/api/workspace/members/${adminId}`, { method: 'DELETE', cookie: memberCookie })
+    const unknownPerson = await app.request('/api/workspace/members/no-such-user', { method: 'DELETE', cookie: adminCookie })
+
+    expect(selfRemoval.status).toBe(400)
+    expect(selfRemoval.body.error).toContain('yourself')
+    expect(byMember.status).toBe(403)
+    expect(unknownPerson.status).toBe(404)
+  })
+})

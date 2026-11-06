@@ -32,3 +32,10 @@ export class HttpError extends Error {
     return Response.json({ error: this.message }, { status: this.status })
   }
 }
+
+/** The person signed in, but an admin removed them from every workspace they belonged to. */
+export class RemovedFromWorkspaceError extends HttpError {
+  constructor() {
+    super(403, 'you were removed from this workspace; ask a workspace admin')
+  }
+}

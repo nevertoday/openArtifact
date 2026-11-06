@@ -23,6 +23,7 @@ export type IconName =
   | 'Settings'
   | 'Share2'
   | 'TriangleAlert'
+  | 'UserMinus'
   | 'UserRound'
   | 'Users'
   | 'X'

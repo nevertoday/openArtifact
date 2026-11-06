@@ -1,4 +1,8 @@
-export type WorkspaceRole = 'admin' | 'member'
+export const WORKSPACE_ROLES = ['admin', 'member'] as const
+export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number]
+
+/** How a role change or a removal ended; a workspace always keeps at least one admin. */
+export type MembershipChange = 'changed' | 'last_admin' | 'not_member'
 
 export interface Workspace {
   workspaceId: string
@@ -24,14 +28,19 @@ export interface WorkspaceMember extends UserProfile {
 
 export interface WorkspaceRepository {
   findWorkspace(workspaceId: string): Promise<Workspace | null>
+  /** The workspaces the user belongs to now; ones an admin removed them from are left out. */
   membershipsOf(userId: string): Promise<Membership[]>
   /**
-   * Puts a user who belongs to no workspace into the instance's first workspace as a member, or creates
-   * that workspace with them as its admin when the instance has none yet.
+   * Puts a user who never belonged to a workspace into the instance's first workspace as a member, or
+   * creates that workspace with them as its admin when the instance has none yet. Returns null for a
+   * user an admin removed: they are not let back in.
    */
-  joinFirstWorkspace(userId: string, newWorkspaceName: string): Promise<Membership>
+  joinFirstWorkspace(userId: string, newWorkspaceName: string): Promise<Membership | null>
   listMembers(workspaceId: string): Promise<WorkspaceMember[]>
   setPublicLinksEnabled(workspaceId: string, enabled: boolean): Promise<void>
+  changeRole(workspaceId: string, userId: string, role: WorkspaceRole): Promise<MembershipChange>
+  /** Ends the membership, revokes the person's API tokens for the workspace and drops their grants on its artifacts. */
+  removeMember(workspaceId: string, userId: string, removedAt: number): Promise<MembershipChange>
 }
 
 export interface UserDirectory {

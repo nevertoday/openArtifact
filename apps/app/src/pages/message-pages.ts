@@ -39,6 +39,16 @@ export class MessagePages {
     return PageShell.render({ title: '找不到 · Open Artifact', body, status: 404 })
   }
 
+  static removedFromWorkspace(): Response {
+    const body = MessagePages.#centered(html`<section class="xxd-empty">
+  ${PageShell.icon('UserMinus', 24)}
+  <h1 class="xxd-empty__title">你已被移出这个 workspace，请联系管理员</h1>
+  <p class="xxd-empty__text">管理员把你移出后，你发布的 artifact 仍留在 workspace 里。如果你用错了账号，退出后换一个登录。</p>
+  <div class="xxd-empty__actions"><button type="button" class="xxd-btn" data-variant="primary" data-sign-out>退出登录</button></div>
+</section>`)
+    return PageShell.render({ title: '已被移出 · Open Artifact', body, status: 403, scripts: ['common.js'] })
+  }
+
   static #centered(content: SafeHtml): SafeHtml {
     return html`${PageShell.brandBar()}<main class="app-center">${content}</main>`
   }
