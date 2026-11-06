@@ -1,4 +1,5 @@
 import { SigningKey, UsercontentSignature } from '@open-artifact/core'
+import { env } from 'cloudflare:workers'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { APP_ORIGIN, SIGNING_KEY, TestApp, USERCONTENT_ORIGIN } from './test-app.ts'
 
@@ -430,6 +431,19 @@ describe('what a visitor of a public link sees', () => {
     expect(pageMarkup).not.toContain('panel-versions')
     expect(pageMarkup).not.toContain('panel-data')
     expect(sharing.body.publicLink.showsComments).toBe(true)
+  })
+
+  it('treats a signed-in person from another workspace like any visitor of the link', async () => {
+    await env.DB.prepare("INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES ('workspace-partner', 'Partner team', ?)").bind(Date.now()).run()
+    const partnerPage = await app.repositories.artifacts.create({ workspaceId: 'workspace-partner', authorId: 'user-partner', title: 'Partner brief', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+
+    const versions = await app.request(`/api/artifacts/${partnerPage.artifactId}/versions`, { cookie: memberCookie })
+    const pageMarkup = await (await app.request(`/a/${partnerPage.artifactId}`, { cookie: memberCookie })).text()
+
+    expect(versions.status).toBe(403)
+    expect(pageMarkup).toContain('artifact-frame')
+    expect(pageMarkup).not.toContain('panel-versions')
+    expect(pageMarkup).not.toContain('登录后可以评论')
   })
 
   it('still shows members the comments, versions and data of an artifact that has a public link', async () => {
