@@ -581,6 +581,12 @@ class ShareDialog {
       this.#save()
     })
     dialog.querySelector('[data-close-share]').addEventListener('click', () => this.#close())
+    // Chrome may ignore preventDefault on a dialog's cancel event, so Escape is caught before it becomes one.
+    dialog.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      this.#close()
+    })
     dialog.addEventListener('cancel', event => {
       event.preventDefault()
       this.#close()
