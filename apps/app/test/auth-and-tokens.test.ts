@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MailerConfigError, Mailers } from '../src/auth/mailer.ts'
 import { APP_ORIGIN, TestApp } from './test-app.ts'
 
 const app = new TestApp()
@@ -123,11 +124,60 @@ describe('who may sign up', () => {
   })
 })
 
-describe('mail', () => {
-  it('fails loudly instead of logging sign-in links when no mail service is configured', async () => {
-    const { Mailers } = await import('../src/auth/mailer.ts')
+/** Stands in for the Cloudflare Email Service binding: keeps what it was asked to send, or refuses with a service error code. */
+class EmailServiceStandIn implements SendEmail {
+  readonly sent: (EmailMessage | EmailMessageBuilder)[] = []
+  #refusalCode: string | undefined
 
-    await expect(Mailers.fromSetting(undefined).send({ to: 'lin@example.com', subject: 's', text: 't' })).rejects.toThrow('No mail service is configured')
+  async send(message: EmailMessage | EmailMessageBuilder): Promise<EmailSendResult> {
+    if (this.#refusalCode) throw Object.assign(new Error(`sender not allowed for ${JSON.stringify(message)}`), { code: this.#refusalCode })
+    this.sent.push(message)
+    return { messageId: `message-${this.sent.length}` }
+  }
+
+  refuseWith(code: string): void {
+    this.#refusalCode = code
+  }
+}
+
+describe('mail', () => {
+  const signInEmail = { to: 'lin@example.com', subject: '登录 Open Artifact', text: 'https://app.test/sign-in' }
+
+  it('fails loudly instead of logging sign-in links when no mail service is configured', async () => {
+    await expect(Mailers.fromEnv({}).send(signInEmail)).rejects.toThrow('No mail service is configured')
+  })
+
+  it('sends through Cloudflare Email Service from the configured sender', async () => {
+    const emailService = new EmailServiceStandIn()
+
+    await Mailers.fromEnv({ MAILER: 'cloudflare', EMAIL: emailService, MAIL_FROM: 'Open Artifact <noreply@example.com>' }).send(signInEmail)
+    await Mailers.fromEnv({ MAILER: 'cloudflare', EMAIL: emailService, MAIL_FROM: 'noreply@example.com' }).send(signInEmail)
+
+    expect(emailService.sent).toEqual([
+      { from: { name: 'Open Artifact', email: 'noreply@example.com' }, to: 'lin@example.com', subject: '登录 Open Artifact', text: 'https://app.test/sign-in' },
+      { from: 'noreply@example.com', to: 'lin@example.com', subject: '登录 Open Artifact', text: 'https://app.test/sign-in' },
+    ])
+  })
+
+  it('reports the service error code without the recipient and keeps the original error', async () => {
+    const emailService = new EmailServiceStandIn()
+    emailService.refuseWith('E_SENDER_NOT_VERIFIED')
+    const mailer = Mailers.fromEnv({ MAILER: 'cloudflare', EMAIL: emailService, MAIL_FROM: 'noreply@example.com' })
+
+    const failure = await mailer.send(signInEmail).then(() => undefined, (error: unknown) => error)
+
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).toBe('Cloudflare Email Service did not send the message: E_SENDER_NOT_VERIFIED')
+    expect((failure as Error).cause).toEqual(expect.objectContaining({ code: 'E_SENDER_NOT_VERIFIED' }))
+  })
+
+  it('refuses a mail configuration that could never send, before any sign-in', () => {
+    const emailService = new EmailServiceStandIn()
+
+    expect(() => Mailers.fromEnv({ MAILER: 'cloudflare', MAIL_FROM: 'noreply@example.com' })).toThrow(MailerConfigError)
+    expect(() => Mailers.fromEnv({ MAILER: 'cloudflare', EMAIL: emailService })).toThrow('MAILER=cloudflare needs MAIL_FROM')
+    expect(() => Mailers.fromEnv({ MAILER: 'cloudflare', EMAIL: emailService, MAIL_FROM: 'Open Artifact' })).toThrow('MAIL_FROM must look like')
+    expect(() => Mailers.fromEnv({ MAILER: 'sendgrid' })).toThrow('MAILER="sendgrid" is not a mail service')
   })
 })
 

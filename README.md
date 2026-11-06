@@ -51,13 +51,14 @@ pnpm run check   # storage boundary, type checks, all tests (Workers runtime, lo
 |---|---|---|
 | `BETTER_AUTH_SECRET` | app | Session signing |
 | `ALLOWED_EMAIL_DOMAINS` | app | Comma-separated domains whose people may create an account. Unset: only the first person (the founder) can sign up |
-| `MAILER` | app | `console` prints mail to the log for local development. No mail service is wired yet, so in production sign-in mail fails loudly instead of leaking links into logs |
+| `MAILER` | app | `console` prints mail to the log for local development. `cloudflare` sends through Cloudflare Email Service with the `EMAIL` binding. Unset: sign-in mail fails loudly instead of leaking links into logs. Any other value, or `cloudflare` without `EMAIL` or `MAIL_FROM`, fails every request with a configuration error |
+| `MAIL_FROM` | app | Sender for `MAILER=cloudflare`, such as `Open Artifact <noreply@example.com>` or `noreply@example.com`. Its domain must be onboarded and verified in Cloudflare Email Service. Sending to any recipient needs the Workers Paid plan, and the service is in public beta |
 | `USERCONTENT_SIGNING_KEY` | app, usercontent | Must be the same in both; signs artifact file URLs |
 | `USERCONTENT_ORIGIN`, `MCP_ORIGIN` | app | Public addresses of the other two Workers |
 | `APP_ORIGIN` | usercontent, mcp | Public address of the app |
 | `GITHUB_CLIENT_ID` / `_SECRET`, `GOOGLE_CLIENT_ID` / `_SECRET` | app | Optional sign-in providers |
 | `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_DISPLAY_NAME` | app | Optional company SSO |
 
-Bindings besides variables: the app needs `DB` (D1), `FILES` (R2) and `UNLOCK_RATE_LIMITER` (rate limit for public-link passwords); usercontent needs the `ARTIFACT_FILES` service binding to the app; MCP needs the `APP` service binding.
+Bindings besides variables: the app needs `DB` (D1), `FILES` (R2) and `UNLOCK_RATE_LIMITER` (rate limit for public-link passwords), plus the `EMAIL` `send_email` binding (Cloudflare Email Service) when `MAILER=cloudflare`; usercontent needs the `ARTIFACT_FILES` service binding to the app; MCP needs the `APP` service binding.
 
 The usercontent Worker must run on a different site from the app (another domain, not only another port in production), so artifact pages can never read the app's cookies.

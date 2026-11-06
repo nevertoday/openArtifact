@@ -10,8 +10,12 @@ export interface AppEnv {
   USERCONTENT_SIGNING_KEY: string
   /** Comma-separated email domains whose people may create an account; unset lets only the founder sign up. */
   ALLOWED_EMAIL_DOMAINS?: string
-  /** "console" prints mail to the log for local development; the real mail service is not chosen yet. */
+  /** "console" prints mail to the log for local development; "cloudflare" sends through the EMAIL binding. */
   MAILER?: string
+  /** Cloudflare Email Service binding, used when MAILER is "cloudflare". */
+  EMAIL?: SendEmail
+  /** Sender for MAILER=cloudflare, on a domain verified in Cloudflare Email Service. */
+  MAIL_FROM?: string
   GITHUB_CLIENT_ID?: string
   GITHUB_CLIENT_SECRET?: string
   GOOGLE_CLIENT_ID?: string

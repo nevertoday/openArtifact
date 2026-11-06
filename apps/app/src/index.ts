@@ -20,7 +20,7 @@ export default {
     const appRoutes = new AppRoutes({
       env,
       repositories: cloudflareRepositories(env.DB, env.FILES),
-      mailer: Mailers.fromSetting(env.MAILER),
+      mailer: Mailers.fromEnv(env),
       mcpUrl: `${env.MCP_ORIGIN}/mcp`,
     })
     return appRoutes.respond(request)
