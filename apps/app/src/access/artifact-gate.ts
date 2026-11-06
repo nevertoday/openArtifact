@@ -43,9 +43,17 @@ export class ArtifactGate {
   async require(artifactId: string, identity: Identity | null, request: Request, permission: ArtifactPermission, action: string): Promise<OpenedArtifact> {
     const openedArtifact = await this.open(artifactId, identity, request)
     if (openedArtifact?.permissions[permission]) return openedArtifact
-    if (openedArtifact?.withheldByTokenScope.includes(permission)) throw HttpError.outsideTokenScope(action)
     const viewable = openedArtifact?.permissions.canView ?? false
-    if (!viewable) throw HttpError.notFound(`artifact ${artifactId}`)
+    const withheldByToken = openedArtifact?.withheldByTokenScope.includes(permission) ?? false
+    if (!openedArtifact || !(viewable || withheldByToken)) throw HttpError.notFound(`artifact ${artifactId}`)
+    ArtifactGate.demand(openedArtifact, identity, permission, action)
+    return openedArtifact
+  }
+
+  /** For a permission on an artifact already opened: throws the 401 or 403 the requester should see. */
+  static demand(openedArtifact: OpenedArtifact, identity: Identity | null, permission: ArtifactPermission, action: string): void {
+    if (openedArtifact.permissions[permission]) return
+    if (openedArtifact.withheldByTokenScope.includes(permission)) throw HttpError.outsideTokenScope(action)
     throw identity ? HttpError.forbidden(action) : HttpError.unauthorized()
   }
 

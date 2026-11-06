@@ -13,6 +13,8 @@ export interface ArtifactSharing {
   publicLinkExpiresAt: number | null
   publicLinkPasswordHash: string | null
   anonymousWriteEnabled: boolean
+  /** Visitors of the public link may read the comments; otherwise they see the page alone. */
+  publicLinkShowsComments: boolean
 }
 
 /** How a version came to be: new files, or the files of an earlier version published again. */

@@ -14,7 +14,7 @@ function artifactWith(sharing: Partial<ArtifactSharing>, removal: ArtifactRemova
     workspaceId: 'workspace-1',
     title: 'Design doc',
     authorId,
-    sharing: { visibility: 'workspace', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, ...sharing },
+    sharing: { visibility: 'workspace', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, ...sharing },
     version: 1,
     publishedVia: null,
     updatedAt: now,
@@ -44,6 +44,9 @@ describe('ArtifactAccess', () => {
       canRename: true,
       canRemove: true,
       canRestore: false,
+      canReadComments: true,
+      canSeeVersions: true,
+      canBrowseSharedData: true,
       needsPublicLinkPassword: false,
     })
   })
@@ -69,6 +72,17 @@ describe('ArtifactAccess', () => {
     expect(permissions({ visibility: 'public_link' }, anonymous)).toMatchObject({ canView: true, canComment: false, canWriteSharedData: false })
     expect(permissions({ visibility: 'public_link', anonymousWriteEnabled: true }, anonymous).canWriteSharedData).toBe(true)
     expect(permissions({ visibility: 'public_link' }, member).canComment).toBe(true)
+  })
+
+  it('shows a public-link visitor the current page alone, and comments only when the author turns them on', () => {
+    expect(permissions({ visibility: 'public_link' }, anonymous)).toMatchObject({ canView: true, canReadComments: false, canSeeVersions: false, canBrowseSharedData: false })
+    expect(permissions({ visibility: 'public_link', publicLinkShowsComments: true }, anonymous)).toMatchObject({ canReadComments: true, canComment: false, canSeeVersions: false })
+    expect(permissions({ visibility: 'public_link' }, { ...outsider, publicLinkUnlocked: true })).toMatchObject({ canView: true, canReadComments: false, canSeeVersions: false })
+  })
+
+  it('keeps the whole artifact open to members and granted people when it also has a public link', () => {
+    expect(permissions({ visibility: 'public_link' }, member)).toMatchObject({ canReadComments: true, canSeeVersions: true, canBrowseSharedData: true })
+    expect(permissions({ visibility: 'specified' }, { ...outsider, grantRole: 'viewer' })).toMatchObject({ canReadComments: true, canSeeVersions: true, canBrowseSharedData: true })
   })
 
   it('asks for the password of a protected public link only when nothing else lets the viewer in', () => {

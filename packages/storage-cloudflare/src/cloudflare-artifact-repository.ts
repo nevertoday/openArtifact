@@ -15,7 +15,7 @@ import {
 
 const SUMMARY_SELECT = `
   SELECT artifacts.id, artifacts.workspace_id, artifacts.title, artifacts.author_id, artifacts.visibility,
-         artifacts.public_link_expires_at, artifacts.public_link_password_hash, artifacts.anonymous_write_enabled,
+         artifacts.public_link_expires_at, artifacts.public_link_password_hash, artifacts.anonymous_write_enabled, artifacts.public_link_shows_comments,
          artifacts.current_version, artifacts.updated_at, artifact_versions.published_via,
          artifacts.removed_at, artifacts.removed_by, artifacts.removed_as_admin
   FROM artifacts
@@ -30,6 +30,7 @@ interface SummaryRow {
   public_link_expires_at: number | null
   public_link_password_hash: string | null
   anonymous_write_enabled: number
+  public_link_shows_comments: number
   current_version: number
   updated_at: number
   published_via: string | null
@@ -293,6 +294,7 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
         publicLinkExpiresAt: summaryRow.public_link_expires_at,
         publicLinkPasswordHash: summaryRow.public_link_password_hash,
         anonymousWriteEnabled: summaryRow.anonymous_write_enabled === 1,
+        publicLinkShowsComments: summaryRow.public_link_shows_comments === 1,
       },
       version: summaryRow.current_version,
       publishedVia: summaryRow.published_via,

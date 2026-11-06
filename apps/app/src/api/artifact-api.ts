@@ -1,5 +1,5 @@
 import { ArtifactRemoval, type ArtifactFile, type ArtifactSummary, type ArtifactVisibility, type PublishResult, type VersionOrigin } from '@open-artifact/core'
-import type { OpenedArtifact } from '../access/artifact-gate.ts'
+import { ArtifactGate, type OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
@@ -49,9 +49,12 @@ export class ArtifactApi {
   }
 
   async read(request: Request, artifactId: string): Promise<Response> {
-    const openedArtifact = await this.#context.gate.require(artifactId, await this.#context.identity(), request, 'canView', 'view this artifact')
+    const identity = await this.#context.identity()
+    const openedArtifact = await this.#context.gate.require(artifactId, identity, request, 'canView', 'view this artifact')
     const requestedVersion = new URL(request.url).searchParams.get('version')
     const version = requestedVersion === null ? openedArtifact.summary.version : Number(requestedVersion)
+    const readsOlderVersion = version !== openedArtifact.summary.version
+    if (readsOlderVersion) ArtifactGate.demand(openedArtifact, identity, 'canSeeVersions', 'read older versions of this artifact')
     const versionContent = await this.#context.repositories.artifacts.readVersion(artifactId, version)
     if (!versionContent) throw HttpError.notFound(`version ${requestedVersion} of artifact ${artifactId}`)
     const names = await this.#namesOf([openedArtifact])
@@ -121,7 +124,7 @@ export class ArtifactApi {
   }
 
   async listVersions(request: Request, artifactId: string): Promise<Response> {
-    await this.#context.gate.require(artifactId, await this.#context.identity(), request, 'canView', 'view this artifact')
+    await this.#context.gate.require(artifactId, await this.#context.identity(), request, 'canSeeVersions', 'see the versions of this artifact')
     const versionHistory = await this.#context.repositories.artifacts.listVersions(artifactId)
     const authorNames = await this.#context.people.namesOf(versionHistory.map(versionRecord => versionRecord.authorId))
     const versions = versionHistory.map(versionRecord => ({

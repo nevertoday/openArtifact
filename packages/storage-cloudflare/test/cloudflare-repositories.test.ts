@@ -134,12 +134,12 @@ describe('artifact access, comments and shared data', () => {
     const accessRepository = new CloudflareArtifactAccessRepository(env.DB)
     const { artifactId } = await createArtifactIn(workspaceId, authorId)
 
-    await accessRepository.updateSharing(artifactId, { visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true })
+    await accessRepository.updateSharing(artifactId, { visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true })
     await accessRepository.setGrant({ artifactId, userId: reviewerId, role: 'commenter' })
     await accessRepository.setGrant({ artifactId, userId: reviewerId, role: 'editor' })
 
     const summary = await artifactRepository.findSummary(artifactId)
-    expect(summary?.sharing).toEqual({ visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true })
+    expect(summary?.sharing).toEqual({ visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true })
     expect(await accessRepository.listGrants(artifactId)).toEqual([{ artifactId, userId: reviewerId, role: 'editor' }])
     expect((await accessRepository.listGrantsOfUser(reviewerId)).map(grant => grant.artifactId)).toContain(artifactId)
 

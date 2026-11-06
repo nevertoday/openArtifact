@@ -31,6 +31,7 @@ export class SharingApi {
         expiresAt: summary.sharing.publicLinkExpiresAt,
         hasPassword: summary.sharing.publicLinkPasswordHash !== null,
         anonymousWriteEnabled: summary.sharing.anonymousWriteEnabled,
+        showsComments: summary.sharing.publicLinkShowsComments,
         allowedInWorkspace: workspace?.publicLinksEnabled ?? false,
       },
       author: { userId: summary.authorId },
@@ -55,9 +56,10 @@ export class SharingApi {
       publicLinkExpiresAt: SharingApi.#expiresAtOf(requestBody, summary.sharing.publicLinkExpiresAt),
       publicLinkPasswordHash: await SharingApi.#passwordHashOf(requestBody, summary.sharing.publicLinkPasswordHash),
       anonymousWriteEnabled: requestBody.boolean('anonymousWriteEnabled', summary.sharing.anonymousWriteEnabled),
+      publicLinkShowsComments: requestBody.boolean('publicLinkShowsComments', summary.sharing.publicLinkShowsComments),
     }
     await this.#context.repositories.artifactAccess.updateSharing(artifactId, sharing)
-    return Response.json({ visibility, publicLinkExpiresAt: sharing.publicLinkExpiresAt, hasPassword: sharing.publicLinkPasswordHash !== null, anonymousWriteEnabled: sharing.anonymousWriteEnabled })
+    return Response.json({ visibility, publicLinkExpiresAt: sharing.publicLinkExpiresAt, hasPassword: sharing.publicLinkPasswordHash !== null, anonymousWriteEnabled: sharing.anonymousWriteEnabled, publicLinkShowsComments: sharing.publicLinkShowsComments })
   }
 
   async grant(request: Request, artifactId: string): Promise<Response> {

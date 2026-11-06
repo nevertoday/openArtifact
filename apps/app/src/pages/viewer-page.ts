@@ -2,7 +2,7 @@ import { ArtifactRemoval } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
-import { html, type SafeHtml } from './html.ts'
+import { html, SafeHtml } from './html.ts'
 import { PageShell } from './page-shell.ts'
 
 // No allow-same-origin: the artifact gets an opaque origin and cannot reach any site's cookies or storage.
@@ -12,6 +12,13 @@ export interface OlderVersion {
   version: number
   authorName: string
   publishedAt: number
+}
+
+interface SideTab {
+  name: 'comments' | 'versions' | 'data'
+  title: string
+  count: SafeHtml | ''
+  shown: boolean
 }
 
 export interface ViewerModel {
@@ -32,7 +39,7 @@ export class ViewerPage {
   static render(model: ViewerModel): Response {
     const { summary, permissions } = model.openedArtifact
     const body = html`<div class="viewer-page">
-${PageShell.topBar(model.identity, ViewerPage.#heading(model))}
+${ViewerPage.#isPublicLinkVisitor(model) ? ViewerPage.#publicLinkBar(model) : PageShell.topBar(model.identity, ViewerPage.#heading(model))}
 <div class="viewer-body">
   <section class="viewer-stage" aria-label="artifact 内容">
     ${model.olderVersion ? ViewerPage.#olderVersionBanner(model, model.olderVersion) : ''}
@@ -42,16 +49,7 @@ ${PageShell.topBar(model.identity, ViewerPage.#heading(model))}
     </div>
     <div class="viewer-frame"><iframe id="artifact-frame" src="${model.artifactUrl}" title="${summary.title}" sandbox="${ARTIFACT_SANDBOX}" referrerpolicy="no-referrer"></iframe></div>
   </section>
-  <aside class="viewer-side" aria-label="评论、版本和数据">
-    <div class="xxd-tabs viewer-side__tabs" data-xxd-tabs id="viewer-tabs" aria-label="评论、版本和数据">
-      <button type="button" role="tab" id="tab-comments" aria-controls="panel-comments" aria-selected="true">评论<span class="xxd-count" data-comment-count></span></button>
-      <button type="button" role="tab" id="tab-versions" aria-controls="panel-versions" aria-selected="false">版本<span class="xxd-count xxd-mono">${summary.version}</span></button>
-      <button type="button" role="tab" id="tab-data" aria-controls="panel-data" aria-selected="false">数据</button>
-    </div>
-    <div class="viewer-side__panel" id="panel-comments"><p class="viewer-side__status"><span class="xxd-spinner" aria-hidden="true"></span>正在加载评论…</p></div>
-    <div class="viewer-side__panel" id="panel-versions" hidden></div>
-    <div class="viewer-side__panel" id="panel-data" hidden></div>
-  </aside>
+  ${ViewerPage.#side(model)}
 </div>
 </div>
 ${permissions.canManageSharing ? ViewerPage.#shareDialog() : ''}
@@ -70,7 +68,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     const { summary } = model.openedArtifact
     const body = html`<div class="viewer-full">
 <header class="viewer-full__bar">
-  <a class="xxd-btn" data-variant="ghost" data-size="sm" href="${ViewerPage.#pathOf(model, '')}">${PageShell.icon('ArrowLeft')}评论和版本</a>
+  <a class="xxd-btn" data-variant="ghost" data-size="sm" href="${ViewerPage.#pathOf(model, '')}">${PageShell.icon('ArrowLeft')}${ViewerPage.#isPublicLinkVisitor(model) ? '返回' : '评论和版本'}</a>
   <span class="viewer-full__title">${summary.title}</span>
   <span class="xxd-text xxd-mono" data-variant="caption">v${model.shownVersion}</span>
 </header>
@@ -116,6 +114,45 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   static #description(model: ViewerModel): string {
     const { summary } = model.openedArtifact
     return `${model.authorName} 发布 · v${summary.version} · ${ArtifactLabels.publishedVia(summary.publishedVia)}`
+  }
+
+  // Someone who reaches the artifact only through its public link sees the page, not the people who work on it:
+  // no history, no data overview, no way into the workspace.
+  static #isPublicLinkVisitor(model: ViewerModel): boolean {
+    return !model.openedArtifact.permissions.canSeeVersions
+  }
+
+  static #publicLinkBar(model: ViewerModel): SafeHtml {
+    const loginPath = `/login?next=${encodeURIComponent(ViewerPage.#pathOf(model, ''))}`
+    const signInLink = model.identity ? '' : html`<a class="xxd-link" href="${loginPath}">登录后可以评论</a>`
+    return html`<header class="xxd-topbar app-topbar">
+  <div class="xxd-topbar__title viewer-heading"><span class="viewer-heading__title">${model.openedArtifact.summary.title}</span></div>
+  <span class="app-topbar__end">${signInLink}</span>
+</header>`
+  }
+
+  static #side(model: ViewerModel): SafeHtml | '' {
+    const { summary, permissions } = model.openedArtifact
+    const allSideTabs: SideTab[] = [
+      { name: 'comments', title: '评论', count: html`<span class="xxd-count" data-comment-count></span>`, shown: permissions.canReadComments },
+      { name: 'versions', title: '版本', count: html`<span class="xxd-count xxd-mono">${summary.version}</span>`, shown: permissions.canSeeVersions },
+      { name: 'data', title: '数据', count: '', shown: permissions.canBrowseSharedData },
+    ]
+    const sideTabs = allSideTabs.filter(sideTab => sideTab.shown)
+    if (sideTabs.length === 0) return ''
+    const sideLabel = sideTabs.map(sideTab => sideTab.title).join('、')
+    return html`<aside class="viewer-side" aria-label="${sideLabel}">
+    <div class="xxd-tabs viewer-side__tabs" data-xxd-tabs id="viewer-tabs" aria-label="${sideLabel}">
+      ${sideTabs.map((sideTab, index) => html`<button type="button" role="tab" id="tab-${sideTab.name}" aria-controls="panel-${sideTab.name}" aria-selected="${index === 0 ? 'true' : 'false'}">${sideTab.title}${sideTab.count}</button>`)}
+    </div>
+    ${sideTabs.map((sideTab, index) => ViewerPage.#sidePanel(sideTab, index === 0))}
+  </aside>`
+  }
+
+  // Comments load at once, so their panel opens with a loading line; the others fill when their tab is picked.
+  static #sidePanel(sideTab: SideTab, isFirst: boolean): SafeHtml {
+    if (sideTab.name === 'comments') return html`<div class="viewer-side__panel" id="panel-comments"><p class="viewer-side__status"><span class="xxd-spinner" aria-hidden="true"></span>正在加载评论…</p></div>`
+    return html`<div class="viewer-side__panel" id="panel-${sideTab.name}" ${isFirst ? '' : new SafeHtml('hidden')}></div>`
   }
 
   static #heading(model: ViewerModel): SafeHtml {

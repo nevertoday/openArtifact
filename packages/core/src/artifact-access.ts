@@ -27,6 +27,11 @@ export interface ArtifactPermissions {
   canRemove: boolean
   /** Only a removed artifact can be restored, and only until it is purged. */
   canRestore: boolean
+  canReadComments: boolean
+  /** The version history and older versions, which name the people who published them. */
+  canSeeVersions: boolean
+  /** Every collection of shared data at once, as the data tab lists it; the page's own SDK calls need only canView. */
+  canBrowseSharedData: boolean
   /** The viewer could open the public link after entering its password. */
   needsPublicLinkPassword: boolean
 }
@@ -49,27 +54,23 @@ const NO_PERMISSIONS: ArtifactPermissions = {
   canRename: false,
   canRemove: false,
   canRestore: false,
+  canReadComments: false,
+  canSeeVersions: false,
+  canBrowseSharedData: false,
   needsPublicLinkPassword: false,
 }
 
+// Everyone inside the artifact's circle, whatever their role, sees its comments, history and data.
+const INSIDE_VIEW: ArtifactPermissions = { ...NO_PERMISSIONS, canView: true, canReadComments: true, canSeeVersions: true, canBrowseSharedData: true }
+
 // A viewer role uses the page, shared data included; a commenter also comments; an editor also publishes.
 const GRANT_PERMISSIONS: Record<GrantRole, ArtifactPermissions> = {
-  viewer: { ...NO_PERMISSIONS, canView: true, canWriteSharedData: true },
-  commenter: { ...NO_PERMISSIONS, canView: true, canComment: true, canWriteSharedData: true },
-  editor: { ...NO_PERMISSIONS, canView: true, canComment: true, canEdit: true, canWriteSharedData: true },
+  viewer: { ...INSIDE_VIEW, canWriteSharedData: true },
+  commenter: { ...INSIDE_VIEW, canComment: true, canWriteSharedData: true },
+  editor: { ...INSIDE_VIEW, canComment: true, canEdit: true, canWriteSharedData: true },
 }
 const MEMBER_PERMISSIONS: ArtifactPermissions = GRANT_PERMISSIONS.commenter
-const AUTHOR_PERMISSIONS: ArtifactPermissions = {
-  canView: true,
-  canComment: true,
-  canEdit: true,
-  canManageSharing: true,
-  canWriteSharedData: true,
-  canRename: true,
-  canRemove: true,
-  canRestore: false,
-  needsPublicLinkPassword: false,
-}
+const AUTHOR_PERMISSIONS: ArtifactPermissions = { ...INSIDE_VIEW, canComment: true, canEdit: true, canManageSharing: true, canWriteSharedData: true, canRename: true, canRemove: true }
 
 /** The one place that decides what a viewer may do with an artifact. */
 export class ArtifactAccess {
@@ -139,7 +140,9 @@ export class ArtifactAccess {
   #publicLinkPermissions(viewer: ArtifactViewer): ArtifactPermissions {
     if (!this.publicLinkActive) return NO_PERMISSIONS
     if (!viewer.publicLinkUnlocked) return { ...NO_PERMISSIONS, needsPublicLinkPassword: true }
-    return { ...NO_PERMISSIONS, canView: true, canWriteSharedData: this.#summary.sharing.anonymousWriteEnabled }
+    // A visitor who reaches the artifact only through its link sees the page, not the people who work on it.
+    const { anonymousWriteEnabled, publicLinkShowsComments } = this.#summary.sharing
+    return { ...NO_PERMISSIONS, canView: true, canWriteSharedData: anonymousWriteEnabled, canReadComments: publicLinkShowsComments }
   }
 
   // A permission the viewer holds through any path counts; a password prompt matters only when nothing else lets them in.
@@ -155,6 +158,9 @@ export class ArtifactAccess {
       canRename: anyGrants('canRename'),
       canRemove: anyGrants('canRemove'),
       canRestore: anyGrants('canRestore'),
+      canReadComments: anyGrants('canReadComments'),
+      canSeeVersions: anyGrants('canSeeVersions'),
+      canBrowseSharedData: anyGrants('canBrowseSharedData'),
       needsPublicLinkPassword: !canView && anyGrants('needsPublicLinkPassword'),
     }
   }

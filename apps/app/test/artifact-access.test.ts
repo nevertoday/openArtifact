@@ -140,7 +140,7 @@ describe('public links', () => {
     const published = await app.publish({ token: authorToken }, 'Expired campaign')
     await setSharing(published.artifactId, { visibility: 'public_link', publicLinkExpiresAt: Date.now() + 60_000 })
     const summary = await app.repositories.artifacts.findSummary(published.artifactId)
-    await app.repositories.artifactAccess.updateSharing(published.artifactId, { ...(summary?.sharing ?? { visibility: 'public_link', publicLinkPasswordHash: null, anonymousWriteEnabled: false }), publicLinkExpiresAt: Date.now() - 1 })
+    await app.repositories.artifactAccess.updateSharing(published.artifactId, { ...(summary?.sharing ?? { visibility: 'public_link', publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false }), publicLinkExpiresAt: Date.now() - 1 })
 
     const backToPrivate = await setSharing(published.artifactId, { visibility: 'private' })
     const sharing = await app.json<{ visibility: string; publicLink: { expiresAt: number } }>(`/api/artifacts/${published.artifactId}/sharing`, { cookie: authorCookie })
@@ -166,6 +166,93 @@ describe('public links', () => {
     const pastExpiry = await setSharing(published.artifactId, { visibility: 'public_link', publicLinkExpiresAt: Date.now() - 1000 })
 
     expect(pastExpiry.status).toBe(400)
+  })
+})
+
+describe('what a visitor of a public link sees', () => {
+  async function publicArtifactWithHistory(title: string): Promise<string> {
+    const published = await app.publish({ token: authorToken }, title, '<h1>v1</h1>')
+    const artifactPath = `/api/artifacts/${published.artifactId}`
+    await app.request(artifactPath, { method: 'PUT', token: authorToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+    await app.request(`${artifactPath}/comments`, { method: 'POST', cookie: memberCookie, body: { body: 'Internal note from a member' } })
+    await app.request(`${artifactPath}/data/signups/member-1`, { method: 'PUT', cookie: memberCookie, body: { data: { name: 'Member' } } })
+    await setSharing(published.artifactId, { visibility: 'public_link', publicLinkExpiresAt: null })
+    return published.artifactId
+  }
+
+  it('shows an anonymous visitor the current page alone, with a way to sign in', async () => {
+    const artifactId = await publicArtifactWithHistory('Launch page')
+
+    const pageMarkup = await (await app.request(`/a/${artifactId}`)).text()
+
+    expect(pageMarkup).toContain('artifact-frame')
+    expect(pageMarkup).toContain('Launch page')
+    expect(pageMarkup).toContain(`href="/login?next=${encodeURIComponent(`/a/${artifactId}`)}">登录后可以评论</a>`)
+    expect(pageMarkup).not.toContain('panel-comments')
+    expect(pageMarkup).not.toContain('panel-versions')
+    expect(pageMarkup).not.toContain('panel-data')
+    expect(pageMarkup).not.toContain('返回列表')
+    expect(pageMarkup).not.toContain('data-visibility-pill')
+  })
+
+  it('refuses an anonymous visitor the comments, the versions, older files and the data listing', async () => {
+    const artifactId = await publicArtifactWithHistory('Closed history')
+    const artifactPath = `/api/artifacts/${artifactId}`
+
+    const comments = await app.request(`${artifactPath}/comments`)
+    const versions = await app.request(`${artifactPath}/versions`)
+    const olderVersion = await app.request(`${artifactPath}?version=1`)
+    const currentVersion = await app.request(`${artifactPath}?version=2`)
+    const olderPage = await app.request(`/a/${artifactId}?v=1`)
+    const olderFullPage = await app.request(`/a/${artifactId}/full?v=1`)
+    const dataListing = await app.request(`${artifactPath}/data`)
+
+    expect([comments.status, versions.status, olderVersion.status, dataListing.status]).toEqual([401, 401, 401, 401])
+    expect(currentVersion.status).toBe(200)
+    expect([olderPage.status, olderFullPage.status]).toEqual([302, 302])
+    expect(olderPage.headers.get('Location')).toContain('/login?next=')
+  })
+
+  it('keeps the page\'s own shared data working for an anonymous visitor', async () => {
+    const artifactId = await publicArtifactWithHistory('Public sign-up')
+    await setSharing(artifactId, { visibility: 'public_link', anonymousWriteEnabled: true })
+
+    const signups = await app.request(`/api/artifacts/${artifactId}/data/signups`)
+    const anonymousSignup = await app.request(`/api/artifacts/${artifactId}/data/signups/guest-1`, { method: 'PUT', body: { data: { name: 'Guest' } } })
+
+    expect([signups.status, anonymousSignup.status]).toEqual([200, 200])
+  })
+
+  it('shows an anonymous visitor the comments, read-only, once the author turns them on', async () => {
+    const artifactId = await publicArtifactWithHistory('Open feedback')
+    await setSharing(artifactId, { visibility: 'public_link', publicLinkShowsComments: true })
+
+    const comments = await app.json<{ comments: { body: string; author: { name: string } }[] }>(`/api/artifacts/${artifactId}/comments`)
+    const anonymousComment = await app.request(`/api/artifacts/${artifactId}/comments`, { method: 'POST', body: { body: 'hello' } })
+    const versions = await app.request(`/api/artifacts/${artifactId}/versions`)
+    const pageMarkup = await (await app.request(`/a/${artifactId}`)).text()
+    const sharing = await app.json<{ publicLink: { showsComments: boolean } }>(`/api/artifacts/${artifactId}/sharing`, { cookie: authorCookie })
+
+    expect(comments.status).toBe(200)
+    expect(comments.body.comments[0]).toMatchObject({ body: 'Internal note from a member', author: { name: 'member' } })
+    expect(anonymousComment.status).toBe(401)
+    expect(versions.status).toBe(401)
+    expect(pageMarkup).toContain('panel-comments')
+    expect(pageMarkup).not.toContain('panel-versions')
+    expect(pageMarkup).not.toContain('panel-data')
+    expect(sharing.body.publicLink.showsComments).toBe(true)
+  })
+
+  it('still shows members the comments, versions and data of an artifact that has a public link', async () => {
+    const artifactId = await publicArtifactWithHistory('Member view')
+    const artifactPath = `/api/artifacts/${artifactId}`
+
+    const statuses = await Promise.all([`${artifactPath}/comments`, `${artifactPath}/versions`, `${artifactPath}?version=1`, `${artifactPath}/data`].map(async path => (await app.request(path, { cookie: memberCookie })).status))
+    const pageMarkup = await (await app.request(`/a/${artifactId}`, { cookie: memberCookie })).text()
+
+    expect(statuses).toEqual([200, 200, 200, 200])
+    expect(pageMarkup).toContain('panel-versions')
+    expect(pageMarkup).toContain('返回列表')
   })
 })
 

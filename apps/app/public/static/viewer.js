@@ -107,7 +107,9 @@ class CommentsPanel {
   #filterChips() {
     const chip = (filter, label) =>
       element('button', { type: 'button', className: 'xxd-chip', 'aria-pressed': String(this.filter === filter), onClick: () => { this.filter = filter; this.render() } }, label)
-    return element('div', { className: 'xxd-cluster comment-filters', role: 'group', 'aria-label': '筛选评论' }, chip('unresolved', '未解决'), chip('for_agent', '给 agent'), chip('all', '全部'))
+    // Addressing an agent is part of commenting, so a read-only reader does not get that filter.
+    const agentChip = viewerConfig.permissions.canComment ? chip('for_agent', '给 agent') : null
+    return element('div', { className: 'xxd-cluster comment-filters', role: 'group', 'aria-label': '筛选评论' }, chip('unresolved', '未解决'), agentChip, chip('all', '全部'))
   }
 
   #threadElement({ comment, replies }) {
@@ -632,20 +634,27 @@ class ShareDialog {
 }
 
 const artifactFrame = document.getElementById('artifact-frame')
-const commentsPanel = new CommentsPanel(document.getElementById('panel-comments'))
-const versionOverwrite = new VersionOverwrite()
-const versionsPanel = new VersionsPanel(document.getElementById('panel-versions'), versionOverwrite)
-const dataPanel = new DataPanel(document.getElementById('panel-data'))
-const viewerTabs = document.getElementById('viewer-tabs')
-viewerTabs.addEventListener('xxd:change', event => {
-  if (event.detail.value === 'tab-versions') versionsPanel.load()
-  if (event.detail.value === 'tab-data') dataPanel.load()
-})
-// Pins belong to the current version; on an older version the page may have moved.
-const showsCurrentVersion = viewerConfig.shownVersion === viewerConfig.currentVersion
-if (showsCurrentVersion) commentsPanel.pagePins = new PagePins(artifactFrame, commentsPanel, () => Xxd.selectTab(viewerTabs, document.getElementById('tab-comments')))
-commentsPanel.load()
 new SharedDataProxy(artifactFrame, viewerConfig)
+
+// A visitor of a public link may get no side panels at all, or the comments alone.
+const commentsPanelElement = document.getElementById('panel-comments')
+const versionsPanelElement = document.getElementById('panel-versions')
+const dataPanelElement = document.getElementById('panel-data')
+const versionOverwrite = new VersionOverwrite()
+const versionsPanel = versionsPanelElement ? new VersionsPanel(versionsPanelElement, versionOverwrite) : null
+const dataPanel = dataPanelElement ? new DataPanel(dataPanelElement) : null
+const viewerTabs = document.getElementById('viewer-tabs')
+viewerTabs?.addEventListener('xxd:change', event => {
+  if (event.detail.value === 'tab-versions') versionsPanel?.load()
+  if (event.detail.value === 'tab-data') dataPanel?.load()
+})
+if (commentsPanelElement) {
+  const commentsPanel = new CommentsPanel(commentsPanelElement)
+  // Pins belong to the current version; on an older version the page may have moved.
+  const showsCurrentVersion = viewerConfig.shownVersion === viewerConfig.currentVersion
+  if (showsCurrentVersion) commentsPanel.pagePins = new PagePins(artifactFrame, commentsPanel, () => Xxd.selectTab(viewerTabs, document.getElementById('tab-comments')))
+  commentsPanel.load()
+}
 
 const shareDialogElement = document.getElementById('share-dialog')
 if (shareDialogElement) {

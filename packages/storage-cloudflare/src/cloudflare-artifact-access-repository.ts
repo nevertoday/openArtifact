@@ -15,8 +15,8 @@ export class CloudflareArtifactAccessRepository implements ArtifactAccessReposit
 
   async updateSharing(artifactId: string, sharing: ArtifactSharing): Promise<void> {
     await this.#db
-      .prepare('UPDATE artifacts SET visibility = ?, public_link_expires_at = ?, public_link_password_hash = ?, anonymous_write_enabled = ? WHERE id = ?')
-      .bind(sharing.visibility, sharing.publicLinkExpiresAt, sharing.publicLinkPasswordHash, sharing.anonymousWriteEnabled ? 1 : 0, artifactId)
+      .prepare('UPDATE artifacts SET visibility = ?, public_link_expires_at = ?, public_link_password_hash = ?, anonymous_write_enabled = ?, public_link_shows_comments = ? WHERE id = ?')
+      .bind(sharing.visibility, sharing.publicLinkExpiresAt, sharing.publicLinkPasswordHash, sharing.anonymousWriteEnabled ? 1 : 0, sharing.publicLinkShowsComments ? 1 : 0, artifactId)
       .run()
   }
 
