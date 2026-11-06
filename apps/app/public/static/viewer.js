@@ -17,6 +17,9 @@ class CommentsPanel {
     this.comments = []
     this.filter = 'unresolved'
     this.openReplyFor = null
+    // The panel re-renders on every filter, resolve or pin change, so unsent text lives here, not in the textarea.
+    this.commentDraft = { body: '', forAgent: false }
+    this.replyDraftBody = ''
     this.pendingAnchor = null
     this.pickingAnchor = false
     this.pagePins = null
@@ -132,17 +135,23 @@ class CommentsPanel {
 
   #threadActions(comment) {
     return element('div', { className: 'xxd-cluster comment-actions' },
-      element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'ghost', 'data-size': 'xs', onClick: () => { this.openReplyFor = comment.commentId; this.render() } }, '回复'),
+      element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'ghost', 'data-size': 'xs', onClick: () => this.#openReply(comment.commentId) }, '回复'),
       element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'ghost', 'data-size': 'xs', onClick: () => this.#setResolved(comment, !comment.resolved) }, comment.resolved ? '重新打开' : '标记已解决'),
     )
   }
 
+  #openReply(commentId) {
+    if (this.openReplyFor !== commentId) this.replyDraftBody = ''
+    this.openReplyFor = commentId
+    this.render()
+  }
+
   #replyForm(parentComment) {
-    const replyBody = element('textarea', { className: 'xxd-textarea', rows: '2', required: true, 'aria-label': '回复内容', 'data-error-required': '写点什么再发送' })
+    const replyBody = element('textarea', { className: 'xxd-textarea', rows: '2', required: true, 'aria-label': '回复内容', 'data-error-required': '写点什么再发送', onInput: event => { this.replyDraftBody = event.target.value } }, this.replyDraftBody)
     const replyForm = element('form', { className: 'xxd-stack comment-reply-form', 'data-xxd-validate': true },
       element('div', { className: 'xxd-field' }, replyBody),
       element('div', { className: 'xxd-cluster comment-form-actions' },
-        element('button', { type: 'button', className: 'xxd-btn ui-dialog-cancel', 'data-size': 'sm', onClick: () => { this.openReplyFor = null; this.render() } }, '取消'),
+        element('button', { type: 'button', className: 'xxd-btn ui-dialog-cancel', 'data-size': 'sm', onClick: () => { this.openReplyFor = null; this.replyDraftBody = ''; this.render() } }, '取消'),
         element('button', { type: 'submit', className: 'xxd-btn', 'data-variant': 'primary', 'data-size': 'sm' }, '发送回复'),
       ),
     )
@@ -159,8 +168,8 @@ class CommentsPanel {
       const reason = viewerConfig.viewer ? '你可以查看，但没有评论权限。' : '登录后可以评论。'
       return element('p', { className: 'comment-composer xxd-text', 'data-variant': 'secondary' }, reason, viewerConfig.viewer ? null : element('a', { className: 'xxd-link', href: `/login?next=${encodeURIComponent(location.pathname)}` }, '登录'))
     }
-    const commentBody = element('textarea', { id: 'comment-body', className: 'xxd-textarea', rows: '3', required: true, placeholder: '这一节需要补充…', 'data-error-required': '写点什么再发送' })
-    const forAgent = element('input', { id: 'for-agent', type: 'checkbox', className: 'xxd-check' })
+    const commentBody = element('textarea', { id: 'comment-body', className: 'xxd-textarea', rows: '3', required: true, placeholder: '这一节需要补充…', 'data-error-required': '写点什么再发送', onInput: event => { this.commentDraft.body = event.target.value } }, this.commentDraft.body)
+    const forAgent = element('input', { id: 'for-agent', type: 'checkbox', className: 'xxd-check', checked: this.commentDraft.forAgent, onChange: event => { this.commentDraft.forAgent = event.target.checked } })
     const anchorControl = this.#anchorControl()
     const composer = element('form', { className: 'comment-composer xxd-stack', 'data-xxd-validate': true },
       element('div', { className: 'xxd-field' }, element('label', { for: 'comment-body', className: 'xxd-label' }, '写评论'), commentBody),
@@ -197,7 +206,11 @@ class CommentsPanel {
       const { comment } = await api(`${artifactPath}/comments`, { method: 'POST', body: newComment })
       this.comments.push(comment)
       this.openReplyFor = null
-      if (!newComment.parentId) this.pendingAnchor = null
+      this.replyDraftBody = ''
+      if (!newComment.parentId) {
+        this.pendingAnchor = null
+        this.commentDraft = { body: '', forAgent: false }
+      }
       if (!newComment.parentId && this.filter === 'for_agent' && !comment.forAgent) this.filter = 'unresolved'
       this.render()
     } catch (error) {
