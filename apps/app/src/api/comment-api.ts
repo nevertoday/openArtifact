@@ -61,13 +61,14 @@ export class CommentApi {
   }
 
   // The artifact's author hears about new comments, and a comment's author hears about replies to it.
+  // The comment is already saved, so a mail failure is logged and never turns the request into an error.
   async #notify(commenter: Identity, artifactTitle: string, artifactAuthorId: string, addedComment: ArtifactComment, parentComment: ArtifactComment | null): Promise<void> {
     const recipientIds = new Set([artifactAuthorId, parentComment?.authorId].filter((userId): userId is string => Boolean(userId)))
     recipientIds.delete(commenter.userId)
     const recipients = await this.#context.repositories.users.profilesOf([...recipientIds])
     const commentKind = CommentApi.#commentKindOf(addedComment, parentComment)
     const viewerUrl = this.#context.viewerUrl(addedComment.artifactId)
-    await Promise.all(
+    const deliveries = await Promise.allSettled(
       [...recipients.values()].map(recipient =>
         this.#context.mailer.send({
           to: recipient.email,
@@ -76,6 +77,9 @@ export class CommentApi {
         }),
       ),
     )
+    for (const failedDelivery of deliveries.filter(delivery => delivery.status === 'rejected')) {
+      console.error(new Error(`comment ${addedComment.commentId} notification could not be sent`, { cause: failedDelivery.reason }))
+    }
   }
 
   // Only a top-level comment points at the page; x and y are fractions of the page's width and height.

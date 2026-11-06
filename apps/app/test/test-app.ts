@@ -11,9 +11,16 @@ export const SIGNING_KEY = 'test-signing-key-that-is-long-enough'
 /** Keeps sent mail in memory, so tests can follow the sign-in link. */
 export class RecordingMailer implements Mailer {
   readonly sent: OutgoingEmail[] = []
+  #outOfService = false
 
   async send(email: OutgoingEmail): Promise<void> {
+    if (this.#outOfService) throw new Error('mail service unavailable')
     this.sent.push(email)
+  }
+
+  /** Every later send fails, as when no mail service is configured or the provider is down. */
+  goOutOfService(): void {
+    this.#outOfService = true
   }
 
   lastTo(address: string): OutgoingEmail | undefined {

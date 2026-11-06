@@ -111,6 +111,24 @@ describe('the comment loop with an agent', () => {
     expect(app.mailer.lastTo('zhou@example.com')?.subject).toBe('lin 在「Design doc」回复了评论')
   })
 
+  it('keeps the comment loop working when notification mail cannot be sent', async () => {
+    const mailOutageApp = new TestApp()
+    const outageAuthorCookie = await mailOutageApp.signIn('lin@example.com')
+    const outageReviewerCookie = await mailOutageApp.signIn('zhou@example.com')
+    const outageAgentToken = await mailOutageApp.createToken(outageAuthorCookie)
+    const published = await mailOutageApp.publish({ token: outageAgentToken }, 'Mail outage')
+    const commentsPath = `/api/artifacts/${published.artifactId}/comments`
+    mailOutageApp.mailer.goOutOfService()
+
+    const reviewerComment = await mailOutageApp.json<{ comment: CommentJson }>(commentsPath, { method: 'POST', cookie: outageReviewerCookie, body: { body: '数字对不上', forAgent: true } })
+    const agentReply = await mailOutageApp.request(commentsPath, { method: 'POST', token: outageAgentToken, body: { body: '已修正', parentId: reviewerComment.body.comment.commentId } })
+    const savedComments = await mailOutageApp.json<{ comments: CommentJson[] }>(commentsPath, { cookie: outageAuthorCookie })
+
+    expect(reviewerComment.status).toBe(201)
+    expect(agentReply.status).toBe(201)
+    expect(savedComments.body.comments.map(comment => comment.body)).toEqual(['数字对不上', '已修正'])
+  })
+
   it('attaches a reply to a reply to the thread it belongs to', async () => {
     const published = await app.publish({ token: agentToken }, 'Threads')
     const commentsPath = `/api/artifacts/${published.artifactId}/comments`
