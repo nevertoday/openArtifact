@@ -1,4 +1,5 @@
 import { element, readJsonData, userMessageOf } from '../common.js'
+import { AgentHandoff } from './agent-handoff.js'
 import { SharedDataProxy } from '../shared-data-proxy.js'
 import { ArtifactFrame } from './artifact-frame.js'
 import { CoachMark, CommentMode, Composer, MODIFIER_KEY, writesByTouch } from './comment-mode.js'
@@ -50,7 +51,10 @@ const compare = versions ? new VersionCompare({ bar: viewer.querySelector('[data
 if (versions) new VersionOverwrite({ config, versions, notice: versionNotice, stage })
 
 const threads = permissions.canReadComments ? new CommentThreads(config.artifactId, config.viewer) : null
-const list = threads ? new CommentList({ element: drawerElement.querySelector('[data-drawer-view="comments"]'), threads, drawer, stage, canComment: permissions.canComment, byTouch: writesByTouch() }) : null
+const handoff = permissions.canEdit
+  ? new AgentHandoff({ artifactId: config.artifactId, title: config.title, version: config.currentVersion, url: `${location.origin}/a/${encodeURIComponent(config.artifactId)}`, guideUrl: `${location.origin}/llms.txt` })
+  : null
+const list = threads ? new CommentList({ element: drawerElement.querySelector('[data-drawer-view="comments"]'), threads, drawer, stage, canComment: permissions.canComment, byTouch: writesByTouch(), handoff }) : null
 const pins = threads ? new CommentPins({ frame, threads, list, isShowingLatest: () => versions?.isShowingLatest ?? true }) : null
 
 if (threads) {

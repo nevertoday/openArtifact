@@ -136,6 +136,12 @@ button.viewer-visibility { cursor: pointer; }
 .comment-reply p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .comment-agent-mark { display: inline-grid; place-items: center; width: 20px; height: 20px; background: var(--ink); color: var(--paper); }
 .comment-thread__resolution { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--text-xs); }
+.agent-handoff { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2) var(--space-3); margin: var(--space-3) var(--inset-md) var(--space-2); padding: var(--space-3); background: var(--wash); border: 1px solid var(--line); }
+.agent-handoff__title { margin: 0; font-weight: var(--weight-strong); color: var(--ink); }
+.agent-handoff__hint { grid-column: 1 / -1; margin: 0; font-size: var(--text-sm); color: var(--muted); }
+.agent-handoff__hint .xxd-link { margin-inline-start: var(--space-1); white-space: nowrap; }
+.comment-thread__copy { margin-inline-start: auto; }
+.comment-thread__copy + .xxd-btn { margin-inline-start: 0; }
 .comment-thread__reply-toggle { margin-top: var(--space-1-5); font-size: var(--text-sm); }
 .comment-reply-form { display: grid; gap: var(--space-2); margin-top: 10px; cursor: auto; }
 .comment-reply-form textarea { min-height: 56px; resize: vertical; }

@@ -19,6 +19,7 @@ export class CommentList extends EventTarget {
   #stage
   #canComment
   #byTouch
+  #handoff
   #filter = 'open'
   #activeId = null
   #replyingTo = null
@@ -28,7 +29,8 @@ export class CommentList extends EventTarget {
   #orphanedIds = new Set()
   #renderWhenIdle = false
 
-  constructor({ element: listElement, threads, drawer, stage, canComment, byTouch }) {
+  /** `handoff` is null for people who cannot edit: an agent acting for them could not change the page. */
+  constructor({ element: listElement, threads, drawer, stage, canComment, byTouch, handoff }) {
     super()
     this.#element = listElement
     this.#threads = threads
@@ -36,6 +38,7 @@ export class CommentList extends EventTarget {
     this.#stage = stage
     this.#canComment = canComment
     this.#byTouch = byTouch
+    this.#handoff = handoff
     threads.addEventListener('change', () => this.render())
     listElement.addEventListener('focusout', () => setTimeout(() => this.#renderIfWaiting()))
     this.#renderFoot()
@@ -115,7 +118,8 @@ export class CommentList extends EventTarget {
     const shownThreads = this.#threads.all.filter(thread => thread.matches(this.#filter))
     this.#renderFilters()
     this.#renderArrivedCue()
-    list.replaceChildren(shownThreads.length > 0 ? element('div', { className: 'comment-threads' }, shownThreads.map(thread => this.#threadElement(thread))) : this.#emptyState())
+    const threadsOrEmpty = shownThreads.length > 0 ? element('div', { className: 'comment-threads' }, shownThreads.map(thread => this.#threadElement(thread))) : this.#emptyState()
+    list.replaceChildren(this.#handoffBar() ?? '', threadsOrEmpty)
     list.scrollTop = scrollTop
     refocus()
     this.#freshId = null
@@ -255,8 +259,45 @@ export class CommentList extends EventTarget {
       element('b', { className: 'comment-thread__author' }, CommentList.#authorOf(thread.root)),
       timeElement(thread.root.createdAt),
       thread.forAgent ? element('span', { className: 'xxd-badge', 'data-tone': 'warning' }, '给 agent') : null,
+      this.#handoff && thread.isOpen ? this.#copyOneButton(thread) : null,
       this.#canComment ? this.#resolveButton(thread) : null,
     )
+  }
+
+  // Every open comment marked for the agent, ready to paste in one go; shown where those comments are being looked at.
+  #handoffBar() {
+    const showsWork = this.#filter === 'open' || this.#filter === 'agent'
+    const waiting = this.#threads.all.filter(thread => thread.isOpen && thread.forAgent)
+    if (!this.#handoff || !showsWork || waiting.length === 0) return null
+    const copyAll = element('button', {
+      type: 'button',
+      className: 'xxd-btn agent-handoff__copy',
+      'data-variant': 'primary',
+      'data-size': 'sm',
+      'data-copy': this.#handoff.promptFor(waiting),
+      'data-copy-done': '已复制',
+      'data-copy-toast': `已复制 ${waiting.length} 条评论，粘贴给你的 agent`,
+    }, icon('Copy', 14), '复制给 agent')
+    return element('section', { className: 'agent-handoff', 'aria-label': '交给 agent' },
+      element('p', { className: 'agent-handoff__title' }, `${waiting.length} 条评论等 agent 处理`),
+      copyAll,
+      element('p', { className: 'agent-handoff__hint' }, '复制后粘贴给任何 agent 都能用。已接入的 agent，直接说「处理 Open Artifact 上的评论」。', element('a', { className: 'xxd-link', href: '/settings/agents' }, '去 Agent 接入')))
+  }
+
+  #copyOneButton(thread) {
+    const label = `复制评论 ${thread.number} 给 agent`
+    return element('button', {
+      type: 'button',
+      className: 'xxd-btn comment-thread__copy',
+      'data-variant': 'ghost',
+      'data-icon-only': true,
+      'data-size': 'xs',
+      'aria-label': label,
+      title: label,
+      'data-copy': this.#handoff.promptFor([thread]),
+      'data-copy-done': '已复制',
+      'data-copy-toast': `已复制评论 ${thread.number}，粘贴给你的 agent`,
+    }, icon('Copy', 14))
   }
 
   #excerptOf(thread) {
