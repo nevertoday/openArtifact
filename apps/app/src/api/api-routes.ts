@@ -1,3 +1,4 @@
+import { ArtifactPath } from '@open-artifact/core'
 import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { ArtifactApi } from './artifact-api.ts'
@@ -118,10 +119,22 @@ export class ApiRoutes {
       if (pathMatches.length === 0) throw HttpError.notFound(`API route ${requestUrl.pathname}`)
       const methodMatch = pathMatches.find(candidate => candidate.apiRoute.method === request.method)
       if (!methodMatch) throw HttpError.methodNotAllowed(request.method)
-      return await methodMatch.apiRoute.respond(new Apis(context), request, methodMatch.match?.pathname.groups ?? {})
+      const params = await ApiRoutes.#withArtifactId(methodMatch.match?.pathname.groups ?? {}, context)
+      return await methodMatch.apiRoute.respond(new Apis(context), request, params)
     } catch (error) {
       if (error instanceof HttpError) return error.toResponse()
       throw error
     }
+  }
+
+  // People hand agents links, not ids, so :artifactId also takes a link's address segment or short id. Only the
+  // id is resolved here; every handler still applies its own access rule, so a stranger learns nothing new.
+  static async #withArtifactId(params: RouteParams, context: ApiContext): Promise<RouteParams> {
+    const requested = params.artifactId
+    if (requested === undefined) return params
+    const reference = ArtifactPath.parse(decodeURIComponent(requested))
+    if (reference?.kind !== 'short_id') return params
+    const summary = await context.gate.find(reference)
+    return summary ? { ...params, artifactId: encodeURIComponent(summary.artifactId) } : params
   }
 }

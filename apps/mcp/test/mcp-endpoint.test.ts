@@ -195,6 +195,14 @@ describe('McpEndpoint', () => {
     expect(result.content[0]?.text).toContain('404')
   })
 
+  it('takes a pasted link as the artifact and sends the app only its address part', async () => {
+    const fakeApp = new FakeApp(Response.json({ artifactId: 'a1' }))
+
+    await callTool(mcpEndpoint(fakeApp), 'read', { artifactId: 'https://artifact.example.com/a/pricing-page-k7f3q9x2m4ab/full?v=2' })
+
+    expect(fakeApp.calls[0]?.url).toBe('http://app.test/api/artifacts/pricing-page-k7f3q9x2m4ab')
+  })
+
   it('answers unknown methods and non-POST requests the MCP way', async () => {
     const endpoint = mcpEndpoint(new FakeApp())
 
