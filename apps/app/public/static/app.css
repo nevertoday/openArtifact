@@ -18,7 +18,9 @@
 .app-search { flex: 0 1 360px; min-width: 0; }
 .app-account-head { padding-block: var(--space-1); }
 .app-bell { position: relative; }
-/* Hangs off the bell's corner, so the count never covers the bell it belongs to. */
+/* Hangs off the bell's corner so it covers less of the bell; the bell keeps that overhang free so the count stays off
+   whatever sits next to it. */
+.app-bell { margin-inline-end: 6px; }
 .app-bell__count { position: absolute; top: -4px; inset-inline-end: -6px; min-width: 18px; height: 18px; padding-inline: 4px; justify-content: center; font-size: 11px; line-height: 18px; pointer-events: none; }
 .app-bell__count[hidden] { display: none; }
 .app-notifications { width: min(360px, calc(100vw - 16px)); max-width: min(360px, calc(100vw - 16px)); padding: 0; }
@@ -72,14 +74,14 @@
    narrow enough that its content fills the cover instead of floating small in the middle of it. */
 /* An artifact page without its own background is written for white paper, whatever theme the app is in. */
 .artifact-cover__preview { color-scheme: light; background: #fff; }
-.artifact-cover__preview { position: absolute; inset: 0 auto auto 0; width: 300%; height: 300%; border: 0; transform: scale(calc(1 / 3)); transform-origin: 0 0; pointer-events: none; }
+/* 12px taller than the cover, so lifting it 4px on hover never shows the cover's ground beneath it. */
+.artifact-cover__preview { position: absolute; inset: 0 auto auto 0; width: 300%; height: calc(300% + 12px); border: 0; transform: scale(calc(1 / 3)); transform-origin: 0 0; pointer-events: none; }
 .xxd-card__media.artifact-cover { border-bottom: 1px solid var(--line); }
 .artifact-meta { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .artifact-meta > * + *::before { content: "·"; padding-inline: var(--space-1-5); color: var(--muted-2); }
 .artifact-card__badges { --cluster-gap: var(--space-1-5); align-self: end; margin-top: var(--space-1); }
-/* Cards answer the pointer: the border darkens and the cover's page eases up a little, as if picked up. */
+/* On hover the cover's page eases up a little, as if picked up; the kit already darkens the border at once. */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .artifact-card { transition: border-color var(--motion-quick) var(--ease-out-quint); }
   .artifact-cover__preview { transition: translate var(--motion-medium) var(--ease-out-quint); }
   .artifact-card:hover .artifact-cover__preview { translate: 0 -4px; }
 }
@@ -88,7 +90,7 @@
 .home-result-line { margin: 0 0 var(--space-3); }
 /* Counts are quiet figures beside the label; only a count that asks for action (data-tone) keeps the badge's fill. */
 .home-sidebar .xxd-badge:empty { display: none; }
-.home-sidebar .xxd-badge:not([data-tone]) { border-color: transparent; background: transparent; color: var(--muted); font-variant-numeric: tabular-nums; }
+.home-sidebar .xxd-badge:not([data-tone]) { border-color: transparent; background: transparent; box-shadow: none; color: var(--muted); font-variant-numeric: tabular-nums; }
 .home-sidebar__sources { margin-top: var(--space-4); }
 .home-source-picker { display: none; }
 @media (max-width: 1024px) {
@@ -103,12 +105,12 @@
   .home-source-picker { display: inline-flex; justify-self: start; }
 }
 @media (max-width: 640px) {
-  /* On a phone the cards come first: the heading and its action share one line, and the description, which the
-     filter's own name already covers, steps aside. */
+  /* On a phone the cards come first: the heading and its action share one line. The description stays, since it is
+     where 全部 says what reach an unbadged card has. */
   .home-header { align-items: center; padding-block: var(--space-4) var(--space-3); }
   .home-header .xxd-page-header__title { min-width: 0; }
-  .home-header .xxd-page-header__desc { display: none; }
   .home-header .xxd-page-header__actions { grid-column: 2; grid-row: 1; order: 0; margin-top: 0; }
+  .home-header .xxd-page-header__desc { grid-column: 1 / -1; }
   .home-header .xxd-page-header__actions .xxd-btn { height: var(--control-h-sm); padding-inline: var(--control-pad-x-sm); }
   .home-sidebar .xxd-sidebar__item { min-height: 44px; }
   .home-sidebar .xxd-sidebar__body { padding-inline: var(--space-4); }

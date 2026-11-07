@@ -297,7 +297,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     const forAgentCount = model.listing.forAgentCount(summary.artifactId)
     const forAgentPart = forAgentCount > 0 ? ` · 其中 ${forAgentCount} 条给 agent` : ''
     const publishedBy = ArtifactLabels.publishedBy(model.authorNames.get(summary.authorId) ?? '', summary.publishedVia)
-    // Visible to the workspace is the default the page heading already states, so only a different reach gets a badge.
+    // Visible to the workspace is the default, which the 全部 description states, so only a different reach gets a badge.
     const sharingBadge = summary.sharing.visibility === 'workspace' ? '' : html`<span class="xxd-badge">${ArtifactLabels.sharingBadge(summary.sharing, model.now)}</span>`
     const commentBadge = unresolvedCount > 0 ? html`<span class="xxd-badge" data-appearance="dot" data-tone="warning">${unresolvedCount} 条未解决评论${forAgentPart}</span>` : ''
     return html`<a class="xxd-card artifact-card" href="/a/${encodeURIComponent(summary.artifactId)}">
@@ -308,7 +308,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
   </div>
   <div class="xxd-card__body">
     <p class="xxd-card__title artifact-card__title" title="${summary.title}">${summary.title}</p>
-    <p class="xxd-card__meta artifact-meta" title="${publishedBy}"><span>${publishedBy}</span>${PageShell.relativeTime(summary.updatedAt, model.now)}${summary.version > 1 ? html`<span class="xxd-mono">v${summary.version}</span>` : ''}</p>
+    <p class="xxd-card__meta artifact-meta" title="${publishedBy} · ${ArtifactLabels.updatedAgo(summary.updatedAt, model.now)}${summary.version > 1 ? ` · v${summary.version}` : ''}"><span>${publishedBy}</span>${PageShell.relativeTime(summary.updatedAt, model.now)}${summary.version > 1 ? html`<span class="xxd-mono">v${summary.version}</span>` : ''}</p>
     ${sharingBadge || commentBadge ? html`<div class="xxd-cluster artifact-card__badges">${sharingBadge}${commentBadge}</div>` : ''}
   </div>
 </a>`
