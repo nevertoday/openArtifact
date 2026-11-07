@@ -2,6 +2,7 @@ import { element, icon, initialOf, submitOnce, timeElement, userMessageOf } from
 import { MODIFIER_KEY } from './comment-mode.js'
 import { COMMENT_FILTERS } from './comment-threads.js'
 
+const COPIED_LABEL_MS = 2000
 const FILTER_LABELS = { open: '待处理', agent: '给 agent', all: '全部' }
 const COMMENT_LINK_PREFIX = '#comment-'
 const THREAD_CONTROLS = ['.comment-pin', '.comment-thread__resolve', '.comment-thread__reply-toggle']
@@ -242,7 +243,7 @@ export class CommentList extends EventTarget {
       element('p', { className: 'comment-thread__body' }, thread.root.body),
       thread.replies.length > 0 ? element('ol', { className: 'comment-replies' }, thread.replies.map(reply => CommentList.#replyElement(reply))) : null,
       isResolved ? CommentList.#resolutionOf(thread.root) : null,
-      this.#canComment ? this.#replyArea(thread) : null,
+      this.#canComment ? this.#actionsOrReplyForm(thread) : null,
     )
     threadElement.addEventListener('click', event => {
       if (event.target.closest('button, a, form')) return
@@ -259,8 +260,6 @@ export class CommentList extends EventTarget {
       element('b', { className: 'comment-thread__author' }, CommentList.#authorOf(thread.root)),
       timeElement(thread.root.createdAt),
       thread.forAgent ? element('span', { className: 'xxd-badge', 'data-tone': 'warning' }, '给 agent') : null,
-      this.#handoff && thread.isOpen ? this.#copyOneButton(thread) : null,
-      this.#canComment ? this.#resolveButton(thread) : null,
     )
   }
 
@@ -274,30 +273,12 @@ export class CommentList extends EventTarget {
       className: 'xxd-btn agent-handoff__copy',
       'data-variant': 'primary',
       'data-size': 'sm',
-      'data-copy': this.#handoff.promptFor(waiting),
-      'data-copy-done': '已复制',
-      'data-copy-toast': `已复制 ${waiting.length} 条评论，粘贴给你的 agent`,
-    }, icon('Copy', 14), '复制给 agent')
+      onClick: event => this.#copyToAgent(event.currentTarget, waiting, `已复制 ${waiting.length} 条评论，粘贴给你的 agent`),
+    }, icon('Copy', 14), element('span', { 'data-copy-label': '' }, '复制给 agent'))
     return element('section', { className: 'agent-handoff', 'aria-label': '交给 agent' },
       element('p', { className: 'agent-handoff__title' }, `${waiting.length} 条评论等 agent 处理`),
       copyAll,
       element('p', { className: 'agent-handoff__hint' }, '复制后粘贴给任何 agent 都能用。已接入的 agent，直接说「处理 Open Artifact 上的评论」。', element('a', { className: 'xxd-link', href: '/settings/agents' }, '去 Agent 接入')))
-  }
-
-  #copyOneButton(thread) {
-    const label = `复制评论 ${thread.number} 给 agent`
-    return element('button', {
-      type: 'button',
-      className: 'xxd-btn comment-thread__copy',
-      'data-variant': 'ghost',
-      'data-icon-only': true,
-      'data-size': 'xs',
-      'aria-label': label,
-      title: label,
-      'data-copy': this.#handoff.promptFor([thread]),
-      'data-copy-done': '已复制',
-      'data-copy-toast': `已复制评论 ${thread.number}，粘贴给你的 agent`,
-    }, icon('Copy', 14))
   }
 
   #excerptOf(thread) {
@@ -306,11 +287,40 @@ export class CommentList extends EventTarget {
     return element('p', { className: 'comment-thread__quote' }, lostSpot, thread.excerpt)
   }
 
-  #resolveButton(thread) {
+  // One quiet row of words under each thread, so no two actions share a look and none is a bare symbol.
+  #actionsOrReplyForm(thread) {
+    if (this.#replyingTo === thread.id) return this.#replyForm(thread)
     const isResolved = !thread.isOpen
-    const label = isResolved ? `重新打开评论 ${thread.number}` : `解决评论 ${thread.number}`
-    return element('button', { type: 'button', className: 'xxd-btn comment-thread__resolve', 'data-variant': 'ghost', 'data-icon-only': true, 'data-size': 'sm', 'aria-label': label, 'data-tooltip': isResolved ? '重新打开' : '解决', 'data-tooltip-placement': 'left', onClick: () => (isResolved ? this.#reopen(thread) : this.#resolve(thread)) },
-      icon(isResolved ? 'RotateCcw' : 'Check'))
+    const action = (label, onClick, extra = {}) => element('button', { type: 'button', className: 'xxd-link', onClick, ...extra }, label)
+    return element('div', { className: 'comment-thread__actions' },
+      action('回复', () => this.#openReply(thread.id), { className: 'xxd-link comment-thread__reply-toggle', 'aria-label': `回复评论 ${thread.number}` }),
+      this.#handoff && !isResolved ? action('复制给 agent', event => this.#copyToAgent(event.currentTarget, [thread], `已复制评论 ${thread.number}，粘贴给你的 agent`), { 'aria-label': `复制评论 ${thread.number} 给 agent` }) : null,
+      isResolved
+        ? action('重新打开', () => this.#reopen(thread), { className: 'xxd-link comment-thread__resolve', 'aria-label': `重新打开评论 ${thread.number}` })
+        : action('解决', () => this.#resolve(thread), { className: 'xxd-link comment-thread__resolve', 'aria-label': `解决评论 ${thread.number}` }),
+    )
+  }
+
+  // The control itself says 已复制 for a moment, in words, so it never reads as another control's symbol.
+  async #copyToAgent(control, threads, doneMessage) {
+    // The kit falls back to a hidden selection when the clipboard API is refused; it answers false only when both fail.
+    const copied = await Xxd.copyText(this.#handoff.promptFor(threads))
+    if (!copied) {
+      Xxd.toast('没有复制成功，请再试一次', { tone: 'danger', within: this.#toastRegion })
+      return
+    }
+    const label = control.querySelector('[data-copy-label]') ?? control
+    const restingLabel = label.textContent
+    // Held at its resting width, so the shorter word does not pull the controls beside it.
+    control.style.minWidth = `${control.offsetWidth}px`
+    label.textContent = '已复制'
+    control.setAttribute('data-copied', '')
+    Xxd.toast(doneMessage, { tone: 'success', within: this.#toastRegion })
+    setTimeout(() => {
+      label.textContent = restingLabel
+      control.removeAttribute('data-copied')
+      control.style.minWidth = ''
+    }, COPIED_LABEL_MS)
   }
 
   // Focus goes to the thread after the resolved one, so the keyboard keeps its place in the list.
@@ -338,10 +348,7 @@ export class CommentList extends EventTarget {
     }
   }
 
-  #replyArea(thread) {
-    if (this.#replyingTo !== thread.id) {
-      return element('button', { type: 'button', className: 'xxd-link comment-thread__reply-toggle', onClick: () => this.#openReply(thread.id) }, '回复')
-    }
+  #replyForm(thread) {
     const replyBody = element('textarea', { className: 'xxd-textarea', rows: '2', required: true, placeholder: '回复…', 'aria-label': `回复评论 ${thread.number}`, onInput: event => this.#replyDrafts.set(thread.id, event.target.value) }, this.#replyDrafts.get(thread.id) ?? '')
     const replyForm = element('form', { className: 'comment-reply-form', 'data-reply-form': thread.id },
       replyBody,

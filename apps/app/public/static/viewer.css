@@ -123,7 +123,6 @@ button.viewer-visibility { cursor: pointer; }
 .comment-thread > * { position: relative; }
 .comment-thread__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-height: 28px; color: var(--muted); font-size: var(--text-xs); }
 .comment-thread__author { color: var(--ink); font-size: var(--text-sm); font-weight: var(--weight-medium); }
-.comment-thread__resolve { margin-inline-start: auto; }
 .comment-pin { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--space-1); border: 0; background: var(--ink); color: var(--paper); font: var(--weight-strong) 11px / 1 var(--font-body); font-variant-numeric: tabular-nums; cursor: pointer; }
 .comment-pin[data-state="agent"] { background: var(--warning-solid); color: var(--warning-on-solid); }
 .comment-pin[data-state="resolved"] { background: var(--success-solid); color: var(--success-on-solid); }
@@ -140,9 +139,8 @@ button.viewer-visibility { cursor: pointer; }
 .agent-handoff__title { margin: 0; font-weight: var(--weight-strong); color: var(--ink); }
 .agent-handoff__hint { grid-column: 1 / -1; margin: 0; font-size: var(--text-sm); color: var(--muted); }
 .agent-handoff__hint .xxd-link { margin-inline-start: var(--space-1); white-space: nowrap; }
-.comment-thread__copy { margin-inline-start: auto; }
-.comment-thread__copy + .xxd-btn { margin-inline-start: 0; }
-.comment-thread__reply-toggle { margin-top: var(--space-1-5); font-size: var(--text-sm); }
+.comment-thread__actions { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-top: var(--space-1-5); font-size: var(--text-sm); }
+.comment-thread__actions [data-copied] { color: var(--success-text, var(--muted)); text-decoration: none; text-align: start; }
 .comment-reply-form { display: grid; gap: var(--space-2); margin-top: 10px; cursor: auto; }
 .comment-reply-form textarea { min-height: 56px; resize: vertical; }
 .comment-reply-form__row { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); }
