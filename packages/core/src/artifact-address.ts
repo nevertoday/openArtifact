@@ -64,14 +64,13 @@ export class ArtifactSlug {
   }
 
   /**
-   * Links already sent keep their words when only the title changes. An artifact that has no words yet takes
-   * them from its new title.
+   * Links already sent keep their words when only the title changes. An artifact that has no words yet, such as
+   * one published before addresses had words, takes them from its title the next time it changes in any way.
    */
-  static afterChange(current: string, requested: string | null, changedTitle: string | null): string {
+  static afterChange(current: string, requested: string | null, title: string): string {
     const chosen = ArtifactSlug.#requested(requested)
     if (chosen !== null) return chosen
-    if (current === '' && changedTitle !== null) return ArtifactSlug.normalize(changedTitle)
-    return current
+    return current === '' ? ArtifactSlug.normalize(title) : current
   }
 
   // Words that normalize to nothing, such as a slug written only in Chinese, count as not given.

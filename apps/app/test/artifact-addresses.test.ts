@@ -213,6 +213,18 @@ describe('changing the words of an address', () => {
     expect(renamed.body.url).toBe(`${APP_ORIGIN}/a/weekly-report-${published.shortId}`)
   })
 
+  it('gives an artifact published before addresses had words the ones of its title at its next version', async () => {
+    const published = await publish({ title: 'Open Artifact 使用指南' })
+    await env.DB.prepare("UPDATE artifacts SET slug = '' WHERE id = ?").bind(published.artifactId).run()
+
+    const updated = await app.json<Published>(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: authorToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+
+    expect(updated.status).toBe(200)
+    expect(updated.body.url).toBe(`${APP_ORIGIN}/a/open-artifact-${published.shortId}`)
+    const oldLink = await app.request(`/a/${published.shortId}`, { cookie: authorCookie })
+    expect(oldLink.headers.get('Location')).toBe(`/a/open-artifact-${published.shortId}`)
+  })
+
   it('ignores words that leave nothing once normalized', async () => {
     const published = await publish({ title: 'Budget', slug: 'budget' })
 

@@ -44,9 +44,9 @@ describe('ArtifactSlug', () => {
 
   it('keeps the words of links already sent when only the title changes', () => {
     expect(ArtifactSlug.afterChange('roadmap', null, 'Launch plan')).toBe('roadmap')
-    expect(ArtifactSlug.afterChange('roadmap', 'launch-plan', null)).toBe('launch-plan')
+    expect(ArtifactSlug.afterChange('roadmap', 'launch-plan', 'Roadmap')).toBe('launch-plan')
     expect(ArtifactSlug.afterChange('', null, 'Launch plan')).toBe('launch-plan')
-    expect(ArtifactSlug.afterChange('', null, null)).toBe('')
+    expect(ArtifactSlug.afterChange('', null, '使用指南')).toBe('')
   })
 })
 
