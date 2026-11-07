@@ -17,8 +17,8 @@ export class CloudflareArtifactAccessRepository implements ArtifactAccessReposit
   async saveSharing(artifactId: string, sharing: ArtifactSharing, grants: PersonGrant[]): Promise<void> {
     await this.#db.batch([
       this.#db
-        .prepare('UPDATE artifacts SET visibility = ?, public_link_expires_at = ?, public_link_password_hash = ?, anonymous_write_enabled = ?, public_link_shows_comments = ? WHERE id = ?')
-        .bind(sharing.visibility, sharing.publicLinkExpiresAt, sharing.publicLinkPasswordHash, sharing.anonymousWriteEnabled ? 1 : 0, sharing.publicLinkShowsComments ? 1 : 0, artifactId),
+        .prepare('UPDATE artifacts SET visibility = ?, public_link_expires_at = ?, public_link_password_hash = ?, anonymous_write_enabled = ?, public_link_shows_comments = ?, listed = ? WHERE id = ?')
+        .bind(sharing.visibility, sharing.publicLinkExpiresAt, sharing.publicLinkPasswordHash, sharing.anonymousWriteEnabled ? 1 : 0, sharing.publicLinkShowsComments ? 1 : 0, sharing.listed ? 1 : 0, artifactId),
       this.#db.prepare('DELETE FROM artifact_grants WHERE artifact_id = ?').bind(artifactId),
       ...grants.map(grant => this.#db.prepare('INSERT INTO artifact_grants (artifact_id, user_id, role) VALUES (?, ?, ?)').bind(artifactId, grant.userId, grant.role)),
     ])

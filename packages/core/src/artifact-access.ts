@@ -1,7 +1,7 @@
 import type { AccessTokenScope } from './access-token-repository.ts'
 import type { GrantRole } from './artifact-access-repository.ts'
 import type { ArtifactRemoval } from './artifact-removal.ts'
-import type { ArtifactSummary, ArtifactVisibility } from './artifact-repository.ts'
+import type { ArtifactSharing, ArtifactSummary, ArtifactVisibility } from './artifact-repository.ts'
 import type { WorkspaceRole } from './workspace-repository.ts'
 
 export interface ArtifactViewer {
@@ -88,6 +88,17 @@ export class ArtifactAccess {
     const { visibility, publicLinkExpiresAt } = this.#summary.sharing
     const notExpired = publicLinkExpiresAt === null || publicLinkExpiresAt > this.#now
     return visibility === 'public_link' && this.#publicLinksEnabled && notExpired
+  }
+
+  /** On the author's personal page: listed, and anyone may open it now without a password. */
+  get onPersonalPage(): boolean {
+    const { listed, publicLinkPasswordHash } = this.#summary.sharing
+    return listed && this.publicLinkActive && publicLinkPasswordHash === null && this.#summary.removal === null
+  }
+
+  /** Only a public link anyone can open may be listed; a password or another visibility rules it out. */
+  static listable(sharing: Pick<ArtifactSharing, 'visibility' | 'publicLinkPasswordHash'>): boolean {
+    return sharing.visibility === 'public_link' && sharing.publicLinkPasswordHash === null
   }
 
   // A removed artifact is gone for everyone; the only thing left to do with it is restore it.

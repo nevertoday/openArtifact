@@ -2,6 +2,7 @@ import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { ArtifactApi } from './artifact-api.ts'
 import { CommentApi } from './comment-api.ts'
+import { ProfileApi } from './profile-api.ts'
 import { NotificationApi } from './notification-api.ts'
 import { InviteApi } from './invite-api.ts'
 import { SharedDataApi } from './shared-data-api.ts'
@@ -26,6 +27,7 @@ class Apis {
   readonly tokens: TokenApi
   readonly sharedData: SharedDataApi
   readonly workspace: WorkspaceApi
+  readonly profile: ProfileApi
 
   constructor(context: ApiContext) {
     this.artifacts = new ArtifactApi(context)
@@ -36,6 +38,7 @@ class Apis {
     this.tokens = new TokenApi(context)
     this.sharedData = new SharedDataApi(context)
     this.workspace = new WorkspaceApi(context)
+    this.profile = new ProfileApi(context)
   }
 }
 
@@ -52,6 +55,7 @@ function param(params: RouteParams, name: string): string {
 const API_ROUTES: ApiRoute[] = [
   route('GET', '/api/me', apis => apis.workspace.me()),
   route('PATCH', '/api/me', (apis, request) => apis.workspace.rename(request)),
+  route('PATCH', '/api/me/profile', (apis, request) => apis.profile.update(request)),
   route('POST', '/api/me/workspace', (apis, request) => apis.workspace.switchWorkspace(request)),
   route('GET', '/api/workspace/members', apis => apis.workspace.members()),
   route('PATCH', '/api/workspace/members/:userId', (apis, request, params) => apis.workspace.changeRole(request, param(params, 'userId'))),

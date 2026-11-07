@@ -5,6 +5,7 @@ import {
   CloudflareArtifactAccessRepository,
   CloudflareArtifactRepository,
   CloudflareCommentRepository,
+  CloudflareProfileRepository,
   CloudflareSharedDataRepository,
   CloudflareUserDirectory,
   CloudflareWorkspaceRepository,
@@ -37,6 +38,9 @@ async function createArtifactIn(workspaceId: string, authorId: string) {
     publicLinkExpiresAt: null,
     publishedVia: null,
     note: null,
+    excerpt: null,
+    listed: false,
+    summary: null,
     files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('<h1>Sign up</h1>') }],
   })
 }
@@ -135,12 +139,12 @@ describe('artifact access, comments and shared data', () => {
     const accessRepository = new CloudflareArtifactAccessRepository(env.DB)
     const { artifactId } = await createArtifactIn(workspaceId, authorId)
 
-    const publicSharing = { visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true } as const
+    const publicSharing = { visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true, listed: false } as const
     await accessRepository.saveSharing(artifactId, publicSharing, [{ userId: reviewerId, role: 'commenter' }])
     await accessRepository.saveSharing(artifactId, publicSharing, [{ userId: reviewerId, role: 'editor' }])
 
     const summary = await artifactRepository.findSummary(artifactId)
-    expect(summary?.sharing).toEqual({ visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true })
+    expect(summary?.sharing).toEqual({ visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true, listed: false })
     expect(await accessRepository.listGrants(artifactId)).toEqual([{ artifactId, userId: reviewerId, role: 'editor' }])
     expect((await accessRepository.listGrantsOfUser(reviewerId)).map(grant => grant.artifactId)).toContain(artifactId)
 
@@ -151,7 +155,7 @@ describe('artifact access, comments and shared data', () => {
   it('saves neither the sharing nor the people when one part of the save fails', async () => {
     const accessRepository = new CloudflareArtifactAccessRepository(env.DB)
     const { artifactId } = await createArtifactIn(workspaceId, authorId)
-    const privateSharing = { visibility: 'private', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false } as const
+    const privateSharing = { visibility: 'private', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, listed: false } as const
 
     const duplicatePerson = accessRepository.saveSharing(artifactId, { ...privateSharing, visibility: 'specified' }, [{ userId: reviewerId, role: 'viewer' }, { userId: reviewerId, role: 'editor' }])
 
@@ -241,5 +245,60 @@ describe('artifact access, comments and shared data', () => {
 
     expect(await tokenRepository.useToken('hash-publish', now)).toMatchObject({ accessToken: { name: 'Publisher', scope: 'publish' } })
     expect(await tokenRepository.useToken('hash-before-scopes', now)).toMatchObject({ accessToken: { name: 'Older laptop', scope: 'full' } })
+  })
+})
+
+describe('CloudflareProfileRepository', () => {
+  const profileRepository = new CloudflareProfileRepository(env.DB)
+
+  it('gives two people with one name their own handles, and moves a handle when the name changes', async () => {
+    const firstLin = await profileRepository.claim('user-lin-1', ['lin', 'lin-2'])
+    const secondLin = await profileRepository.claim('user-lin-2', ['lin', 'lin-2'])
+    const firstLinAgain = await profileRepository.claim('user-lin-1', ['LIN', 'lin-2'])
+    const renamed = await profileRepository.claim('user-lin-2', ['lin.yang', 'lin.yang-2'])
+
+    expect([firstLin.handle, secondLin.handle, firstLinAgain.handle]).toEqual(['lin', 'lin-2', 'lin'])
+    expect(renamed.handle).toBe('lin.yang')
+    expect((await profileRepository.findByHandle('LIN.YANG'))?.userId).toBe('user-lin-2')
+    expect(await profileRepository.findByHandle('lin-2')).toBeNull()
+  })
+
+  it('changes the bio and the pinned artifact separately', async () => {
+    const authorId = await addUser('Pinner')
+    const workspaceId = (await joinedFirstWorkspace(authorId)).workspace.workspaceId
+    const { artifactId } = await createArtifactIn(workspaceId, authorId)
+    await profileRepository.claim(authorId, ['pinner'])
+
+    await profileRepository.update(authorId, { bio: '写规则的人' })
+    const pinned = await profileRepository.update(authorId, { pinnedArtifactId: artifactId })
+    const bioKept = await profileRepository.update(authorId, { bio: '写规则和评审的人' })
+    const unpinned = await profileRepository.update(authorId, { pinnedArtifactId: null })
+
+    expect(pinned).toMatchObject({ bio: '写规则的人', pinnedArtifactId: artifactId })
+    expect(bioKept.pinnedArtifactId).toBe(artifactId)
+    expect(unpinned).toMatchObject({ bio: '写规则和评审的人', pinnedArtifactId: null })
+  })
+})
+
+describe('listing on a personal page', () => {
+  it('lists the author’s listed, active artifacts with the summary they wrote or the page’s opening words', async () => {
+    const accessRepository = new CloudflareArtifactAccessRepository(env.DB)
+    const authorId = await addUser('Lister')
+    const workspaceId = (await joinedFirstWorkspace(authorId)).workspace.workspaceId
+    const publicSharing = { visibility: 'public_link', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false } as const
+    const withOpening = await artifactRepository.create({ workspaceId, authorId, title: 'Opening', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: '页面开头的话', listed: true, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+    const withSummary = await artifactRepository.create({ workspaceId, authorId, title: 'Summarized', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: '页面开头的话', listed: true, summary: '作者写的摘要', files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+    const unlisted = await createArtifactIn(workspaceId, authorId)
+    await accessRepository.saveSharing(unlisted.artifactId, { ...publicSharing, listed: false }, [])
+
+    const listed = await artifactRepository.listListedBy(authorId)
+    await artifactRepository.setSummary(withSummary.artifactId, null)
+    const summaryCleared = await artifactRepository.findSummary(withSummary.artifactId)
+
+    expect(listed.map(summary => [summary.artifactId, summary.summary])).toEqual([
+      [withSummary.artifactId, '作者写的摘要'],
+      [withOpening.artifactId, '页面开头的话'],
+    ])
+    expect(summaryCleared?.summary).toBe('页面开头的话')
   })
 })

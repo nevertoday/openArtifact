@@ -11,11 +11,14 @@ export interface PublicLinkChange {
   visibilityBefore: ArtifactVisibility | null
   visibilityAfter: ArtifactVisibility
   savedExpiresAt: number | null
+  /** Put on the author's personal page, where it is meant to stay. */
+  listedAfter: boolean
 }
 
 /**
  * When a public link expires, as one request sets it. A person on the web page always chooses. An agent that
- * opens a public link without saying when it should expire gets 7 days, so a link it forgets does not stay open.
+ * opens a public link without saying when it should expire gets 7 days, so a link it forgets does not stay open,
+ * unless it lists the artifact on the author's personal page, which is meant to last.
  */
 export class PublicLinkExpiry {
   readonly expiresAt: number | null
@@ -32,7 +35,7 @@ export class PublicLinkExpiry {
     if (requestBody.has('publicLinkExpiresAt')) return new PublicLinkExpiry(PublicLinkExpiry.#requestedExpiry(requestBody, now), null)
     const isAgent = identity.agentClient !== null
     const opensPublicLink = change.visibilityAfter === 'public_link' && change.visibilityBefore !== 'public_link'
-    if (isAgent && opensPublicLink) {
+    if (isAgent && opensPublicLink && !change.listedAfter) {
       const agentDefaultExpiresAt = now + AGENT_PUBLIC_LINK_DAYS * DAY_MS
       return new PublicLinkExpiry(agentDefaultExpiresAt, agentDefaultExpiresAt)
     }

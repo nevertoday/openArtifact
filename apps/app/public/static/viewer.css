@@ -214,3 +214,14 @@ button.viewer-visibility { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .viewer *:not(.xxd-spinner), .viewer *::before { animation: none !important; transition: none !important; }
 }
+
+/* Under an artifact listed on its author's personal page: who wrote it, and where to read on. */
+.viewer-byline { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 10px max(var(--space-4), calc(50% - 560px)); border-top: 1px solid var(--line); background: var(--paper); font-size: var(--text-sm); }
+.viewer-byline__avatar { display: grid; place-items: center; width: 30px; height: 30px; background: var(--ink); color: var(--paper); font-weight: 700; text-decoration: none; }
+.viewer-byline__who { display: grid; margin: 0; min-width: 0; }
+.viewer-byline__who a { color: var(--ink); font-weight: var(--weight-strong); text-decoration: none; }
+.viewer-byline__who span { color: var(--muted); font-size: var(--text-xs); }
+.viewer-byline__next { display: flex; align-items: center; gap: 10px; min-width: 0; margin: 0; color: var(--muted); }
+.viewer-byline__next a { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; overflow: hidden; color: var(--ink); font-weight: var(--weight-strong); text-decoration: none; white-space: nowrap; text-overflow: ellipsis; }
+@media (hover: hover) { .viewer-byline a:hover { text-decoration: underline; text-underline-offset: 3px; } }
+@media (max-width: 560px) { .viewer-byline__next span { display: none; } .viewer-byline__next a { max-width: 44vw; } }

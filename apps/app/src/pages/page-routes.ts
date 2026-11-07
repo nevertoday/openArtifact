@@ -4,13 +4,15 @@ import type { ApiContext } from '../api/api-context.ts'
 import { INVITE_COOKIE } from '../auth/admission.ts'
 import { WORKSPACE_COOKIE, type Identity } from '../auth/request-identity.ts'
 import { AgentGuide } from '../guide/agent-guide.ts'
+import { PersonalPages } from '../personal-pages.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { HOME_FILTERS, HomeListing, HomePage, type HomeFilter } from './home-page.ts'
 import { LoginPage } from './login-page.ts'
 import { MessagePages, type PasswordPrompt } from './message-pages.ts'
+import { PersonalPage } from './personal-page.ts'
 import { SettingsPage, type WorkspaceAdministration } from './settings-page.ts'
 import { SETTINGS_SECTIONS, type SettingsSection } from './settings-sections.ts'
-import { ViewerPage, type OlderVersion, type ViewerModel } from './viewer-page.ts'
+import { ViewerPage, type Byline, type OlderVersion, type ViewerModel } from './viewer-page.ts'
 
 const UNLOCK_COOKIE_SECONDS = 30 * 24 * 60 * 60
 const MAX_LIVE_PREVIEWS = 12
@@ -102,6 +104,34 @@ export class PageRoutes {
     return HomePage.render({ identity, listing, query, authorNames, previewUrls, justRemoved, usercontentOrigin: this.#settings.usercontentOrigin, now: Date.now() })
   }
 
+  /** Anyone may read a personal page; `/@me` takes a signed-in person to their own, making it the first time. */
+  async personalPage(request: Request, handle: string): Promise<Response> {
+    const identity = await this.#context.identity()
+    if (handle === 'me') return identity ? this.#redirectToOwnPersonalPage(identity) : this.#redirectToLogin(request)
+    const profile = await this.#context.personalPages.findByHandle(handle)
+    if (!profile) return MessagePages.unknownAddress(404)
+    const now = Date.now()
+    const [entries, names] = await Promise.all([this.#context.personalPages.entriesOf(profile.userId, now), this.#context.people.namesOf([profile.userId])])
+    const previewUrls = new Map(
+      await Promise.all(entries.map(async entry => [entry.artifactId, `${await this.#context.artifactPages.entryPageUrl(entry.artifactId, entry.version, now)}?preview`] as const)),
+    )
+    return PersonalPage.render({
+      profile,
+      name: names.get(profile.userId) ?? profile.handle,
+      entries,
+      previewUrls,
+      isOwner: identity?.userId === profile.userId,
+      pageUrl: this.#context.personalPages.url(profile.handle),
+      usercontentOrigin: this.#settings.usercontentOrigin,
+      now,
+    })
+  }
+
+  async #redirectToOwnPersonalPage(identity: Identity): Promise<Response> {
+    const profile = await this.#context.personalPages.claim(identity.userId)
+    return new Response(null, { status: 302, headers: { Location: PersonalPages.path(profile.handle) } })
+  }
+
   async viewer(request: Request, artifactId: string): Promise<Response> {
     const viewing = await this.#viewing(request, artifactId)
     return viewing instanceof Response ? viewing : ViewerPage.render(viewing)
@@ -127,16 +157,33 @@ export class PageRoutes {
     if (showsOlderVersion && !openedArtifact.permissions.canSeeVersions) return identity ? MessagePages.notFound(null) : this.#redirectToLogin(request)
     const now = Date.now()
     const authorNames = await this.#context.people.namesOf([openedArtifact.summary.authorId])
+    const authorName = authorNames.get(openedArtifact.summary.authorId) ?? ''
     return {
       openedArtifact,
       identity,
-      authorName: authorNames.get(openedArtifact.summary.authorId) ?? '',
+      authorName,
+      byline: ViewerPage.isPublicLinkVisitor(openedArtifact) ? await this.#bylineOf(openedArtifact, authorName, now) : null,
       shownVersion,
       missingVersion: asksForMissingVersion ? requestedVersion : null,
       olderVersion: shownVersion === openedArtifact.summary.version ? null : await this.#olderVersion(artifactId, shownVersion),
       artifactUrl: await this.#context.artifactPages.entryPageUrl(artifactId, shownVersion, now),
       usercontentOrigin: this.#settings.usercontentOrigin,
       now,
+    }
+  }
+
+  // A stranger reading a listed artifact can follow the author to their page and on to the next piece.
+  async #bylineOf(openedArtifact: OpenedArtifact, authorName: string, now: number): Promise<Byline | null> {
+    const { summary } = openedArtifact
+    const [entries, profile] = await Promise.all([this.#context.personalPages.entriesOf(summary.authorId, now), this.#context.repositories.profiles.findByUser(summary.authorId)])
+    const position = entries.findIndex(entry => entry.artifactId === summary.artifactId)
+    if (position < 0 || !profile) return null
+    const next = entries[(position + 1) % entries.length]
+    return {
+      authorName,
+      personalPagePath: PersonalPages.path(profile.handle),
+      articleUrl: this.#context.viewerUrl(summary.artifactId),
+      next: next && next.artifactId !== summary.artifactId ? { artifactId: next.artifactId, title: next.title } : null,
     }
   }
 

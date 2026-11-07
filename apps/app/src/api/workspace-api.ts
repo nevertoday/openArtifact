@@ -29,10 +29,11 @@ export class WorkspaceApi {
   }
 
   async rename(request: Request): Promise<Response> {
-    await this.#context.requireBrowserSession()
+    const identity = await this.#context.requireBrowserSession()
     const requestBody = await JsonBody.of(request)
     const name = requestBody.text('name', MAX_NAME_LENGTH)
     await this.#context.auth.rename(request, name)
+    await this.#context.personalPages.followRename(identity.userId)
     return Response.json({ name })
   }
 

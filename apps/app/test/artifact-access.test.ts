@@ -336,7 +336,7 @@ describe('public links', () => {
     const published = await app.publish({ token: authorToken }, 'Expired campaign')
     await setSharing(published.artifactId, { visibility: 'public_link', publicLinkExpiresAt: Date.now() + 60_000 })
     const summary = await app.repositories.artifacts.findSummary(published.artifactId)
-    await app.repositories.artifactAccess.saveSharing(published.artifactId, { ...(summary?.sharing ?? { visibility: 'public_link', publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false }), publicLinkExpiresAt: Date.now() - 1 }, [])
+    await app.repositories.artifactAccess.saveSharing(published.artifactId, { ...(summary?.sharing ?? { visibility: 'public_link', publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, listed: false }), publicLinkExpiresAt: Date.now() - 1 }, [])
 
     const backToPrivate = await setSharing(published.artifactId, { visibility: 'private' })
     const sharing = await app.json<{ visibility: string; publicLink: { expiresAt: number } }>(`/api/artifacts/${published.artifactId}/sharing`, { cookie: authorCookie })
@@ -471,7 +471,7 @@ describe('what a visitor of a public link sees', () => {
 
   it('treats a signed-in person from another workspace like any visitor of the link', async () => {
     await env.DB.prepare("INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES ('workspace-partner', 'Partner team', ?)").bind(Date.now()).run()
-    const partnerPage = await app.repositories.artifacts.create({ workspaceId: 'workspace-partner', authorId: 'user-partner', title: 'Partner brief', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+    const partnerPage = await app.repositories.artifacts.create({ workspaceId: 'workspace-partner', authorId: 'user-partner', title: 'Partner brief', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: null, listed: false, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
 
     const versions = await app.request(`/api/artifacts/${partnerPage.artifactId}/versions`, { cookie: memberCookie })
     const pageMarkup = await (await app.request(`/a/${partnerPage.artifactId}`, { cookie: memberCookie })).text()

@@ -31,3 +31,5 @@ export type { SharedCollection, SharedDataRepository, SharedDocument } from './s
 export { WORKSPACE_ROLES } from './workspace-repository.ts'
 export type { JoinResult, Membership, MembershipChange, UserDirectory, UserProfile, Workspace, WorkspaceMember, WorkspaceRepository, WorkspaceRole } from './workspace-repository.ts'
 export type { Repositories } from './repositories.ts'
+export type { Profile, ProfileChange, ProfileRepository } from './profile-repository.ts'
+export { ProfileHandle } from './profile-handle.ts'

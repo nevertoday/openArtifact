@@ -26,6 +26,7 @@ export type ErrorCode =
   | 'author_always_sees'
   | 'public_links_off'
   | 'version_conflict'
+  | 'not_listable'
 
 /** Which request field an error is about, so a page can show it under that field. */
 export interface FieldDetail {

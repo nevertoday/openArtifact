@@ -15,6 +15,8 @@ export interface ArtifactSharing {
   anonymousWriteEnabled: boolean
   /** Visitors of the public link may read the comments; otherwise they see the page alone. */
   publicLinkShowsComments: boolean
+  /** The author put it on their personal page; it shows there only while anyone may open it without a password. */
+  listed: boolean
 }
 
 /** How a version came to be: new files, or the files of an earlier version published again. */
@@ -29,6 +31,8 @@ export interface Publication {
   publishedVia: string | null
   origin: VersionOrigin
   note: string | null
+  /** The opening words of the entry page, for the author's personal page; null when the page has none. */
+  excerpt: string | null
   files: ArtifactFile[]
 }
 
@@ -39,6 +43,9 @@ export interface NewArtifact extends Omit<Publication, 'origin'> {
   visibility: ArtifactVisibility
   /** null for a link that never expires; it matters only while the visibility is public_link. */
   publicLinkExpiresAt: number | null
+  listed: boolean
+  /** The publisher's own summary; null leaves it to the page's opening words. */
+  summary: string | null
 }
 
 export interface CreatedArtifact {
@@ -57,6 +64,11 @@ export interface ArtifactSummary {
   updatedAt: number
   /** null while the artifact is active. */
   removal: ArtifactRemoval | null
+  /** What the author wrote it is about, or else the current version's opening words; null when neither exists. */
+  summary: string | null
+  /** The current version's note and when it was published. */
+  currentVersionNote: string | null
+  currentVersionAt: number
 }
 
 export interface ArtifactVersionRecord {
@@ -97,6 +109,10 @@ export interface ArtifactRepository extends ArtifactFileSource {
   findSummary(artifactId: string): Promise<ArtifactSummary | null>
   /** Every artifact of the workspace, removed ones included, most recently updated first. */
   listRecentlyUpdated(workspaceId: string): Promise<ArtifactSummary[]>
+  /** The author's active artifacts they put on their personal page, in every workspace, most recently updated first. */
+  listListedBy(authorId: string): Promise<ArtifactSummary[]>
+  /** null goes back to the page's opening words. */
+  setSummary(artifactId: string, summary: string | null): Promise<void>
   listVersions(artifactId: string): Promise<ArtifactVersionRecord[]>
   rename(artifactId: string, title: string): Promise<void>
   /** Returns false when the artifact is missing or already removed. */

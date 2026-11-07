@@ -14,10 +14,22 @@ export interface OlderVersion {
   publishedAt: number
 }
 
+/** Under an artifact listed on its author's personal page, for the strangers who read it there. */
+export interface Byline {
+  authorName: string
+  personalPagePath: string
+  /** Where search engines and share cards should send people: the artifact's own address. */
+  articleUrl: string
+  /** The next piece on the author's page; null when this is the only one. */
+  next: { artifactId: string; title: string } | null
+}
+
 export interface ViewerModel {
   openedArtifact: OpenedArtifact
   identity: Identity | null
   authorName: string
+  /** Shown to a visitor of a listed artifact; null otherwise. */
+  byline: Byline | null
   /** The version on screen; older than the current one when the viewer picked it from the history. */
   shownVersion: number
   /** A version the address asked for that does not exist; the latest one is shown instead. */
@@ -49,6 +61,7 @@ ${permissions.canSeeVersions ? ViewerPage.#compareBar() : ''}
   </section>
   ${ViewerPage.#drawer(model)}
 </div>
+${model.byline ? ViewerPage.#byline(model, model.byline) : ''}
 ${permissions.canComment ? ViewerPage.#coachMark() : ''}
 </div>
 ${permissions.canManageSharing ? ViewerPage.#shareDialog() : ''}
@@ -61,7 +74,17 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
       scripts: ['common.js', 'viewer/viewer.js'],
       styles: ['viewer.css'],
       frameOrigin: model.usercontentOrigin,
+      ...(model.byline ? { publicCard: { url: model.byline.articleUrl, kind: 'article' as const } } : {}),
     })
+  }
+
+  static #byline(model: ViewerModel, byline: Byline): SafeHtml {
+    const { summary } = model.openedArtifact
+    return html`<footer class="viewer-byline">
+  <a class="viewer-byline__avatar" href="${byline.personalPagePath}" aria-label="${byline.authorName} 的主页">${PageShell.initialOf(byline.authorName)}</a>
+  <p class="viewer-byline__who"><a href="${byline.personalPagePath}">${byline.authorName}</a><span>第 ${summary.version} 版 · ${PageShell.relativeTime(summary.currentVersionAt, model.now)}更新</span></p>
+  ${byline.next ? html`<p class="viewer-byline__next"><span>下一篇</span><a href="/a/${encodeURIComponent(byline.next.artifactId)}">${byline.next.title} ${PageShell.icon('ArrowRight', 14)}</a></p>` : html`<p class="viewer-byline__next"><a href="${byline.personalPagePath}">更多文章 ${PageShell.icon('ArrowRight', 14)}</a></p>`}
+</footer>`
   }
 
   /** The artifact alone, filling the tab; the page still proxies its shared data. */
@@ -122,18 +145,19 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
 
   static #description(model: ViewerModel): string {
     const { summary } = model.openedArtifact
+    if (model.byline && summary.summary) return summary.summary
     return `${model.authorName} 发布 · v${summary.version} · ${ArtifactLabels.publishedVia(summary.publishedVia)}`
   }
 
   // Someone who reaches the artifact only through its public link sees the page, not the people who work on it:
   // no history, no data overview, no way into the workspace.
-  static #isPublicLinkVisitor(model: ViewerModel): boolean {
-    return !model.openedArtifact.permissions.canSeeVersions
+  static isPublicLinkVisitor(openedArtifact: OpenedArtifact): boolean {
+    return !openedArtifact.permissions.canSeeVersions
   }
 
   static #bar(model: ViewerModel): SafeHtml {
     const { summary, permissions } = model.openedArtifact
-    const isVisitor = ViewerPage.#isPublicLinkVisitor(model)
+    const isVisitor = ViewerPage.isPublicLinkVisitor(model.openedArtifact)
     const homeLink = html`<a class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" href="/" aria-label="返回首页" data-tooltip="返回首页" data-tooltip-placement="bottom-start">${PageShell.icon('House')}</a>`
     return html`<header class="xxd-topbar viewer-bar">
   ${isVisitor ? '' : homeLink}

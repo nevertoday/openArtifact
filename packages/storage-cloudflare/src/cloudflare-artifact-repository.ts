@@ -16,7 +16,9 @@ import {
 const SUMMARY_SELECT = `
   SELECT artifacts.id, artifacts.workspace_id, artifacts.title, artifacts.author_id, artifacts.visibility,
          artifacts.public_link_expires_at, artifacts.public_link_password_hash, artifacts.anonymous_write_enabled, artifacts.public_link_shows_comments,
+         artifacts.listed, COALESCE(artifacts.summary, artifact_versions.excerpt) AS summary,
          artifacts.current_version, artifacts.updated_at, artifact_versions.published_via,
+         artifact_versions.note AS current_version_note, artifact_versions.created_at AS current_version_at,
          artifacts.removed_at, artifacts.removed_by, artifacts.removed_as_admin
   FROM artifacts
   JOIN artifact_versions ON artifact_versions.artifact_id = artifacts.id AND artifact_versions.version = artifacts.current_version`
@@ -31,6 +33,10 @@ interface SummaryRow {
   public_link_password_hash: string | null
   anonymous_write_enabled: number
   public_link_shows_comments: number
+  listed: number
+  summary: string | null
+  current_version_note: string | null
+  current_version_at: number
   current_version: number
   updated_at: number
   published_via: string | null
@@ -78,10 +84,23 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     await this.#writeVersion(artifactId, newArtifact.files, uploadId => [
       this.#db
         .prepare(
-          `INSERT INTO artifacts (id, workspace_id, author_id, title, visibility, public_link_expires_at, current_version, current_upload_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO artifacts (id, workspace_id, author_id, title, visibility, public_link_expires_at, listed, summary, current_version, current_upload_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .bind(artifactId, newArtifact.workspaceId, newArtifact.authorId, newArtifact.title, newArtifact.visibility, newArtifact.publicLinkExpiresAt, firstVersion, uploadId, createdAt, createdAt),
+        .bind(
+          artifactId,
+          newArtifact.workspaceId,
+          newArtifact.authorId,
+          newArtifact.title,
+          newArtifact.visibility,
+          newArtifact.publicLinkExpiresAt,
+          newArtifact.listed ? 1 : 0,
+          newArtifact.summary,
+          firstVersion,
+          uploadId,
+          createdAt,
+          createdAt,
+        ),
       ...this.#recordVersionStatements(artifactId, firstVersion, uploadId, { ...newArtifact, origin: { kind: 'published' } }, createdAt),
     ])
     return { artifactId, version: firstVersion }
@@ -146,6 +165,18 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
       .bind(workspaceId)
       .all<SummaryRow>()
     return summaryRows.map(summaryRow => CloudflareArtifactRepository.#summaryOf(summaryRow))
+  }
+
+  async listListedBy(authorId: string): Promise<ArtifactSummary[]> {
+    const { results: summaryRows } = await this.#db
+      .prepare(`${SUMMARY_SELECT} WHERE artifacts.author_id = ? AND artifacts.listed = 1 AND artifacts.removed_at IS NULL ORDER BY artifacts.updated_at DESC, artifacts.rowid DESC`)
+      .bind(authorId)
+      .all<SummaryRow>()
+    return summaryRows.map(summaryRow => CloudflareArtifactRepository.#summaryOf(summaryRow))
+  }
+
+  async setSummary(artifactId: string, summary: string | null): Promise<void> {
+    await this.#db.prepare('UPDATE artifacts SET summary = ? WHERE id = ?').bind(summary, artifactId).run()
   }
 
   async listVersions(artifactId: string): Promise<ArtifactVersionRecord[]> {
@@ -230,8 +261,8 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
   #recordVersionStatements(artifactId: string, version: number, uploadId: string, publication: Publication, createdAt: number): D1PreparedStatement[] {
     const versionRow = this.#db
       .prepare(
-        `INSERT INTO artifact_versions (artifact_id, version, upload_id, author_id, published_via, origin, restored_from, note, created_at)
-         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM artifacts WHERE id = ? AND current_upload_id = ?)`,
+        `INSERT INTO artifact_versions (artifact_id, version, upload_id, author_id, published_via, origin, restored_from, note, excerpt, created_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM artifacts WHERE id = ? AND current_upload_id = ?)`,
       )
       .bind(
         artifactId,
@@ -242,6 +273,7 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
         publication.origin.kind,
         CloudflareArtifactRepository.#restoredFromOf(publication.origin),
         publication.note,
+        publication.excerpt,
         createdAt,
         artifactId,
         uploadId,
@@ -295,7 +327,11 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
         publicLinkPasswordHash: summaryRow.public_link_password_hash,
         anonymousWriteEnabled: summaryRow.anonymous_write_enabled === 1,
         publicLinkShowsComments: summaryRow.public_link_shows_comments === 1,
+        listed: summaryRow.listed === 1,
       },
+      summary: summaryRow.summary,
+      currentVersionNote: summaryRow.current_version_note,
+      currentVersionAt: summaryRow.current_version_at,
       version: summaryRow.current_version,
       publishedVia: summaryRow.published_via,
       updatedAt: summaryRow.updated_at,

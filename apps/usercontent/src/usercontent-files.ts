@@ -45,6 +45,8 @@ export class UsercontentFiles {
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'no-referrer',
         'Cache-Control': `private, max-age=${SIGNED_URL_CACHE_SECONDS}`,
+        // Signed addresses expire; a listed artifact is found at its viewer address instead.
+        'X-Robots-Tag': 'noindex',
       },
     })
   }

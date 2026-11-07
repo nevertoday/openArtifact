@@ -6,6 +6,7 @@ import { SETTINGS_SECTION_ICONS, SETTINGS_SECTION_LABELS, SETTINGS_SECTIONS } fr
 /** Kit icon names the pages use; the union keeps a misspelt name from reaching the browser. */
 export type IconName =
   | 'ArrowLeft'
+  | 'ArrowRight'
   | 'Bell'
   | 'Bot'
   | 'Check'
@@ -63,6 +64,17 @@ export interface PageOptions {
   description?: string
   /** The one origin this page may frame: the usercontent Worker on the viewer page. */
   frameOrigin?: string
+  /**
+   * A page meant for strangers to find: a personal page, or an artifact listed on one. Search engines are told
+   * to leave every other page alone, a public link sent to one person included.
+   */
+  publicCard?: PublicCard
+}
+
+/** How a page meant for strangers looks when its link is shared, on X and in chat apps alike. */
+export interface PublicCard {
+  url: string
+  kind: 'article' | 'profile'
 }
 
 export class PageShell {
@@ -76,6 +88,7 @@ export class PageShell {
 <meta property="og:title" content="${options.title}">
 <meta property="og:site_name" content="Open Artifact">
 ${options.description ? html`<meta name="description" content="${options.description}"><meta property="og:description" content="${options.description}">` : ''}
+${PageShell.#publicCardMeta(options)}
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <script src="/static/vendor/xxd/boot.js" data-key="open-artifact" data-default-theme="system"></script>
 <link rel="stylesheet" href="/static/vendor/xxd/xxd.css">
@@ -93,9 +106,22 @@ ${(options.styles ?? []).map(style => html`<link rel="stylesheet" href="/static/
         'Cache-Control': 'no-store',
         'X-Frame-Options': 'DENY',
         'Content-Security-Policy': PageShell.#contentSecurityPolicy(options.frameOrigin),
+        ...(options.publicCard ? {} : { 'X-Robots-Tag': 'noindex' }),
         ...options.headers,
       },
     })
+  }
+
+  // A small summary card: the title and description carry it, so no picture has to be made for each page.
+  static #publicCardMeta(options: PageOptions): SafeHtml {
+    if (!options.publicCard) return html`<meta name="robots" content="noindex">`
+    const { url, kind } = options.publicCard
+    return html`<link rel="canonical" href="${url}">
+<meta property="og:url" content="${url}">
+<meta property="og:type" content="${kind}">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="${options.title}">
+${options.description ? html`<meta name="twitter:description" content="${options.description}">` : ''}`
   }
 
   // Only our own scripts run on app pages, so text from agents or people can never execute here even if escaping slipped.
@@ -183,6 +209,7 @@ ${(options.styles ?? []).map(style => html`<link rel="stylesheet" href="/static/
 <div class="xxd-menu" id="account-menu" role="menu" popover>
   <div class="xxd-menu__label xxd-text-pair app-account-head"><span class="xxd-text" data-account-name>${identity.name}</span><span class="xxd-text" data-variant="caption">${identity.email}</span></div>
   <div class="xxd-menu__sep" role="separator"></div>
+  <a class="xxd-menu__item" role="menuitem" href="/@me">${PageShell.icon('UserRound', 14)}我的主页</a>
   ${SETTINGS_SECTIONS.map(menuLink)}
   <div class="xxd-menu__sep" role="separator"></div>
   <button type="button" class="xxd-menu__item" role="menuitem" data-sign-out>${PageShell.icon('LogOut', 14)}退出登录</button>

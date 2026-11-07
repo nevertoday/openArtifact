@@ -5,11 +5,14 @@ import { HttpError, type ErrorCode } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { ArtifactFileJson } from './artifact-file-json.ts'
 import { JsonBody } from './json-body.ts'
+import { PageExcerpt } from './page-excerpt.ts'
 import { PublicLinkExpiry } from './public-link-expiry.ts'
 
 const VISIBILITIES: readonly ArtifactVisibility[] = ['private', 'specified', 'workspace', 'public_link']
 const MAX_TITLE_LENGTH = 200
 const MAX_NOTE_LENGTH = 200
+export const MAX_SUMMARY_LENGTH = 300
+const LIST_ON_PERSONAL_PAGE = 'list it on your personal page'
 const BASE_VERSION_HINT = 'pass the version you read; pass force: true only when told to overwrite'
 
 /** Publishing, reading, versions, renaming and removal of artifacts: what agents call through MCP or the HTTP API. */
@@ -25,23 +28,38 @@ export class ArtifactApi {
     const requestBody = await JsonBody.of(request)
     const title = requestBody.text('title', MAX_TITLE_LENGTH)
     const visibility = requestBody.oneOf('visibility', VISIBILITIES, 'workspace')
-    const publicLinkExpiry = PublicLinkExpiry.of(requestBody, identity, { visibilityBefore: null, visibilityAfter: visibility, savedExpiresAt: null }, Date.now())
+    const listed = ArtifactApi.#listedOnCreate(requestBody, identity, visibility)
+    const publicLinkExpiry = PublicLinkExpiry.of(requestBody, identity, { visibilityBefore: null, visibilityAfter: visibility, savedExpiresAt: null, listedAfter: listed }, Date.now())
+    const files = ArtifactFileJson.filesFrom(requestBody.raw('files'))
     const createdArtifact = await this.#context.repositories.artifacts.create({
       workspaceId: identity.membership.workspace.workspaceId,
       authorId: identity.userId,
       publishedVia: identity.agentClient,
       note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
+      excerpt: await PageExcerpt.of(files),
       title,
       visibility,
       publicLinkExpiresAt: publicLinkExpiry.expiresAt,
-      files: ArtifactFileJson.filesFrom(requestBody.raw('files')),
+      listed,
+      summary: requestBody.optionalText('summary', MAX_SUMMARY_LENGTH),
+      files,
     })
+    if (listed) await this.#context.personalPages.claim(identity.userId)
     if (publicLinkExpiry.agentDefaultExpiresAt !== null) {
       const createdSummary = { artifactId: createdArtifact.artifactId, title, authorId: identity.userId }
       await this.#context.notifier.notify(identity, createdSummary, { kind: 'public_link_opened_by_agent', expiresAt: publicLinkExpiry.agentDefaultExpiresAt })
     }
-    const createdJson = { ...createdArtifact, url: this.#context.viewerUrl(createdArtifact.artifactId), visibility, publicLinkExpiresAt: publicLinkExpiry.expiresAt }
+    const createdJson = { ...createdArtifact, url: this.#context.viewerUrl(createdArtifact.artifactId), visibility, publicLinkExpiresAt: publicLinkExpiry.expiresAt, listed }
     return Response.json(createdJson, { status: 201 })
+  }
+
+  // Listing puts the page in front of strangers, so it takes the same full-access token as changing sharing later.
+  static #listedOnCreate(requestBody: JsonBody, identity: Identity, visibility: ArtifactVisibility): boolean {
+    const listed = requestBody.boolean('listed', false)
+    if (!listed) return false
+    if (identity.tokenScope === 'publish') throw HttpError.outsideTokenScope(LIST_ON_PERSONAL_PAGE)
+    if (visibility !== 'public_link') throw new HttpError(400, 'not_listable', 'only an artifact with visibility public_link can be listed on your personal page')
+    return true
   }
 
   /** `?removed=true` lists the removed artifacts the caller may restore instead of the ones they can view. */
@@ -77,26 +95,35 @@ export class ArtifactApi {
     const requestBody = await JsonBody.of(request)
     const files = ArtifactFileJson.filesFrom(requestBody.raw('files'))
     const newTitle = requestBody.optionalText('title', MAX_TITLE_LENGTH)
+    const newSummary = requestBody.optionalText('summary', MAX_SUMMARY_LENGTH)
     const baseVersion = requestBody.boolean('force', false) ? openedArtifact.summary.version : requestBody.positiveInteger('baseVersion', BASE_VERSION_HINT)
     const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
       authorId: identity.userId,
       publishedVia: identity.agentClient,
       origin: { kind: 'published' },
       note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
+      excerpt: await PageExcerpt.of(files),
       files,
     })
-    const renamesWithVersion = publishResult.status === 'published' && newTitle !== null
-    if (renamesWithVersion) await this.#rename(identity, openedArtifact.summary, newTitle)
+    const published = publishResult.status === 'published'
+    if (published && newTitle !== null) await this.#rename(identity, openedArtifact.summary, newTitle)
+    if (published && newSummary !== null) await this.#context.repositories.artifacts.setSummary(artifactId, newSummary)
     return this.#publishResponse(identity, openedArtifact, publishResult)
   }
 
+  /** Changes the title, the summary on the personal page, or both; a summary of null goes back to the page's opening words. */
   async rename(request: Request, artifactId: string): Promise<Response> {
     const identity = await this.#context.requireIdentity()
     const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canRename', 'rename this artifact')
     const requestBody = await JsonBody.of(request)
-    const title = requestBody.text('title', MAX_TITLE_LENGTH)
-    await this.#rename(identity, summary, title)
-    return Response.json({ artifactId, title })
+    const changesTitle = requestBody.has('title')
+    const changesSummary = requestBody.has('summary')
+    if (!changesTitle && !changesSummary) throw HttpError.badRequest('send a title, a summary, or both')
+    const title = changesTitle ? requestBody.text('title', MAX_TITLE_LENGTH) : summary.title
+    if (changesTitle) await this.#rename(identity, summary, title)
+    if (changesSummary) await this.#context.repositories.artifacts.setSummary(artifactId, requestBody.optionalText('summary', MAX_SUMMARY_LENGTH))
+    const savedSummary = await this.#context.repositories.artifacts.findSummary(artifactId)
+    return Response.json({ artifactId, title, summary: savedSummary?.summary ?? null })
   }
 
   /** Hides the artifact from everyone at once; it can be restored for 30 days, then it is purged. */
@@ -176,6 +203,7 @@ export class ArtifactApi {
       publishedVia: olderVersionRecord.publishedVia,
       origin: { kind: 'restored', restoredFrom: version },
       note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
+      excerpt: await PageExcerpt.of(olderVersion.files),
       files: olderVersion.files,
     })
     return this.#publishResponse(identity, openedArtifact, publishResult)

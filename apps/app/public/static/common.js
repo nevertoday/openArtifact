@@ -1,6 +1,6 @@
 // Helpers shared by the page scripts. Text from people and agents is only ever set through textContent.
 // Toasts, copy buttons, menus, tabs and dialogs come from the UI kit's global `Xxd`.
-import { dateText, fullTimeText, relativeTimeText } from './time-text.js'
+import { dateText, dayText, fullTimeText, relativeTimeText } from './time-text.js'
 
 export { dateText }
 
@@ -41,6 +41,7 @@ const ERROR_MESSAGES = {
   author_always_sees: () => '作者自己一直能看到，不用添加。',
   public_links_off: () => '管理员已关闭公开链接。',
   version_conflict: () => '刚有人发布了新版本。刷新页面后再试。',
+  not_listable: () => '只有不设密码的公开链接才能列在主页上。',
 }
 
 /**
@@ -120,11 +121,11 @@ export function timeElement(timestamp) {
   return element('time', { datetime: new Date(timestamp).toISOString(), title: fullTimeText(timestamp), 'data-relative': true }, timeAgo(timestamp))
 }
 
-/** Re-renders the server's <time data-relative> under `root` in the reader's time zone, which decides 昨天 and the date. */
+/** Re-renders the server's <time data-relative> and <time data-day> under `root` in the reader's time zone, which decides 昨天 and the date. */
 export function renderServerTimes(root = document) {
-  for (const timeTag of root.querySelectorAll('time[data-relative]')) {
+  for (const timeTag of root.querySelectorAll('time[data-relative], time[data-day]')) {
     const timestamp = Date.parse(timeTag.dateTime)
-    timeTag.textContent = timeAgo(timestamp)
+    timeTag.textContent = timeTag.hasAttribute('data-day') ? dayText(timestamp) : timeAgo(timestamp)
     timeTag.title = fullTimeText(timestamp)
   }
 }

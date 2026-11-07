@@ -14,11 +14,14 @@ function artifactWith(sharing: Partial<ArtifactSharing>, removal: ArtifactRemova
     workspaceId: 'workspace-1',
     title: 'Design doc',
     authorId,
-    sharing: { visibility: 'workspace', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, ...sharing },
+    sharing: { visibility: 'workspace', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, listed: false, ...sharing },
     version: 1,
     publishedVia: null,
     updatedAt: now,
     removal,
+    summary: null,
+    currentVersionNote: null,
+    currentVersionAt: now,
   }
 }
 

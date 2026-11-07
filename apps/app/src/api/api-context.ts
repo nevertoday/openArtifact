@@ -7,6 +7,7 @@ import type { Identity, RequestIdentity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
 import { Notifier } from '../notifications/notifier.ts'
 import type { People } from '../people.ts'
+import { PersonalPages } from '../personal-pages.ts'
 import type { Repositories } from '@open-artifact/core'
 
 export interface ApiContextFields {
@@ -34,6 +35,7 @@ export class ApiContext {
   readonly admission: Admission
   readonly appOrigin: string
   readonly artifactPages: ArtifactPageAddress
+  readonly personalPages: PersonalPages
 
   constructor(fields: ApiContextFields) {
     this.repositories = fields.repositories
@@ -46,6 +48,7 @@ export class ApiContext {
     this.admission = fields.admission
     this.appOrigin = fields.appOrigin
     this.artifactPages = fields.artifactPages
+    this.personalPages = new PersonalPages(fields.repositories, fields.appOrigin)
   }
 
   identity(): Promise<Identity | null> {

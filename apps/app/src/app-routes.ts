@@ -19,6 +19,7 @@ const FULL_VIEW = new URLPattern({ pathname: '/a/:artifactId/full' })
 const UNLOCK = new URLPattern({ pathname: '/a/:artifactId/unlock' })
 const SETTINGS = new URLPattern({ pathname: '/settings{/:section}?' })
 const INVITE = new URLPattern({ pathname: '/invite/:inviteCode' })
+const PERSONAL_PAGE = new URLPattern({ pathname: '/@:handle' })
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 export interface AppDependencies {
@@ -74,6 +75,8 @@ export class AppRoutes {
     if (fullViewMatch) return pageRoutes.fullView(request, decodeURIComponent(fullViewMatch.pathname.groups.artifactId ?? ''))
     const inviteMatch = INVITE.exec(requestUrl)
     if (inviteMatch) return pageRoutes.invite(request, decodeURIComponent(inviteMatch.pathname.groups.inviteCode ?? ''))
+    const personalPageMatch = PERSONAL_PAGE.exec(requestUrl)
+    if (personalPageMatch) return pageRoutes.personalPage(request, decodeURIComponent(personalPageMatch.pathname.groups.handle ?? ''))
     const settingsMatch = SETTINGS.exec(requestUrl)
     if (settingsMatch) return pageRoutes.settings(request, settingsMatch.pathname.groups.section)
     return MessagePages.unknownAddress(404)

@@ -20,6 +20,21 @@ class SharingDraft {
     this.newPassword = ''
     this.anonymousWriteEnabled = saved.publicLink.anonymousWriteEnabled
     this.showsComments = saved.publicLink.showsComments
+    this.listed = saved.publicLink.listed
+  }
+
+  /** A page with a password cannot go on the personal page; the server refuses it the same way. */
+  get listable() {
+    switch (this.passwordChange) {
+      case 'keep':
+        return !this.saved.publicLink.hasPassword
+      case 'remove':
+        return true
+      case 'set':
+        return this.newPassword === ''
+      default:
+        throw new Error(`unknown password change ${this.passwordChange}`)
+    }
   }
 
   /** Whether the people list counts at the chosen level; the server owns that rule and sends the levels. */
@@ -90,6 +105,8 @@ class SharingDraft {
     }
     if (this.anonymousWriteEnabled !== this.saved.publicLink.anonymousWriteEnabled) changes.anonymousWriteEnabled = this.anonymousWriteEnabled
     if (this.showsComments !== this.saved.publicLink.showsComments) changes.publicLinkShowsComments = this.showsComments
+    const listedNow = this.listed && this.listable
+    if (listedNow !== this.saved.publicLink.listed) changes.listed = listedNow
     return changes
   }
 }
@@ -265,6 +282,7 @@ export class ShareDialog extends EventTarget {
     })
     const anonymousWrite = this.#draftSwitch('anonymous-write', 'anonymousWriteEnabled', '允许匿名访客写入共享数据', '适合对外的报名表。')
     const showsComments = this.#draftSwitch('shows-comments', 'showsComments', '对外显示评论', '访客可以看到评论和评论人的名字，但不能发表评论。')
+    const listed = this.#listedSwitch()
     return element('section', { className: 'xxd-stack share-section' },
       element('div', { className: 'xxd-text-pair' },
         element('h3', { className: 'share-section__title' }, '公开链接'),
@@ -272,8 +290,27 @@ export class ShareDialog extends EventTarget {
       element('div', { className: 'xxd-layout', 'data-cols': '2up' },
         element('div', { className: 'xxd-field' }, element('label', { className: 'xxd-label', for: 'link-expiry' }, '有效期'), element('label', { className: 'xxd-select' }, expirySelect)),
         element('div', { className: 'xxd-field' }, element('label', { className: 'xxd-label', for: 'link-password', 'data-optional': true }, '访问密码'), this.#passwordControl())),
-      anonymousWrite, showsComments,
+      listed, anonymousWrite, showsComments,
     )
+  }
+
+  // The personal page is for strangers to find, so the switch says so; a password rules it out.
+  #listedSwitch() {
+    const listedSwitch = this.#draftSwitch('listed', 'listed', '列在我的主页', '')
+    queueMicrotask(() => this.#refreshListedSwitch())
+    return listedSwitch
+  }
+
+  #refreshListedSwitch() {
+    const checkbox = this.#dialog.querySelector('#listed')
+    if (!checkbox) return
+    const { listable } = this.#draft
+    const { personalPageUrl } = this.#draft.saved.publicLink
+    checkbox.disabled = !listable
+    checkbox.checked = this.#draft.listed && listable
+    const description = checkbox.closest('label').querySelector('small')
+    const pageLink = personalPageUrl ? element('a', { className: 'xxd-link', href: personalPageUrl, target: '_blank', rel: 'noopener' }, '看我的主页') : null
+    description.replaceChildren(...(listable ? ['陌生人能在你的主页上看到它，搜索引擎也能找到。', pageLink ? ' ' : '', pageLink ?? ''] : ['设了访问密码的文档不能列出。']))
   }
 
   // The saved expiry is the selected option, so 永不过期 appears once whichever way the link is set.
@@ -298,6 +335,7 @@ export class ShareDialog extends EventTarget {
         const passwordInput = element('input', { className: 'xxd-input', id: 'link-password', type: 'password', autocomplete: 'new-password', placeholder: hasPassword ? '输入新密码' : '不设置', value: this.#draft.newPassword })
         passwordInput.addEventListener('input', () => {
           this.#draft.newPassword = passwordInput.value
+          this.#refreshListedSwitch()
           this.#refreshSaveButton()
         })
         if (hasPassword) queueMicrotask(() => passwordInput.focus())

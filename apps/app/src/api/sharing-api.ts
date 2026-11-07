@@ -63,8 +63,15 @@ export class SharingApi {
     const requestBody = await JsonBody.of(request)
     const savedGrants: PersonGrant[] = (await this.#context.repositories.artifactAccess.listGrants(artifactId)).map(({ userId, role }) => ({ userId, role }))
     const visibility = requestBody.oneOf('visibility', VISIBILITIES, summary.sharing.visibility)
-    const publicLinkExpiry = PublicLinkExpiry.of(requestBody, identity, { visibilityBefore: summary.sharing.visibility, visibilityAfter: visibility, savedExpiresAt: summary.sharing.publicLinkExpiresAt }, Date.now())
+    const listedRequested = requestBody.boolean('listed', summary.sharing.listed)
+    const publicLinkExpiry = PublicLinkExpiry.of(
+      requestBody,
+      identity,
+      { visibilityBefore: summary.sharing.visibility, visibilityAfter: visibility, savedExpiresAt: summary.sharing.publicLinkExpiresAt, listedAfter: listedRequested },
+      Date.now(),
+    )
     const sharing = await this.#sharingFrom(requestBody, summary, visibility, publicLinkExpiry.expiresAt)
+    if (sharing.listed) await this.#context.personalPages.claim(summary.authorId)
     const grants = requestBody.has('grants') ? await this.#grantsFrom(requestBody.raw('grants'), summary, savedGrants) : savedGrants
     await this.#context.repositories.artifactAccess.saveSharing(artifactId, sharing, grants)
     const newlyGranted = SharingApi.#newlyGranted({ visibility: summary.sharing.visibility, grants: savedGrants }, { visibility, grants })
@@ -77,13 +84,23 @@ export class SharingApi {
     const workspace = await this.#context.repositories.workspaces.findWorkspace(summary.workspaceId)
     const publicLinkForbidden = visibility === 'public_link' && !workspace?.publicLinksEnabled
     if (publicLinkForbidden) throw new HttpError(400, 'public_links_off', 'the workspace admin has switched public links off')
+    const publicLinkPasswordHash = await SharingApi.#passwordHashOf(requestBody, summary.sharing.publicLinkPasswordHash)
     return {
       visibility,
       publicLinkExpiresAt,
-      publicLinkPasswordHash: await SharingApi.#passwordHashOf(requestBody, summary.sharing.publicLinkPasswordHash),
+      publicLinkPasswordHash,
       anonymousWriteEnabled: requestBody.boolean('anonymousWriteEnabled', summary.sharing.anonymousWriteEnabled),
       publicLinkShowsComments: requestBody.boolean('publicLinkShowsComments', summary.sharing.publicLinkShowsComments),
+      listed: SharingApi.#listedFrom(requestBody, summary, { visibility, publicLinkPasswordHash }),
     }
+  }
+
+  // Asking to list a page strangers cannot open is refused; a change that closes the page takes it off the list.
+  static #listedFrom(requestBody: JsonBody, summary: ArtifactSummary, sharingAfter: Pick<ArtifactSharing, 'visibility' | 'publicLinkPasswordHash'>): boolean {
+    const listable = ArtifactAccess.listable(sharingAfter)
+    const asksToList = requestBody.has('listed') && requestBody.boolean('listed', false)
+    if (asksToList && !listable) throw new HttpError(400, 'not_listable', 'only a public link without a password can be listed on your personal page', { field: 'listed' })
+    return listable && requestBody.boolean('listed', summary.sharing.listed)
   }
 
   // People already on the list stay valid even if their account was deleted; a person added now must exist.
@@ -103,10 +120,11 @@ export class SharingApi {
   }
 
   async #sharingJson(summary: ArtifactSummary, grants: PersonGrant[]) {
-    const [members, workspace, grantedProfiles] = await Promise.all([
+    const [members, workspace, grantedProfiles, profile] = await Promise.all([
       this.#context.repositories.workspaces.listMembers(summary.workspaceId),
       this.#context.repositories.workspaces.findWorkspace(summary.workspaceId),
       this.#context.repositories.users.profilesOf(grants.map(grant => grant.userId)),
+      this.#context.repositories.profiles.findByUser(summary.authorId),
     ])
     return {
       visibility: summary.sharing.visibility,
@@ -117,6 +135,8 @@ export class SharingApi {
         anonymousWriteEnabled: summary.sharing.anonymousWriteEnabled,
         showsComments: summary.sharing.publicLinkShowsComments,
         allowedInWorkspace: workspace?.publicLinksEnabled ?? false,
+        listed: summary.sharing.listed,
+        personalPageUrl: profile ? this.#context.personalPages.url(profile.handle) : null,
       },
       author: { userId: summary.authorId },
       grants: grants.map(grant => {

@@ -230,7 +230,7 @@ describe('asking the author for access', () => {
 
   it('keeps answering 找不到 to people outside the workspace, and refuses their request', async () => {
     await env.DB.prepare("INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES ('workspace-elsewhere', 'Elsewhere', ?)").bind(Date.now()).run()
-    const elsewhere = await app.repositories.artifacts.create({ workspaceId: 'workspace-elsewhere', authorId: 'user-elsewhere', title: 'Elsewhere plan', visibility: 'private', publicLinkExpiresAt: null, publishedVia: null, note: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+    const elsewhere = await app.repositories.artifacts.create({ workspaceId: 'workspace-elsewhere', authorId: 'user-elsewhere', title: 'Elsewhere plan', visibility: 'private', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: null, listed: false, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
 
     const page = await app.request(`/a/${elsewhere.artifactId}`, { cookie: zhouCookie })
     const ask = await app.json<{ code: string }>(`/api/artifacts/${elsewhere.artifactId}/access-requests`, { method: 'POST', cookie: zhouCookie })

@@ -14,6 +14,12 @@ export function dateText(timestamp) {
   return `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())}`
 }
 
+/** 11 月 7 日: a day in the current year, the way a list of writing dates it. */
+export function dayText(timestamp) {
+  const date = new Date(timestamp)
+  return `${date.getMonth() + 1} 月 ${date.getDate()} 日`
+}
+
 /** 2026-10-20 14:05, for the hover title of a relative time. */
 export function fullTimeText(timestamp) {
   const date = new Date(timestamp)
