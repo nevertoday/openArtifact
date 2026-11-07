@@ -3,7 +3,6 @@ export default {
   notification: {
     /** @param {string} link */
     openLink: link => `打开查看：${link}`,
-    roles: { viewer: '可查看', commenter: '可评论', editor: '可编辑' },
     commentSubjects: {
       /** @param {{ actor: string, title: string }} p */
       comment: ({ actor, title }) => `${actor}在「${title}」发表了评论`,

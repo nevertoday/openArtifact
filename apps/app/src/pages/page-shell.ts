@@ -1,4 +1,4 @@
-import { LOCALES } from '@open-artifact/core'
+import { LOCALES, type Locale } from '@open-artifact/core'
 import type { Identity } from '../auth/request-identity.ts'
 import { messagesFor, type Messages } from '../i18n/messages.ts'
 import { fullTimeText, relativeTimeText } from '../../public/static/time-text.js'
@@ -202,7 +202,7 @@ ${options.description ? html`<meta name="twitter:description" content="${options
    * comes back to this page. Each language is named in itself, so a reader who cannot read the page still finds theirs.
    */
   static localeSwitch(m: Messages, role: 'menu' | 'bar' = 'bar'): SafeHtml {
-    const choice = (locale: (typeof LOCALES)[number]) => {
+    const choice = (locale: Locale) => {
       const current = locale === m.meta.lang
       return role === 'menu'
         ? html`<button type="submit" class="xxd-menu__item" role="menuitemradio" aria-checked="${String(current)}" name="locale" value="${locale}" lang="${locale}">${PageShell.icon(current ? 'Check' : 'Globe', 14)}${messagesFor(locale).meta.name}</button>`

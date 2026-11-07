@@ -1,4 +1,5 @@
-import { LOCALES, type Locale } from '@open-artifact/core'
+import { DEFAULT_LOCALE, LOCALES, parseLocale, type Locale } from '@open-artifact/core'
+import { HttpCookies } from '../http-cookies.ts'
 
 /** Set when a person picks a language in this browser; it decides for visitors who are not signed in. */
 export const LOCALE_COOKIE = 'oa_locale'
@@ -10,6 +11,19 @@ export interface LocaleSignals {
   browser: Locale | null
   acceptLanguage: string | null
   fallback: Locale
+}
+
+/** The deployment's language for requests that say nothing: DEFAULT_LOCALE when it names a language, else the default. */
+export function fallbackLocaleOf(env: { DEFAULT_LOCALE?: string | undefined }): Locale {
+  return parseLocale(env.DEFAULT_LOCALE) ?? DEFAULT_LOCALE
+}
+
+/** What a request's headers say about language: the browser's choice and its Accept-Language. */
+export function requestLocaleSignals(headers: Headers | null): Pick<LocaleSignals, 'browser' | 'acceptLanguage'> {
+  return {
+    browser: headers ? parseLocale(HttpCookies.read({ headers }, LOCALE_COOKIE)) : null,
+    acceptLanguage: headers?.get('Accept-Language') ?? null,
+  }
 }
 
 /** A choice someone made wins over what the browser asks for; the deployment's default comes last. */

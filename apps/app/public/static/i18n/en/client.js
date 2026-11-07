@@ -31,14 +31,12 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
   },
   removal: {
     takeDown: {
-      word: 'Take down',
       confirmTitle: title => `Take down “${title}”?`,
       confirmMessage: "Once it's taken down, no one can see it, and the author can't bring it back. An admin can restore it from “Recently deleted” within 30 days.",
       done: title => `Took down “${title}”`,
       failed: message => `Couldn't take it down. ${message}`,
     },
     delete: {
-      word: 'Delete',
       confirmTitle: title => `Delete “${title}”?`,
       confirmMessage: "Once it's deleted, no one can see it. You can restore it from “Recently deleted” within 30 days.",
       done: title => `Deleted “${title}”`,

@@ -194,7 +194,6 @@ export default /** @satisfies {import('../messages').Messages['viewerClient']} *
     addedOnSave: 'Added when you save',
     remove: 'Remove',
     role: 'Access',
-    roles: { viewer: 'Can view', commenter: 'Can comment', editor: 'Can edit' },
     anonymousWrite: 'Let anonymous visitors write shared data',
     anonymousWriteHint: 'Good for a public sign-up sheet.',
     showsComments: 'Show comments publicly',

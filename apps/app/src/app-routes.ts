@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, parseLocale, SigningKey, UsercontentSignature } from '@open-artifact/core'
+import { SigningKey, UsercontentSignature } from '@open-artifact/core'
 import { ArtifactGate } from './access/artifact-gate.ts'
 import { ArtifactPageAddress } from './access/artifact-page-address.ts'
 import { ApiContext } from './api/api-context.ts'
@@ -9,9 +9,8 @@ import type { Mailer } from './auth/mailer.ts'
 import { OpenArtifactAuth } from './auth/open-artifact-auth.ts'
 import { RequestIdentity } from './auth/request-identity.ts'
 import type { AppEnv } from './env.ts'
-import { HttpCookies } from './http-cookies.ts'
 import { HttpError, RemovedFromWorkspaceError } from './http-error.ts'
-import { LOCALE_COOKIE } from './i18n/resolve-locale.ts'
+import { fallbackLocaleOf, requestLocaleSignals } from './i18n/resolve-locale.ts'
 import { MessagePages } from './pages/message-pages.ts'
 import { PageRoutes } from './pages/page-routes.ts'
 import type { Repositories } from '@open-artifact/core'
@@ -100,11 +99,7 @@ export class AppRoutes {
       admission,
       appOrigin,
       artifactPages: this.#artifactPages,
-      localeSignals: {
-        browser: parseLocale(HttpCookies.read(request, LOCALE_COOKIE)),
-        acceptLanguage: request.headers.get('Accept-Language'),
-        fallback: parseLocale(env.DEFAULT_LOCALE) ?? DEFAULT_LOCALE,
-      },
+      localeSignals: { ...requestLocaleSignals(request.headers), fallback: fallbackLocaleOf(env) },
     })
   }
 

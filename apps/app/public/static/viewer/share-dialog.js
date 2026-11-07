@@ -266,7 +266,7 @@ export class ShareDialog extends EventTarget {
   }
 
   static #roleSelect(selectedRole, selectId) {
-    return element('select', { id: selectId, 'aria-label': m.viewerClient.share.role }, GRANT_ROLES.map(role => element('option', { value: role, selected: role === selectedRole }, m.viewerClient.share.roles[role])))
+    return element('select', { id: selectId, 'aria-label': m.viewerClient.share.role }, GRANT_ROLES.map(role => element('option', { value: role, selected: role === selectedRole }, m.labels.grantRoles[role])))
   }
 
   static #selectBox(select) {

@@ -262,7 +262,6 @@ export default {
     addedOnSave: '保存后添加',
     remove: '移除',
     role: '权限',
-    roles: { viewer: '可查看', commenter: '可评论', editor: '可编辑' },
     anonymousWrite: '允许匿名访客写入共享数据',
     anonymousWriteHint: '适合对外的报名表。',
     showsComments: '对外显示评论',

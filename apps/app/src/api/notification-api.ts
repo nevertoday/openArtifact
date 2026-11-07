@@ -3,7 +3,7 @@ import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import type { Messages } from '../i18n/messages.ts'
 import { HttpError } from '../http-error.ts'
-import { NotificationText } from '../notifications/notification-text.ts'
+import { NotificationLink } from '../notifications/notification-link.ts'
 import type { ApiContext } from './api-context.ts'
 
 const SHOWN_NOTIFICATIONS = 50
@@ -61,7 +61,7 @@ export class NotificationApi {
       commentId: notification.commentId,
       actor: { userId: notification.actorId, name: actorName, agentClient: notification.actorAgentClient },
       text: m.notification.sentences[notification.kind]({ actor: actorLabel, title: artifactTitle }),
-      url: NotificationText.link(this.#context.viewerUrl(notification.artifactId), notification.commentId, notification.kind === 'access_requested' ? notification.actorId : null),
+      url: NotificationLink.to(this.#context.viewerUrl(notification.artifactId), notification.commentId, notification.kind === 'access_requested' ? notification.actorId : null),
       createdAt: notification.createdAt,
       read: notification.readAt !== null,
     }

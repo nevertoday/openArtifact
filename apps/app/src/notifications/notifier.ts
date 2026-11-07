@@ -3,7 +3,7 @@ import { dateText } from '../../public/static/time-text.js'
 import type { Mailer } from '../auth/mailer.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { messagesFor, type Messages } from '../i18n/messages.ts'
-import { NotificationText } from './notification-text.ts'
+import { NotificationLink } from './notification-link.ts'
 
 /** What happened on an artifact. The notifier decides who hears about it, and through which channel. */
 export type ArtifactEvent =
@@ -110,7 +110,7 @@ export class Notifier {
 
   async #mail(actor: Actor, artifact: NotifiedArtifact, event: ArtifactEvent, newNotifications: NewNotification[]): Promise<void> {
     const recipients = await this.#repositories.users.profilesOf(newNotifications.map(newNotification => newNotification.recipientId))
-    const link = NotificationText.link(this.#viewerUrl(artifact.artifactId), Notifier.#commentIdOf(event), event.kind === 'access_requested' ? actor.userId : null)
+    const link = NotificationLink.to(this.#viewerUrl(artifact.artifactId), Notifier.#commentIdOf(event), event.kind === 'access_requested' ? actor.userId : null)
     const mails = newNotifications.flatMap(newNotification => {
       const recipient = recipients.get(newNotification.recipientId)
       if (!recipient) return []
@@ -139,7 +139,7 @@ export class Notifier {
         return null
       case 'shared_with_me': {
         if (event.kind !== 'artifact_shared') return null
-        return { subject: sentence, body: words.sharedBody({ sentence, role: words.roles[event.role] }) }
+        return { subject: sentence, body: words.sharedBody({ sentence, role: m.labels.grantRoles[event.role] }) }
       }
       case 'public_link_opened': {
         if (event.kind !== 'public_link_opened_by_agent') return null

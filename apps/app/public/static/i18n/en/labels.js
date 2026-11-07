@@ -7,6 +7,7 @@ export default /** @satisfies {import('../messages').Messages['labels']} */ ({
     public_link: 'Public link',
   },
   roles: { admin: 'Admin', member: 'Member' },
+  grantRoles: { viewer: 'Can view', commenter: 'Can comment', editor: 'Can edit' },
   webPage: 'Web',
   hasPassword: 'Password',
   expiresOn: date => `Expires ${date}`,

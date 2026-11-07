@@ -1,11 +1,11 @@
-import { DEFAULT_LOCALE, parseLocale, type Locale, type Repositories } from '@open-artifact/core'
+import { parseLocale, type Locale, type Repositories } from '@open-artifact/core'
 import { betterAuth } from 'better-auth'
 import { APIError } from 'better-auth/api'
 import { genericOAuth, magicLink } from 'better-auth/plugins'
 import type { AppEnv } from '../env.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { messagesFor, type Messages } from '../i18n/messages.ts'
-import { LOCALE_COOKIE, resolveLocale } from '../i18n/resolve-locale.ts'
+import { fallbackLocaleOf, requestLocaleSignals, resolveLocale } from '../i18n/resolve-locale.ts'
 import { Admission, INVITE_COOKIE } from './admission.ts'
 import type { Mailer } from './mailer.ts'
 
@@ -53,7 +53,7 @@ export class OpenArtifactAuth {
 
   constructor(env: AppEnv, appOrigin: string, mailer: Mailer, repositories: Repositories, admission: Admission) {
     this.#loginProviders = OpenArtifactAuth.#configuredProviders(env)
-    this.#fallbackLocale = parseLocale(env.DEFAULT_LOCALE) ?? DEFAULT_LOCALE
+    this.#fallbackLocale = fallbackLocaleOf(env)
     this.#admission = admission
     this.#repositories = repositories
     this.#mailer = mailer
@@ -101,8 +101,7 @@ export class OpenArtifactAuth {
 
   /** The language of a request that may come before anyone is signed in: `account` is the person's choice, if known. */
   requestMessages(headers: Headers | null, account: Locale | null): Messages {
-    const browser = headers ? parseLocale(HttpCookies.read({ headers }, LOCALE_COOKIE)) : null
-    return messagesFor(resolveLocale({ account, browser, acceptLanguage: headers?.get('Accept-Language') ?? null, fallback: this.#fallbackLocale }))
+    return messagesFor(resolveLocale({ account, ...requestLocaleSignals(headers), fallback: this.#fallbackLocale }))
   }
 
   get loginProviders(): LoginProvider[] {

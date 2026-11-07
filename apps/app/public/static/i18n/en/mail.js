@@ -4,7 +4,6 @@ const days = (/** @type {number} */ count) => `${count} ${count === 1 ? 'day' : 
 export default /** @satisfies {import('../messages').Messages['mail']} */ ({
   notification: {
     openLink: link => `Open it: ${link}`,
-    roles: { viewer: 'Can view', commenter: 'Can comment', editor: 'Can edit' },
     commentSubjects: {
       comment: ({ actor, title }) => `${actor}commented on “${title}”`,
       forAgent: ({ actor, title }) => `${actor}left a comment for the agent on “${title}”`,

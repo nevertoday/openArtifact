@@ -111,17 +111,13 @@ export function removalText(takesDown) {
   return takesDown ? m.client.removal.takeDown : m.client.removal.delete
 }
 
-export function removalWord(takesDown) {
-  return removalText(takesDown).word
-}
-
 /** Asks before removing an artifact; the kit puts Cancel first and the danger action last. */
 export function confirmArtifactRemoval(title, takesDown) {
   const removal = removalText(takesDown)
   return Xxd.confirmDialog({
     title: removal.confirmTitle(title),
     message: removal.confirmMessage,
-    confirmLabel: removal.word,
+    confirmLabel: takesDown ? m.labels.removal.takeDown : m.labels.removal.remove,
     cancelLabel: m.client.dialog.cancel,
     closeLabel: m.client.dialog.close,
     tone: 'danger',

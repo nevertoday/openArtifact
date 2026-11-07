@@ -7,6 +7,7 @@ export default {
     public_link: '公开链接',
   },
   roles: { admin: '管理员', member: '成员' },
+  grantRoles: { viewer: '可查看', commenter: '可评论', editor: '可编辑' },
   webPage: '网页',
   hasPassword: '有密码',
   /** @param {string} date */

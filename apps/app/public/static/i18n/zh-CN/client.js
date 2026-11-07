@@ -33,7 +33,6 @@ export default {
   /** takeDown is an admin removing someone else's artifact; delete is the author removing their own. */
   removal: {
     takeDown: {
-      word: '下架',
       /** @param {string} title */
       confirmTitle: title => `下架「${title}」？`,
       confirmMessage: '下架后所有人都看不到它，作者也不能自己恢复。30 天内管理员可以在「最近删除」里恢复。',
@@ -43,7 +42,6 @@ export default {
       failed: message => `下架失败：${message}`,
     },
     delete: {
-      word: '删除',
       /** @param {string} title */
       confirmTitle: title => `删除「${title}」？`,
       confirmMessage: '删除后所有人都看不到它。30 天内可以在「最近删除」里恢复。',
