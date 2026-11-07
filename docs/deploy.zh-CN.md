@@ -52,7 +52,7 @@ npx wrangler r2 bucket create open-artifact-files
 cd apps/app
 npx wrangler secret put BETTER_AUTH_SECRET
 npx wrangler secret put USERCONTENT_SIGNING_KEY
-npx wrangler secret put ALLOWED_EMAIL_DOMAINS   # 例如 example.com；不设置则只有第一个人能注册
+npx wrangler secret put ALLOWED_EMAIL_DOMAINS   # 例如 example.com，* 表示任意邮箱；不设置则只有第一个人能注册
 npx wrangler secret put MAILER                  # cloudflare
 npx wrangler secret put MAIL_FROM               # Open Artifact <noreply@artifact.example.com>
 
@@ -96,6 +96,6 @@ cd ../mcp && npx wrangler deploy
 
 ## 运营
 
-- **谁能注册。** `ALLOWED_EMAIL_DOMAINS` 只放你自己的域名。管理员可以为整个 workspace 关闭公开链接，也可以下架任何 artifact。
+- **谁能注册。** `ALLOWED_EMAIL_DOMAINS` 只放你自己的域名；设为 `*` 时，互联网上任何人都能加入 workspace，看到团队在里面共享的内容。管理员可以为整个 workspace 关闭公开链接，也可以下架任何 artifact。
 - **公开链接上是别人发布的内容。** 作为运营者，你要对自己域名上提供的内容负责。遇到滥用，在 artifact 页面上下架；被删除的 artifact 30 天后由每日任务彻底清除（`apps/app/wrangler.jsonc` 里的 `triggers.crons`）。
 - **升级。** 拉取代码，执行 `pnpm install`，执行数据库迁移（第 5 步），再重新部署三个 Worker（第 6 步）。

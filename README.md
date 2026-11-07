@@ -59,7 +59,7 @@ pnpm run check   # storage boundary, type checks, all tests (Workers runtime, lo
 | Variable | Worker | Purpose |
 |---|---|---|
 | `BETTER_AUTH_SECRET` | app | Session signing |
-| `ALLOWED_EMAIL_DOMAINS` | app | Comma-separated domains whose people may create an account. Unset: only the first person (the founder) can sign up |
+| `ALLOWED_EMAIL_DOMAINS` | app | Comma-separated domains whose people may create an account, or `*` to let any address sign up and join the workspace. Unset: only the first person (the founder) can sign up |
 | `MAILER` | app | `console` prints mail to the log for local development. `cloudflare` sends through Cloudflare Email Service with the `EMAIL` binding. Unset: sign-in mail fails loudly instead of leaking links into logs. Any other value, or `cloudflare` without `EMAIL` or `MAIL_FROM`, fails every request with a configuration error |
 | `MAIL_FROM` | app | Sender for `MAILER=cloudflare`, such as `Open Artifact <noreply@example.com>` or `noreply@example.com`. Its domain must be onboarded and verified in Cloudflare Email Service. Sending to any recipient needs the Workers Paid plan, and the service is in public beta |
 | `USERCONTENT_SIGNING_KEY` | app, usercontent | Must be the same in both; signs artifact file URLs |

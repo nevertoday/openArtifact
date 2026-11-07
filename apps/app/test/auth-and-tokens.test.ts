@@ -246,6 +246,17 @@ describe('who may sign up', () => {
     expect(newcomer.status).toBe(403)
     expect(existingPerson).toContain('session_token')
   })
+
+  it('lets any address sign up and join the first workspace when the allowed domains are "*"', async () => {
+    const openApp = new TestApp({ allowedEmailDomains: '*' })
+    await openApp.signIn('lin@example.com')
+
+    const strangerCookie = await openApp.signIn('stranger@other.org')
+    const me = await openApp.json<{ workspace: { role: string } }>('/api/me', { cookie: strangerCookie })
+
+    expect(strangerCookie).toContain('session_token')
+    expect(me.body.workspace).toMatchObject({ role: 'member' })
+  })
 })
 
 /** Stands in for the Cloudflare Email Service binding: keeps what it was asked to send, or refuses with a service error code. */
