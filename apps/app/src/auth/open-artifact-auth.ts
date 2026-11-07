@@ -16,7 +16,8 @@ export interface SignedInUser {
 
 export interface LoginProvider {
   providerId: string
-  label: string
+  /** null for company SSO without a configured name; the login page words it in the reader's language. */
+  label: string | null
   /** Generic OIDC providers sign in through a different Better Auth endpoint than built-in social ones. */
   kind: 'social' | 'oidc'
 }
@@ -145,7 +146,7 @@ export class OpenArtifactAuth {
 
   static #configuredProviders(env: AppEnv): LoginProvider[] {
     const providers: LoginProvider[] = []
-    if (OpenArtifactAuth.#companySsoConfigured(env)) providers.push({ providerId: OIDC_PROVIDER_ID, label: env.OIDC_DISPLAY_NAME ?? '公司 SSO', kind: 'oidc' })
+    if (OpenArtifactAuth.#companySsoConfigured(env)) providers.push({ providerId: OIDC_PROVIDER_ID, label: env.OIDC_DISPLAY_NAME ?? null, kind: 'oidc' })
     if (OpenArtifactAuth.#githubConfigured(env)) providers.push({ providerId: 'github', label: 'GitHub', kind: 'social' })
     if (OpenArtifactAuth.#googleConfigured(env)) providers.push({ providerId: 'google', label: 'Google', kind: 'social' })
     return providers

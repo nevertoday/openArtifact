@@ -116,7 +116,7 @@ ${SettingsPage.#appearanceSection()}`
       return html`<tr data-member-row="${member.userId}">
     <td><span class="xxd-cluster"><span class="xxd-avatar" data-size="sm" aria-hidden="true">${PageShell.initialOf(name)}</span><span>${name}${isSelf ? html`<span class="xxd-text" data-variant="secondary">（你）</span>` : ''}</span></span></td>
     <td><span class="xxd-text" data-variant="secondary">${member.email}</span></td>
-    ${isAdmin ? SettingsPage.#memberControls(member, name, identity.userId, adminCount) : html`<td>${ArtifactLabels.role(member.role)}</td>`}
+    ${isAdmin ? SettingsPage.#memberControls(model.m, member, name, identity.userId, adminCount) : html`<td>${ArtifactLabels.role(model.m, member.role)}</td>`}
   </tr>`
     }
     const joiningHint = isAdmin ? '' : '要请同事加入，请管理员邀请。'
@@ -159,11 +159,11 @@ ${isAdmin ? SettingsPage.#inviteSection() : ''}
   }
 
   // An admin acting on someone else always leaves themselves as admin, so only their own row can hit the limits.
-  static #memberControls(member: WorkspaceMember, name: string, adminId: string, adminCount: number): SafeHtml {
+  static #memberControls(m: Messages, member: WorkspaceMember, name: string, adminId: string, adminCount: number): SafeHtml {
     const isSelf = member.userId === adminId
     const isLastAdmin = member.role === 'admin' && adminCount === 1
     const roleLocked = isSelf && isLastAdmin
-    const roleOption = (role: WorkspaceMember['role']) => html`<option value="${role}" ${member.role === role ? new SafeHtml('selected') : ''}>${ArtifactLabels.role(role)}</option>`
+    const roleOption = (role: WorkspaceMember['role']) => html`<option value="${role}" ${member.role === role ? new SafeHtml('selected') : ''}>${ArtifactLabels.role(m, role)}</option>`
     return html`<td>
       <label class="xxd-select" data-size="sm"><span class="xxd-sr-only">${name} 的角色</span><select data-member-role="${member.userId}" data-name="${name}" ${roleLocked ? new SafeHtml('disabled') : ''}>${roleOption('admin')}${roleOption('member')}</select></label>
       ${roleLocked ? html`<p class="xxd-text member-reason" data-variant="caption">workspace 至少要有一位管理员</p>` : ''}
@@ -222,9 +222,9 @@ ${administration ? SettingsPage.#auditSection(model.m, administration, model.now
       return html`<tr>
     <td>${titleCell}</td>
     <td><span class="xxd-text" data-variant="secondary">${administration.names.get(summary.authorId)}</span></td>
-    <td>${SettingsPage.#contentState(summary, administration.names, now)}</td>
+    <td>${SettingsPage.#contentState(m, summary, administration.names, now)}</td>
     <td><span class="xxd-text" data-variant="secondary">${PageShell.relativeTime(m, summary.updatedAt, now)}</span></td>
-    <td class="xxd-table__actions">${SettingsPage.#contentAction(openedArtifact, identity)}</td>
+    <td class="xxd-table__actions">${SettingsPage.#contentAction(m, openedArtifact, identity)}</td>
   </tr>`
     }
     return html`<section class="xxd-stack" aria-labelledby="content-title">
@@ -239,26 +239,26 @@ ${administration ? SettingsPage.#auditSection(model.m, administration, model.now
 </section>`
   }
 
-  static #contentState(summary: OpenedArtifact['summary'], names: Map<string, string>, now: number): SafeHtml {
+  static #contentState(m: Messages, summary: OpenedArtifact['summary'], names: Map<string, string>, now: number): SafeHtml {
     const removal = summary.removal
-    if (removal === null) return html`<span class="xxd-badge">${ArtifactLabels.sharingBadge(summary.sharing, now)}</span>`
-    const removalWord = ArtifactLabels.removal(removal.removedAsAdmin)
-    return html`<span class="xxd-badge" data-tone="danger">已${removalWord}</span> <span class="xxd-text" data-variant="caption">${names.get(removal.removedBy)} ${removalWord} · ${ArtifactLabels.purgeIn(removal.purgeAt, now)}</span>`
+    if (removal === null) return html`<span class="xxd-badge">${ArtifactLabels.sharingBadge(m, summary.sharing, now)}</span>`
+    const removalWord = ArtifactLabels.removal(m, removal.removedAsAdmin)
+    return html`<span class="xxd-badge" data-tone="danger">已${removalWord}</span> <span class="xxd-text" data-variant="caption">${names.get(removal.removedBy)} ${removalWord} · ${ArtifactLabels.purgeIn(m, removal.purgeAt, now)}</span>`
   }
 
-  static #contentAction({ summary, permissions }: OpenedArtifact, identity: Identity): SafeHtml | string {
+  static #contentAction(m: Messages, { summary, permissions }: OpenedArtifact, identity: Identity): SafeHtml | string {
     if (permissions.canRestore) {
       return html`<button type="button" class="xxd-btn" data-size="xs" data-restore-artifact="${summary.artifactId}" data-title="${summary.title}">恢复</button>`
     }
     if (!permissions.canRemove) return ''
     const takesDown = ArtifactRemoval.isTakedown(identity.userId, summary.authorId)
-    return html`<button type="button" class="xxd-btn" data-variant="danger-outline" data-size="xs" data-remove-artifact="${summary.artifactId}" data-title="${summary.title}" ${takesDown ? new SafeHtml('data-takes-down') : ''}>${ArtifactLabels.removal(takesDown)}</button>`
+    return html`<button type="button" class="xxd-btn" data-variant="danger-outline" data-size="xs" data-remove-artifact="${summary.artifactId}" data-title="${summary.title}" ${takesDown ? new SafeHtml('data-takes-down') : ''}>${ArtifactLabels.removal(m, takesDown)}</button>`
   }
 
   static #auditSection(m: Messages, administration: WorkspaceAdministration, now: number): SafeHtml {
     const { auditEvents, names } = administration
     const eventItem = (auditEvent: AuditEvent) => html`<li class="xxd-list__item"><span class="xxd-list__main">
-    <span class="xxd-list__title">${SettingsPage.#auditSentence(auditEvent, names)}</span>
+    <span class="xxd-list__title">${SettingsPage.#auditSentence(m, auditEvent, names)}</span>
     <span class="xxd-list__meta">${PageShell.relativeTime(m, auditEvent.createdAt, now)}</span>
   </span></li>`
     return html`<section class="xxd-stack" aria-labelledby="audit-title">
@@ -270,11 +270,11 @@ ${administration ? SettingsPage.#auditSection(model.m, administration, model.now
 </section>`
   }
 
-  static #auditSentence(auditEvent: AuditEvent, names: Map<string, string>): string {
+  static #auditSentence(m: Messages, auditEvent: AuditEvent, names: Map<string, string>): string {
     const actor = names.get(auditEvent.actorId)
     switch (auditEvent.action) {
       case 'artifact.removed':
-        return `${actor} ${ArtifactLabels.removal(auditEvent.detail.removedAsAdmin)}了「${auditEvent.detail.title}」`
+        return `${actor} ${ArtifactLabels.removal(m, auditEvent.detail.removedAsAdmin)}了「${auditEvent.detail.title}」`
       case 'artifact.restored':
         return `${actor} 恢复了「${auditEvent.detail.title}」`
       case 'artifact.renamed':
@@ -282,7 +282,7 @@ ${administration ? SettingsPage.#auditSection(model.m, administration, model.now
       case 'member.removed':
         return `${actor} 把 ${names.get(auditEvent.targetId)} 移出了 workspace`
       case 'member.role_changed':
-        return `${actor} 把 ${names.get(auditEvent.targetId)} 设为${ArtifactLabels.role(auditEvent.detail.to)}`
+        return `${actor} 把 ${names.get(auditEvent.targetId)} 设为${ArtifactLabels.role(m, auditEvent.detail.to)}`
       case 'member.invited':
         return auditEvent.detail.email === null ? `${actor} 生成了一个邀请链接` : `${actor} 邀请了 ${auditEvent.detail.email}`
       case 'invite.revoked':
