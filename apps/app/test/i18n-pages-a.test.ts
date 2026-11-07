@@ -57,7 +57,7 @@ describe('the server-rendered pages in English', () => {
     expect(markup).toContain('All artifacts')
     expect(markup).toContain('Waiting for my agent')
     expect(markup).toContain('published on the web')
-    expect(markup).toContain(`href="/a/${published.artifactId}"`)
+    expect(markup).toContain(`href="${published.path}"`)
     expect(markup).toContain('>Private</span>')
     expect(markup).toContain('1 artifact')
     expect(markup).not.toMatch(anyChinese)
