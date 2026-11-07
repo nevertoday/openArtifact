@@ -1,3 +1,5 @@
+import { m } from './common.js'
+
 const loginCard = document.querySelector('[data-next-path]')
 const nextPath = loginCard.dataset.nextPath
 const sentNotice = document.getElementById('magic-link-sent')
@@ -11,11 +13,8 @@ const RESEND_COOLDOWN_SECONDS = 60
 const EMAIL_NOT_ADMITTED = 'EMAIL_NOT_ADMITTED'
 const SIGN_IN_ERRORS = {
   [EMAIL_NOT_ADMITTED]: emailInput.dataset.errorNotAdmitted,
-  EXPIRED_TOKEN: '登录链接已过期，请重新发送。',
-  INVALID_TOKEN: '登录链接无效或已用过，请重新发送。',
-  rate_limited: '登录链接发得太频繁了，请等一分钟再试。',
+  ...m.client.login.errors,
 }
-const UNKNOWN_SIGN_IN_ERROR = '登录没有成功，请重新发送登录链接。'
 
 class SignInError extends Error {
   constructor(code, message) {
@@ -25,7 +24,7 @@ class SignInError extends Error {
 }
 
 function showError(code) {
-  const message = SIGN_IN_ERRORS[code] ?? UNKNOWN_SIGN_IN_ERROR
+  const message = SIGN_IN_ERRORS[code] ?? m.client.login.unknownError
   if (code === EMAIL_NOT_ADMITTED) {
     Xxd.setFieldError(emailInput, message)
     emailInput.focus()
@@ -42,7 +41,7 @@ async function postAuth(path, body) {
   return responseBody
 }
 
-/** After a link is sent, 再发一次 waits a minute; typing another address makes it 发送登录链接 again at once. */
+/** After a link is sent, the resend button waits a minute; typing another address makes it a first send again at once. */
 class ResendCooldown {
   #timer = null
   #sentTo = null
@@ -64,7 +63,7 @@ class ResendCooldown {
   #tick(secondsLeft) {
     const waiting = secondsLeft > 0
     sendButton.disabled = waiting
-    sendButton.textContent = waiting ? `再发一次（${secondsLeft} 秒）` : '再发一次'
+    sendButton.textContent = waiting ? m.client.login.resendIn(secondsLeft) : m.client.login.resend
     if (waiting) this.#timer = setTimeout(() => this.#tick(secondsLeft - 1), 1000)
   }
 
