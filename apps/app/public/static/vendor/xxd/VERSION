@@ -3,3 +3,4 @@ commit e4eda9c
 hash unknown
 synced 2026-11-06T13:39:31Z
 source xxd-ui-kit（请勿手改这个目录，用 xxd-ui sync 更新 · don't edit by hand, run xxd-ui sync）
+patched by hand: dark-theme --action-fill uses --ink (kit commit 5dedda7 on fix/dark-primary-ink, not yet released); replace with xxd-ui sync once the kit is rebuilt

@@ -586,9 +586,9 @@
   --action-rgb: var(--ink-rgb);
   --on-action: var(--on-ink);
   --action-text: var(--ink);
-  /* 实心底（主按钮）用墨色族的 9 级：暗色比正文的米白暗一档，整行宽的按钮在暗处不刺眼（MINI-REVIEW-PLAN D30） */
-  --action-fill: var(--accent-9);
-  --action-fill-hover: var(--accent-10);
+  /* 实心底（主按钮）和亮色一样用墨色本身：暗一档的 9 级读起来像禁用。悬停才降到 9 级。 */
+  --action-fill: var(--ink);
+  --action-fill-hover: var(--accent-9);
   --focus-ring: 0 0 0 2px color-mix(in srgb, var(--action) 24%, transparent);
   --focus-color: var(--action-text);
 }
@@ -1122,8 +1122,8 @@
     --action-rgb: var(--ink-rgb);
     --on-action: var(--on-ink);
     --action-text: var(--ink);
-    --action-fill: var(--accent-9);
-    --action-fill-hover: var(--accent-10);
+    --action-fill: var(--ink);
+    --action-fill-hover: var(--accent-9);
     --focus-ring: 0 0 0 2px color-mix(in srgb, var(--action) 24%, transparent);
     --focus-color: var(--action-text);
   }
