@@ -13,5 +13,6 @@ import client from './en/client.js'
 import viewerClient from './en/viewerClient.js'
 import notification from './en/notification.js'
 import mail from './en/mail.js'
+import server from './en/server.js'
 
-export default /** @satisfies {import('./messages').Messages} */ ({ meta, shell, time, settings, login, home, labels, personal, messagePages, viewer, client, viewerClient, notification, mail })
+export default /** @satisfies {import('./messages').Messages} */ ({ meta, shell, time, settings, login, home, labels, personal, messagePages, viewer, client, viewerClient, notification, mail, server })

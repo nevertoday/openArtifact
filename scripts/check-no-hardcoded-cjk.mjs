@@ -1,6 +1,7 @@
 // Interface text lives in the dictionaries under apps/app/public/static/i18n, so every language can word it.
-// Chinese anywhere else in the source is text that one language would be stuck with. Comments may still
-// quote Chinese, and the few strings meant for agents that name an interface label in both languages are listed.
+// Chinese anywhere else in the source is text that one language would be stuck with. Comments may still quote
+// Chinese, English meant for agents may gloss an interface label in Chinese, as in "Share (分享)", and code that
+// reads people's own Chinese text (punctuation that ends a sentence) is listed by file.
 // `--report` prints the count of offending lines per file and always exits 0, for tracking a migration.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -10,8 +11,8 @@ const scannedDirectories = ['apps/app/src', 'apps/app/public/static', 'apps/user
 const skippedDirectories = new Set(['i18n', 'vendor', 'node_modules'])
 const cjk = /[　-〿㐀-䶿一-鿿＀-￯]/
 
-/** Agent-facing English that names an interface label the way a person sees it, in both languages. */
-const allowedLines = [/Settings › Agent access \(设置 › Agent 接入\)/, /\(这次改了什么[，,]一句话\)/]
+const glossedLabel = /(?<=[A-Za-z0-9`)] )\([\p{Script=Han}\u3000-\u303f\uff00-\uffef A-Za-z›]+\)/gu
+const readsPeoplesText = new Map([['apps/app/src/api/page-excerpt.ts', /\['。', '！', '？'/]])
 
 function sourceFilesUnder(directory) {
   return readdirSync(directory).flatMap(entry => {
@@ -33,7 +34,7 @@ const offendingLines = scannedDirectories
     const lines = withoutComments(readFileSync(filePath, 'utf8')).split('\n')
     return lines
       .map((line, index) => ({ file: relative(repositoryRoot, filePath), line: index + 1, text: line.trim() }))
-      .filter(({ text }) => cjk.test(text) && !allowedLines.some(allowed => allowed.test(text)))
+      .filter(({ file, text }) => cjk.test(text.replace(glossedLabel, '')) && !readsPeoplesText.get(file)?.test(text))
   })
 
 if (process.argv.includes('--report')) {
@@ -42,5 +43,5 @@ if (process.argv.includes('--report')) {
   console.log(`${String(offendingLines.length).padStart(4)}  total`)
 } else if (offendingLines.length > 0) {
   console.error('Interface text outside the i18n dictionaries:\n' + offendingLines.map(({ file, line, text }) => `  ${file}:${line}  ${text.slice(0, 100)}`).join('\n'))
-  process.exit(1)
+  process.exitCode = 1
 }

@@ -13,5 +13,6 @@ import client from './zh-CN/client.js'
 import viewerClient from './zh-CN/viewerClient.js'
 import notification from './zh-CN/notification.js'
 import mail from './zh-CN/mail.js'
+import server from './zh-CN/server.js'
 
-export default { meta, shell, time, settings, login, home, labels, personal, messagePages, viewer, client, viewerClient, notification, mail }
+export default { meta, shell, time, settings, login, home, labels, personal, messagePages, viewer, client, viewerClient, notification, mail, server }
