@@ -33,7 +33,7 @@ describe('login page', () => {
 
     expect(fromSharedLink).toContain('登录后会打开你刚才的页面。')
     expect(plain).not.toContain('登录后会打开你刚才的页面。')
-    expect(plain).toContain('输入公司邮箱或受邀的邮箱，我们发一个登录链接，不用密码。')
+    expect(plain).toContain('输入邮箱，我们发一个登录链接，不用密码。')
   })
 
   it.each(['//evil.example/steal', '/\t/evil.example', '/\\evil.example', 'https://evil.example/'])('never redirects off the site after sign-in (next=%s)', async nextPath => {

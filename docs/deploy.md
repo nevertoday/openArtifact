@@ -52,7 +52,7 @@ Generate two random secrets (for example `openssl rand -base64 32`). The signing
 cd apps/app
 npx wrangler secret put BETTER_AUTH_SECRET
 npx wrangler secret put USERCONTENT_SIGNING_KEY
-npx wrangler secret put ALLOWED_EMAIL_DOMAINS   # e.g. example.com; leave it out to let only the first person sign up
+npx wrangler secret put ALLOWED_EMAIL_DOMAINS   # e.g. example.com, or * for any address; leave it out to let only the first person sign up
 npx wrangler secret put MAILER                  # cloudflare
 npx wrangler secret put MAIL_FROM               # Open Artifact <noreply@artifact.example.com>
 
@@ -96,6 +96,6 @@ Check that it works end to end:
 
 ## Running it
 
-- **Who can sign up.** Keep `ALLOWED_EMAIL_DOMAINS` to your own domains. Admins can switch public links off for the whole workspace and take down any artifact.
+- **Who can sign up.** Keep `ALLOWED_EMAIL_DOMAINS` to your own domains; `*` lets anyone on the internet join the workspace and read what the team shares inside it. Admins can switch public links off for the whole workspace and take down any artifact.
 - **Public links host whatever people publish.** As the operator you are responsible for what is served from your domains. Take down abuse from the artifact's page; removed artifacts are purged after 30 days by the daily job (`triggers.crons` in `apps/app/wrangler.jsonc`).
 - **Upgrades.** Pull, run `pnpm install`, apply the migrations (step 5), then deploy the three Workers again (step 6).

@@ -20,6 +20,7 @@ export type InviteAcceptance = JoinResult | { status: 'other_address'; invitedEm
  * |------------------------------------------------|-----------------------|----------------------------------------------|
  * | The founder: no account yet, no domains set     | yes                   | the new first workspace, as admin            |
  * | An address in ALLOWED_EMAIL_DOMAINS            | yes                   | the first workspace, as member               |
+ * | Any address, when ALLOWED_EMAIL_DOMAINS is "*" | yes                   | the first workspace, as member               |
  * | An address with a pending email invite         | yes                   | the invite's workspace; readmits if removed  |
  * | Anyone who opened a pending invite link        | yes                   | the invite's workspace; removed stays out    |
  * | Anyone else                                    | no                    |                                              |
@@ -28,11 +29,13 @@ export class Admission {
   /** Shown under the email field; it never names the allowed domains or the setting behind them. */
   static readonly REFUSAL = '这个邮箱不能登录 Open Artifact。请用公司邮箱，或请管理员邀请你。'
   static readonly REFUSAL_CODE = 'EMAIL_NOT_ADMITTED'
+  /** In ALLOWED_EMAIL_DOMAINS, opens sign-up to every address. */
+  static readonly ANY_DOMAIN = '*'
 
   readonly #allowedDomains: string[]
   readonly #repositories: Repositories
 
-  /** `allowedDomainsSetting` is a comma-separated list such as "example.com, example.cn". */
+  /** `allowedDomainsSetting` is a comma-separated list such as "example.com, example.cn", or "*" to admit any address. */
   constructor(allowedDomainsSetting: string | undefined, repositories: Repositories) {
     this.#allowedDomains = (allowedDomainsSetting ?? '')
       .split(',')
@@ -44,6 +47,7 @@ export class Admission {
   /** `inviteCode` is the invite link this browser opened, if any. */
   async mayCreateAccount(email: string, inviteCode: string | null): Promise<boolean> {
     if ((await this.#inviteFor(email, inviteCode)) !== null) return true
+    if (this.#allowedDomains.includes(Admission.ANY_DOMAIN)) return true
     if (this.#allowedDomains.length > 0) return this.#allowedDomains.includes(Admission.#domainOf(email))
     // With no allowlist and no invite, only the founder may sign up, so a fresh deployment is never open to everyone.
     return !(await this.#repositories.users.hasAnyUser())

@@ -12,7 +12,7 @@ export interface AppEnv {
   BETTER_AUTH_SECRET: string
   /** Shared with the usercontent Worker, which checks the signed file URLs the app hands out. */
   USERCONTENT_SIGNING_KEY: string
-  /** Comma-separated email domains whose people may create an account; unset lets only the founder sign up. */
+  /** Comma-separated email domains whose people may create an account, or "*" for any address; unset lets only the founder sign up. */
   ALLOWED_EMAIL_DOMAINS?: string
   /** "console" prints mail to the log for local development; "cloudflare" sends through the EMAIL binding. */
   MAILER?: string

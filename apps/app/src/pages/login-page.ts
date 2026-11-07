@@ -31,7 +31,7 @@ export class LoginPage {
   <main class="login-panel" id="main" tabindex="-1">
     <div class="xxd-auth login-card" data-next-path="${nextPath}">
       <h2 class="xxd-auth__name">登录</h2>
-      ${invitation ? LoginPage.#invitationBanner(invitation) : html`<p class="xxd-auth__line">输入公司邮箱或受邀的邮箱，我们发一个登录链接，不用密码。</p>`}
+      ${invitation ? LoginPage.#invitationBanner(invitation) : html`<p class="xxd-auth__line">输入邮箱，我们发一个登录链接，不用密码。</p>`}
       ${nextPath !== '/' && !invitation ? html`<p class="xxd-auth__line">登录后会打开你刚才的页面。</p>` : ''}
       <div class="xxd-banner" data-tone="success" id="magic-link-sent" role="status" hidden>${PageShell.icon('MailCheck')}<p class="xxd-banner__text">登录链接已发送到 <strong class="login-card__address" data-sent-to></strong>，5 分钟内有效。没收到的话，检查垃圾邮件，或者再发一次。</p></div>
       <div class="xxd-banner" data-tone="danger" id="login-error" role="alert" hidden>${PageShell.icon('TriangleAlert')}<p class="xxd-banner__text" data-error-text></p></div>
