@@ -128,6 +128,43 @@ describe('links that are not the canonical address', () => {
     expect(await outsider.text()).not.toMatch(/acquisition|Acquisition target/)
   })
 
+  it('answers a member without access at a link with the wrong words without naming the artifact', async () => {
+    const privatePage = await publish({ title: 'Layoff plan', slug: 'layoff-plan', visibility: 'private' })
+
+    const guessed = await app.request(`/a/team-notes-${privatePage.shortId}`, { cookie: memberCookie })
+
+    expect(guessed.status).toBe(403)
+    expect(guessed.headers.get('Location')).toBeNull()
+    expect(await guessed.text()).not.toMatch(/layoff|Layoff plan/)
+  })
+
+  it('asks for a public link\'s password at a link with the wrong words without echoing the real ones', async () => {
+    const published = await publish({ title: 'Salary bands', slug: 'salary-bands', visibility: 'public_link', publicLinkExpiresAt: null })
+    await app.request(`/api/artifacts/${published.artifactId}/sharing`, { method: 'PUT', token: authorToken, body: { publicLinkPassword: 'bands-2026' } })
+    const guessedPath = `/a/old-notes-${published.shortId}`
+
+    const prompt = await app.request(guessedPath)
+    const wrongPassword = await app.request(`${guessedPath}/unlock`, { method: 'POST', form: { password: 'not-it' } })
+
+    expect(await prompt.text()).not.toContain('salary-bands')
+    expect(wrongPassword.headers.get('Location') ?? '').not.toContain('salary-bands')
+  })
+
+  it('lets the API and agents name an artifact by the address part of its link, refusing others as with its id', async () => {
+    const published = await publish({ title: 'Pricing page', slug: 'pricing-page', visibility: 'private' })
+    const segment = pathOf(published).slice('/a/'.length)
+
+    const bySegment = await app.json<{ artifactId: string }>(`/api/artifacts/${segment}`, { token: authorToken })
+    const byShortId = await app.json<{ artifactId: string }>(`/api/artifacts/${published.shortId}`, { token: authorToken })
+    const strangerById = await app.request(`/api/artifacts/${published.artifactId}`, { cookie: memberCookie })
+    const strangerBySegment = await app.request(`/api/artifacts/${segment}`, { cookie: memberCookie })
+
+    expect([bySegment.status, byShortId.status]).toEqual([200, 200])
+    expect([bySegment.body.artifactId, byShortId.body.artifactId]).toEqual([published.artifactId, published.artifactId])
+    expect(strangerBySegment.status).toBe(strangerById.status)
+    expect(await strangerBySegment.text()).toBe(await strangerById.text())
+  })
+
   it('asks for a public link\'s password at the old address and redirects only once it is entered', async () => {
     const published = await publish({ title: 'Board deck', slug: 'board-deck', visibility: 'public_link', publicLinkExpiresAt: null })
     await app.request(`/api/artifacts/${published.artifactId}/sharing`, { method: 'PUT', token: authorToken, body: { publicLinkPassword: 'board-2026' } })

@@ -111,7 +111,7 @@ Collection names and ids: letters, digits, \`-\`, \`_\`; at most 64 characters. 
 ### HTTP API
 - \`POST ${api}/artifacts\` \`{ title, slug?, visibility?, publicLinkExpiresAt?, listed?, summary?, note?, files: [{ path, content, encoding?: "utf8"|"base64", contentType? }] }\`
 - \`GET ${api}/artifacts\`, \`GET ${api}/artifacts/{id}\`
-- \`PUT ${api}/artifacts/{id}\` \`{ baseVersion, note, files, title?, slug?, summary? }\`; \`PATCH ${api}/artifacts/{id}\` \`{ title?, slug?, summary? }\` renames or re-summarizes without a new version. \`{id}\` is always the \`artifactId\`, never the link's short id
+- \`PUT ${api}/artifacts/{id}\` \`{ baseVersion, note, files, title?, slug?, summary? }\`; \`PATCH ${api}/artifacts/{id}\` \`{ title?, slug?, summary? }\` renames or re-summarizes without a new version. \`{id}\` is the \`artifactId\`; the address part of a link someone gave you (\`/a/{this-part}\`) works too
 - \`PUT ${api}/artifacts/{id}/sharing\` \`{ visibility?, publicLinkExpiresAt?, publicLinkPassword?, anonymousWriteEnabled?, publicLinkShowsComments?, listed? }\` (full token); fields left out keep their value
 - \`DELETE ${api}/artifacts/{id}\` removes it; \`GET ${api}/artifacts?removed=true\` lists what you can restore; \`POST ${api}/artifacts/{id}/restore\` brings it back
 - \`GET ${api}/comments?for=me&status=open\`: your agent's open comments across artifacts you can edit.

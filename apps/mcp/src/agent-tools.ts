@@ -41,7 +41,7 @@ const SLUG = {
   type: 'string',
   description: '3–6 English words describing the page, e.g. quarterly-sales-review; shown in the link people share. Always pass one, above all when the title is not in English.',
 }
-const ARTIFACT_ID = { type: 'string', description: 'The artifactId returned by publish or list.' }
+const ARTIFACT_ID = { type: 'string', description: 'The artifactId returned by publish or list, or a link to the artifact that someone gave you.' }
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
@@ -196,8 +196,19 @@ export class AgentTools {
   }
 
   // An id is sent as one path segment, so a crafted id cannot reach a different API route.
+  // A link someone pasted names the artifact by its address segment, /a/{segment}/...; the app resolves that segment.
   static #segment(value: unknown): string {
-    return encodeURIComponent(String(value ?? ''))
+    const text = String(value ?? '').trim()
+    const linked = /\/a\/([^/?#]+)/.exec(text)?.[1]
+    return encodeURIComponent(linked === undefined ? text : AgentTools.#decoded(linked))
+  }
+
+  static #decoded(segment: string): string {
+    try {
+      return decodeURIComponent(segment)
+    } catch {
+      return segment
+    }
   }
 
   static #result(appResponse: AppResponse, heading: string): ToolResult {

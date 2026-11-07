@@ -165,6 +165,21 @@ describe('CloudflareArtifactRepository', () => {
     expect(await artifactRepository.findSummaryByShortId('zzzzzzzzzzzz')).toBeNull()
   })
 
+  it('gives a short id to rows inserted without one, as the previous app does while a deploy is under way', async () => {
+    const insertTheOldWay = (id: string) =>
+      env.DB.prepare("INSERT INTO artifacts (id, workspace_id, author_id, title, visibility, current_version, current_upload_id, created_at, updated_at) VALUES (?, ?, ?, 'Old way', 'workspace', 1, 'upload', 0, 0)").bind(id, workspaceId, authorId).run()
+    const firstId = `old-${crypto.randomUUID()}`
+    const secondId = `old-${crypto.randomUUID()}`
+
+    await insertTheOldWay(firstId)
+    await insertTheOldWay(secondId)
+    const shortIds = await Promise.all([firstId, secondId].map(async id => (await env.DB.prepare('SELECT short_id FROM artifacts WHERE id = ?').bind(id).first<{ short_id: string }>())?.short_id))
+
+    expect(shortIds[0]).toMatch(/^[0-9a-z]{12}$/)
+    expect(shortIds[1]).toMatch(/^[0-9a-z]{12}$/)
+    expect(shortIds[0]).not.toBe(shortIds[1])
+  })
+
   it('draws another short id when the first one is taken', async () => {
     const takenShortId = (await createDesignDoc()).shortId
     const freshShortId = `t${crypto.randomUUID().replaceAll('-', '').slice(0, 11)}`
