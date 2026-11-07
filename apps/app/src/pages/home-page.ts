@@ -2,7 +2,7 @@ import type { CommentThread } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
-import { html, type SafeHtml } from './html.ts'
+import { html, SafeHtml } from './html.ts'
 import { type IconName, PageShell } from './page-shell.ts'
 
 const ARTIFACT_FILTERS = ['all', 'mine', 'shared', 'removed'] as const
@@ -13,7 +13,7 @@ export type HomeFilter = (typeof HOME_FILTERS)[number]
 const FILTER_LABELS: Record<HomeFilter, string> = {
   all: '全部',
   mine: '我发布的',
-  shared: '共享给我',
+  shared: '分享给我的',
   removed: '最近删除',
   waiting_for_me: '等我处理',
   waiting_for_my_agent: '等我的 agent 处理',
@@ -72,11 +72,15 @@ export class HomeListing {
     return [...countByAgent].map(([agent, count]) => ({ agent, count })).sort((left, right) => right.count - left.count)
   }
 
-  matching(query: HomeQuery): OpenedArtifact[] {
+  /** A search matches the title, the author's name or the source, ignoring case. */
+  matching(query: HomeQuery, authorNames: Map<string, string>): OpenedArtifact[] {
     const searchText = query.search.trim().toLowerCase()
     return this.#artifactsFor(query.filter).filter(openedArtifact => {
-      const matchesAgent = query.agent === null || ArtifactLabels.publishedVia(openedArtifact.summary.publishedVia) === query.agent
-      const matchesSearch = searchText === '' || openedArtifact.summary.title.toLowerCase().includes(searchText)
+      const { summary } = openedArtifact
+      const source = ArtifactLabels.publishedVia(summary.publishedVia)
+      const matchesAgent = query.agent === null || source === query.agent
+      const searchedFields = [summary.title, authorNames.get(summary.authorId) ?? '', source]
+      const matchesSearch = searchText === '' || searchedFields.some(field => field.toLowerCase().includes(searchText))
       return this.#matchesFilter(openedArtifact, query.filter) && matchesAgent && matchesSearch
     })
   }
@@ -129,9 +133,26 @@ const FILTER_ICONS: Record<HomeFilter, IconName> = {
   waiting_for_my_agent: 'Bot',
 }
 
+// What each filter holds, under the heading; the count and the search follow it.
+const FILTER_DESCRIPTIONS: Record<HomeFilter, string> = {
+  all: '团队成员和他们的 agent 发布的 artifact，默认 workspace 内可见。',
+  mine: '你发布的，和你的 agent 代你发布的。',
+  shared: '作者把你加进分享名单的 artifact。',
+  removed: '删除后所有人都看不到。30 天内可以恢复，之后彻底删除。',
+  waiting_for_me: '有评论在等你回复。',
+  waiting_for_my_agent: '有给 agent 的评论还没解决，等你的 agent 处理。',
+}
+
+interface EmptyState {
+  icon: IconName
+  title: string
+  text: string
+  action: { label: string; href: string; primary: boolean } | null
+}
+
 export class HomePage {
   static render(model: HomeModel): Response {
-    const shownArtifacts = model.listing.matching(model.query)
+    const shownArtifacts = model.listing.matching(model.query, model.authorNames)
     const topBarMiddle = html`${PageShell.workspaceSwitcher(model.identity)}${HomePage.#searchBox(model.query)}<a class="xxd-btn app-topbar__action" data-variant="ghost" data-size="sm" href="/settings/agents">${PageShell.icon('Bot')}Agent 接入</a>`
     const main = model.query.filter === 'removed' ? HomePage.#removedSection(shownArtifacts, model) : HomePage.#artifactsSection(shownArtifacts, model)
     const body = html`${PageShell.topBar(model.identity, topBarMiddle)}${PageShell.withSidebar(HomePage.#sidebar(model), main)}
@@ -145,9 +166,10 @@ ${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(mod
     <h1 class="xxd-page-header__title">${HomePage.#heading(model.query)}</h1>
     <div class="xxd-page-header__actions"><a class="xxd-btn" data-variant="primary" href="/settings/agents">让 agent 发布</a></div>
   </div>
-  <p class="xxd-page-header__desc">由团队成员的 agent 发布，默认整个 workspace 可见</p>
+  <p class="xxd-page-header__desc">${HomePage.#description(model.query)}</p>
 </header>
-${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#emptyState(model)}`
+${HomePage.#resultLine(shownArtifacts.length, model.query)}
+${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#emptyState(HomePage.#emptyStateOf(model.query))}`
   }
 
   // The heading names what the list shows, so it never runs the workspace name into a sentence.
@@ -156,13 +178,24 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     return query.filter === 'all' ? '全部 artifact' : FILTER_LABELS[query.filter]
   }
 
+  static #description(query: HomeQuery): string {
+    return query.agent === null ? FILTER_DESCRIPTIONS[query.filter] : `来源是 ${query.agent} 的 artifact。`
+  }
+
+  // Said in a live region, so a screen reader hears the count change as the search narrows.
+  static #resultLine(shownCount: number, query: HomeQuery): SafeHtml {
+    const searchText = query.search.trim()
+    const line = searchText === '' ? `${shownCount} 个` : `搜索「${searchText}」· ${shownCount} 个`
+    return html`<p class="xxd-text home-result-line" data-variant="secondary" role="status">${line}</p>`
+  }
+
   // Removed artifacts have no page to open; the list offers only 恢复 until they are purged.
   static #removedSection(removedArtifacts: OpenedArtifact[], model: HomeModel): SafeHtml {
     const header = html`<header class="xxd-page-header">
-  <div class="xxd-page-header__row"><h1 class="xxd-page-header__title">最近删除</h1></div>
-  <p class="xxd-page-header__desc">删除后所有人都看不到。30 天内可以恢复，之后彻底删除。</p>
+  <div class="xxd-page-header__row"><h1 class="xxd-page-header__title">${FILTER_LABELS.removed}</h1></div>
+  <p class="xxd-page-header__desc">${FILTER_DESCRIPTIONS.removed}</p>
 </header>`
-    if (removedArtifacts.length === 0) return html`${header}<section class="xxd-empty">${PageShell.icon('Trash2', 24)}<h2 class="xxd-empty__title">没有可以恢复的 artifact</h2></section>`
+    if (removedArtifacts.length === 0) return html`${header}${HomePage.#emptyState({ icon: 'Trash2', title: '没有可以恢复的 artifact', text: '你删除的 artifact 会在这里留 30 天。', action: null })}`
     const row = ({ summary }: OpenedArtifact) => {
       const removal = summary.removal
       if (removal === null) throw new Error(`Artifact ${summary.artifactId} is listed as removed but has no removal`)
@@ -185,31 +218,56 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     return { artifactId: summary.artifactId, title: summary.title, removedAsAdmin: summary.removal?.removedAsAdmin ?? false }
   }
 
+  // Enter submits as a plain GET; home.js also filters as the person types. The filter and source go along.
   static #searchBox(query: HomeQuery): SafeHtml {
-    return html`<form class="xxd-input-wrap app-search" role="search" action="/" method="get">
-  ${PageShell.icon('Search')}<label class="xxd-sr-only" for="artifact-search">搜索标题</label>
-  <input class="xxd-input" data-size="sm" id="artifact-search" name="q" type="search" placeholder="搜索标题" value="${query.search}">
+    return html`<form class="xxd-input-wrap app-search" role="search" action="/" method="get" data-home-search>
+  ${PageShell.icon('Search')}<label class="xxd-sr-only" for="artifact-search">搜索标题、作者或 agent</label>
+  <input class="xxd-input" data-size="sm" id="artifact-search" name="q" type="search" placeholder="搜索标题、作者或 agent" autocomplete="off" value="${query.search}">
   ${query.filter !== 'all' ? html`<input type="hidden" name="filter" value="${query.filter}">` : ''}
+  ${query.agent !== null ? html`<input type="hidden" name="agent" value="${query.agent}">` : ''}
 </form>`
   }
 
+  /** The home address for a filter or a source; a search in progress stays. */
+  static #homePath(query: HomeQuery): string {
+    const searchParams = new URLSearchParams()
+    if (query.filter !== 'all') searchParams.set('filter', query.filter)
+    if (query.agent !== null) searchParams.set('agent', query.agent)
+    if (query.search.trim() !== '') searchParams.set('q', query.search.trim())
+    const queryString = searchParams.toString()
+    return queryString === '' ? '/' : `/?${queryString}`
+  }
+
   static #sidebar(model: HomeModel): SafeHtml {
+    const search = model.query.search
     const filterLink = (filter: HomeFilter) => {
       const isCurrent = model.query.filter === filter && model.query.agent === null
       const count = model.listing.countFor(filter)
       const somethingWaits = WAITING_FILTERS.some(waitingFilter => waitingFilter === filter) && count > 0
-      return html`<a class="xxd-sidebar__item" ${filter === 'removed' ? html`data-removed-count` : ''} href="${filter === 'all' ? '/' : `/?filter=${filter}`}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(FILTER_ICONS[filter], 18)}<span>${FILTER_LABELS[filter]}</span><span class="xxd-badge" ${somethingWaits ? html`data-tone="warning"` : ''}>${count}</span></a>`
+      return html`<a class="xxd-sidebar__item" ${filter === 'removed' ? html`data-removed-count` : ''} href="${HomePage.#homePath({ filter, agent: null, search })}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(FILTER_ICONS[filter], 18)}<span>${FILTER_LABELS[filter]}</span><span class="xxd-badge" ${somethingWaits ? html`data-tone="warning"` : ''} title="${count} 个 artifact">${count}</span></a>`
     }
     const agentLink = ({ agent, count }: { agent: string; count: number }) => {
       const isCurrent = model.query.agent === agent
-      return html`<a class="xxd-sidebar__item" href="/?agent=${encodeURIComponent(agent)}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(HomePage.#sourceIcon(agent), 18)}<span>${agent}</span><span class="xxd-badge">${count}</span></a>`
+      return html`<a class="xxd-sidebar__item" href="${HomePage.#homePath({ filter: 'all', agent, search })}" title="${agent}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(HomePage.#sourceIcon(agent), 18)}<span>${agent}</span><span class="xxd-badge" title="${count} 个 artifact">${count}</span></a>`
     }
     const agentCounts = model.listing.agentCounts()
-    return html`<nav class="xxd-sidebar app-sidebar" aria-label="筛选"><div class="xxd-sidebar__body">
-  <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">ARTIFACT</div>${ARTIFACT_FILTERS.map(filterLink)}</div>
-  <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">待处理</div>${WAITING_FILTERS.map(filterLink)}</div>
-  ${agentCounts.length > 0 ? html`<div class="xxd-sidebar__group"><div class="xxd-sidebar__label">来源</div>${agentCounts.map(agentLink)}</div>` : ''}
+    return html`<nav class="xxd-sidebar app-sidebar home-sidebar" aria-label="筛选"><div class="xxd-sidebar__body">
+  <div class="home-sidebar__filter-row">
+    <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">筛选</div>${ARTIFACT_FILTERS.map(filterLink)}</div>
+    <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">待处理</div>${WAITING_FILTERS.map(filterLink)}</div>
+  </div>
+  ${agentCounts.length > 0 ? html`<div class="xxd-sidebar__group home-sidebar__sources"><div class="xxd-sidebar__label">来源</div>${agentCounts.map(agentLink)}</div>${HomePage.#sourcePicker(model, agentCounts)}` : ''}
 </div></nav>`
+  }
+
+  // On narrow screens the sources become one select, so the filters keep a row of their own.
+  static #sourcePicker(model: HomeModel, agentCounts: { agent: string; count: number }[]): SafeHtml {
+    const option = (label: string, path: string, selected: boolean) => html`<option value="${path}" ${selected ? new SafeHtml('selected') : ''}>${label}</option>`
+    const search = model.query.search
+    return html`<label class="xxd-select home-source-picker"><span class="xxd-sr-only">来源</span><select data-source-picker>
+  ${option('全部来源', HomePage.#homePath({ filter: model.query.agent === null ? model.query.filter : 'all', agent: null, search }), model.query.agent === null)}
+  ${agentCounts.map(({ agent, count }) => option(`${agent}（${count}）`, HomePage.#homePath({ filter: 'all', agent, search }), model.query.agent === agent))}
+</select></label>`
   }
 
   static #sourceIcon(agent: string): IconName {
@@ -222,22 +280,19 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
 
   static #card({ summary }: OpenedArtifact, model: HomeModel): SafeHtml {
     const unresolvedCount = model.listing.unresolvedCount(summary.artifactId)
-    return html`<a class="xxd-card" href="/a/${encodeURIComponent(summary.artifactId)}">
+    const publishedBy = ArtifactLabels.publishedBy(model.authorNames.get(summary.authorId) ?? '', summary.publishedVia)
+    return html`<a class="xxd-card artifact-card" href="/a/${encodeURIComponent(summary.artifactId)}">
   <div class="xxd-card__media artifact-cover" aria-hidden="true">
     <span class="artifact-cover__title"></span><span class="artifact-cover__line"></span><span class="artifact-cover__line"></span>
     <span class="artifact-cover__blocks"><span></span><span></span><span></span></span>
     ${HomePage.#livePreview(model.previewUrls.get(summary.artifactId))}
   </div>
   <div class="xxd-card__body">
-    <p class="xxd-card__title">${summary.title}</p>
-    <p class="xxd-card__meta artifact-meta">
-      <span>${model.authorNames.get(summary.authorId)}</span>
-      <span>${ArtifactLabels.publishedVia(summary.publishedVia)}</span>
-      <span class="xxd-mono">v${summary.version}</span>
-      <span>${PageShell.relativeTime(summary.updatedAt, model.now)}</span>
-    </p>
+    <p class="xxd-card__title artifact-card__title" title="${summary.title}">${summary.title}</p>
+    <p class="xxd-card__meta artifact-meta" title="${publishedBy}">${publishedBy}</p>
+    <p class="xxd-card__meta artifact-meta"><span class="xxd-mono">v${summary.version}</span>${PageShell.relativeTime(summary.updatedAt, model.now)}</p>
     <div class="xxd-cluster artifact-card__badges">
-      <span class="xxd-badge">${ArtifactLabels.visibility(summary.sharing.visibility)}</span>
+      <span class="xxd-badge">${ArtifactLabels.sharingBadge(summary.sharing, model.now)}</span>
       ${unresolvedCount > 0 ? html`<span class="xxd-badge" data-appearance="dot" data-tone="warning">${unresolvedCount} 条未解决评论</span>` : ''}
     </div>
   </div>
@@ -250,16 +305,36 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     return html`<iframe class="artifact-cover__preview" src="${previewUrl}" sandbox="allow-scripts" loading="lazy" tabindex="-1" referrerpolicy="no-referrer" title=""></iframe>`
   }
 
-  static #emptyState(model: HomeModel): SafeHtml {
-    const isFiltered = model.query.filter !== 'all' || model.query.agent !== null || model.query.search !== ''
-    if (isFiltered) {
-      return html`<section class="xxd-empty">${PageShell.icon('SearchX', 24)}<h2 class="xxd-empty__title">没有符合条件的 artifact</h2><div class="xxd-empty__actions"><a class="xxd-btn" href="/">查看全部</a></div></section>`
+  // A search that finds nothing is undone by clearing the search alone; each filter says what would fill it.
+  static #emptyStateOf(query: HomeQuery): EmptyState {
+    const searchText = query.search.trim()
+    if (searchText !== '') {
+      return { icon: 'SearchX', title: `没有找到「${searchText}」`, text: '搜索会查标题、作者的名字和发布它的 agent。', action: { label: '清除搜索', href: HomePage.#homePath({ ...query, search: '' }), primary: false } }
     }
+    if (query.agent !== null) return { icon: 'SearchX', title: `没有来自 ${query.agent} 的 artifact`, text: '', action: { label: '查看全部', href: '/', primary: false } }
+    switch (query.filter) {
+      case 'all':
+        return { icon: 'Inbox', title: '还没有 artifact', text: '在「Agent 接入」里连接你的 agent，然后让它把设计文档、报告或看板发布到这里。', action: { label: '连接 agent', href: '/settings/agents', primary: true } }
+      case 'mine':
+        return { icon: 'UserRound', title: '你还没有发布 artifact', text: '连接你的 agent，让它把页面发布到这里。', action: { label: '连接 agent', href: '/settings/agents', primary: true } }
+      case 'shared':
+        return { icon: 'Users', title: '还没有人把 artifact 分享给你', text: '作者在分享设置里加上你之后，会出现在这里。', action: null }
+      case 'waiting_for_me':
+        return { icon: 'MessageSquareText', title: '没有等你回复的评论', text: '有人评论你的 artifact，或回复你的评论时，会出现在这里。', action: null }
+      case 'waiting_for_my_agent':
+        return { icon: 'Bot', title: '没有给 agent 的评论', text: '有人在评论时选「给 agent」，你的 agent 就会在这里看到要做的事。', action: null }
+      case 'removed':
+        return { icon: 'Trash2', title: '没有可以恢复的 artifact', text: '', action: null }
+    }
+  }
+
+  static #emptyState(emptyState: EmptyState): SafeHtml {
+    const { icon, title, text, action } = emptyState
     return html`<section class="xxd-empty">
-  ${PageShell.icon('Inbox', 24)}
-  <h2 class="xxd-empty__title">还没有 artifact</h2>
-  <p class="xxd-empty__text">在「Agent 接入」里连接你的 agent，然后让它把设计文档、报告或看板发布到这里。</p>
-  <div class="xxd-empty__actions"><a class="xxd-btn" data-variant="primary" href="/settings/agents">连接 agent</a></div>
+  ${PageShell.icon(icon, 24)}
+  <h2 class="xxd-empty__title">${title}</h2>
+  ${text ? html`<p class="xxd-empty__text">${text}</p>` : ''}
+  ${action ? html`<div class="xxd-empty__actions"><a class="xxd-btn" ${action.primary ? html`data-variant="primary"` : ''} href="${action.href}">${action.label}</a></div>` : ''}
 </section>`
   }
 }

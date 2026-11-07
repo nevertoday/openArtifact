@@ -77,7 +77,7 @@ describe('publishing and updating', () => {
     expect(bigFile.body.error).toContain('index.html')
   })
 
-  it('keeps every version and restores an older one as a new version that says where it came from', async () => {
+  it('keeps every version and restores an older one as a new version that says where it came from and keeps its source', async () => {
     const published = await app.publish({ token: agentToken, agentClient: 'Claude Code' }, 'Roadmap', '<h1>v1</h1>')
     await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, agentClient: 'Cursor', body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
 
@@ -88,7 +88,7 @@ describe('publishing and updating', () => {
 
     expect(restored.body.version).toBe(3)
     expect(history.body.versions.map(version => [version.version, version.publishedVia, version.origin, version.restoredFrom])).toEqual([
-      [3, null, 'restored', 1],
+      [3, 'Claude Code', 'restored', 1],
       [2, 'Cursor', 'published', null],
       [1, 'Claude Code', 'published', null],
     ])

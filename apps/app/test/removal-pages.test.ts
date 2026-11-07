@@ -58,7 +58,7 @@ describe('recently removed on the home page', () => {
     const memberRemovedMarkup = await pageText('/?filter=removed', memberCookie)
 
     expect(homeMarkup).not.toContain('<p class="xxd-card__title">Oops page</p>')
-    expect(homeMarkup).toMatch(/最近删除<\/span><span class="xxd-badge"\s*>1<\/span>/)
+    expect(homeMarkup).toMatch(/最近删除<\/span><span class="xxd-badge"\s*title="1 个 artifact">1<\/span>/)
     expect(jsonDataOf(homeMarkup, 'home-config')).toEqual({ justRemoved: { artifactId: published.artifactId, title: 'Oops page', removedAsAdmin: false } })
     expect(mineMarkup).not.toContain('Oops page')
     expect(removedMarkup).toContain('Oops page')

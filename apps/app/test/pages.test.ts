@@ -109,6 +109,52 @@ describe('home page', () => {
     expect(reviewerForMeMarkup).not.toContain('Answered me')
   })
 
+  it('finds artifacts by title, author name or agent, and keeps the filter and source while searching', async () => {
+    await app.request('/api/me', { method: 'PATCH', cookie: reviewerCookie, body: { name: '周晓' } })
+    const reviewerToken = await app.createToken(reviewerCookie)
+    await app.publish({ token: reviewerToken, agentClient: 'Gemini CLI' }, 'Quarterly numbers')
+
+    const byAuthor = await pageText(`/?q=${encodeURIComponent('周晓')}`, authorCookie)
+    const byAgent = await pageText('/?q=gemini', authorCookie)
+    const withinSource = await pageText('/?agent=Gemini%20CLI&q=quarterly', authorCookie)
+
+    expect(byAuthor).toContain('Quarterly numbers')
+    expect(byAuthor).toMatch(/搜索「周晓」· \d+ 个/)
+    expect(byAgent).toContain('Quarterly numbers')
+    expect(withinSource).toContain('<input type="hidden" name="agent" value="Gemini CLI">')
+    expect(withinSource).toContain('placeholder="搜索标题、作者或 agent"')
+    expect(withinSource).toMatch(/href="\/\?filter=mine&amp;q=quarterly"/)
+  })
+
+  it('says why a list is empty and offers the step that fills it, clearing only the search when the search found nothing', async () => {
+    const noMatch = await pageText('/?filter=mine&q=zzzz-nothing', authorCookie)
+    const nothingShared = await pageText('/?filter=shared', authorCookie)
+
+    expect(noMatch).toContain('没有找到「zzzz-nothing」')
+    expect(noMatch).toContain('href="/?filter=mine">清除搜索')
+    expect(nothingShared).toContain('还没有人把 artifact 分享给你')
+    expect(nothingShared).toContain('<h1 class="xxd-page-header__title">分享给我的</h1>')
+  })
+
+  it('keeps long titles to two lines with the full title on hover, and says who published through what', async () => {
+    const longTitle = '产品 A 发布计划：从需求评审、设计稿确认、灰度发布到全量上线的完整时间线与每一步的负责人和验收标准'
+    await app.publish({ token: agentToken, agentClient: 'Claude Code' }, longTitle)
+    await app.publish({ cookie: authorCookie }, 'Written on the web')
+
+    const homeMarkup = await pageText('/', authorCookie)
+
+    expect(homeMarkup).toContain(`<p class="xxd-card__title artifact-card__title" title="${longTitle}">`)
+    expect(homeMarkup).toContain('lin 用 Claude Code 发布')
+    expect(homeMarkup).toContain('lin 在网页上发布')
+  })
+
+  it('offers a skip link to the main content as the first thing on the page', async () => {
+    const homeMarkup = await pageText('/', authorCookie)
+
+    expect(homeMarkup).toMatch(/<body class="xxd-page"><a class="xxd-sr-only-focusable" href="#main">跳到内容<\/a>/)
+    expect(homeMarkup).toContain('<main class="app-main" id="main"')
+  })
+
   it('says when each artifact changed as a relative time with the full time on hover', async () => {
     await app.publish({ token: agentToken }, 'Timed page')
 

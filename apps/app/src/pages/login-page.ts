@@ -28,7 +28,7 @@ export class LoginPage {
     </div>
     <footer class="xxd-text" data-variant="caption">页面和数据都存在团队自己的 Cloudflare 账号里。</footer>
   </section>
-  <main class="login-panel">
+  <main class="login-panel" id="main" tabindex="-1">
     <div class="xxd-auth login-card" data-next-path="${nextPath}">
       <h2 class="xxd-auth__name">登录</h2>
       ${invitation ? LoginPage.#invitationBanner(invitation) : html`<p class="xxd-auth__line">输入工作邮箱，我们发一个登录链接，不用密码。</p>`}

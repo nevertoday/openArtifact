@@ -99,9 +99,9 @@ export function timeElement(timestamp) {
   return element('time', { datetime: new Date(timestamp).toISOString(), title: fullTimeText(timestamp), 'data-relative': true }, timeAgo(timestamp))
 }
 
-// The server writes these in its own time zone; the reader's zone decides 昨天 and the date.
-function rerenderServerTimes() {
-  for (const timeTag of document.querySelectorAll('time[data-relative]')) {
+/** Re-renders the server's <time data-relative> under `root` in the reader's time zone, which decides 昨天 and the date. */
+export function renderServerTimes(root = document) {
+  for (const timeTag of root.querySelectorAll('time[data-relative]')) {
     const timestamp = Date.parse(timeTag.dateTime)
     timeTag.textContent = timeAgo(timestamp)
     timeTag.title = fullTimeText(timestamp)
@@ -233,7 +233,7 @@ function wireNotificationBell() {
   if (bell && panel) new NotificationBell(bell, panel).refresh()
 }
 
-rerenderServerTimes()
+renderServerTimes()
 wireSignOut()
 wireWorkspaceSwitcher()
 wireNotificationBell()

@@ -71,7 +71,7 @@ ${options.description ? html`<meta name="description" content="${options.descrip
 <script src="/static/vendor/xxd/xxd.js"></script>
 <link rel="stylesheet" href="/static/app.css">
 </head>
-<body class="xxd-page">${options.body}${(options.scripts ?? []).map(script => html`<script type="module" src="/static/${script}"></script>`)}</body>
+<body class="xxd-page"><a class="xxd-sr-only-focusable" href="#main">跳到内容</a>${options.body}${(options.scripts ?? []).map(script => html`<script type="module" src="/static/${script}"></script>`)}</body>
 </html>`
     return new Response(page.markup, {
       status: options.status ?? 200,
@@ -120,9 +120,9 @@ ${options.description ? html`<meta name="description" content="${options.descrip
     return html`<header class="xxd-topbar app-topbar">${PageShell.brandLink()}</header>`
   }
 
-  /** Home and settings: side navigation beside one content column. */
+  /** Home and settings: side navigation beside one content column. Every page's main region is #main, where 跳到内容 leads. */
   static withSidebar(sidebar: SafeHtml, main: SafeHtml): SafeHtml {
-    return html`<div class="app-frame">${sidebar}<main class="app-main">${main}</main></div>`
+    return html`<div class="app-frame">${sidebar}<main class="app-main" id="main" tabindex="-1">${main}</main></div>`
   }
 
   static workspaceSwitcher(identity: Identity): SafeHtml {

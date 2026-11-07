@@ -157,11 +157,13 @@ export class ArtifactApi {
     const openedArtifact = await this.#context.gate.require(artifactId, identity, request, 'canEdit', 'restore a version of this artifact')
     const requestBody = await JsonBody.of(request)
     const baseVersion = requestBody.positiveInteger('baseVersion', BASE_VERSION_HINT)
-    const olderVersion = await this.#context.repositories.artifacts.readVersion(artifactId, version)
-    if (!olderVersion) throw HttpError.notFound(`version ${version} of artifact ${artifactId}`)
+    const [olderVersion, versionHistory] = await Promise.all([this.#context.repositories.artifacts.readVersion(artifactId, version), this.#context.repositories.artifacts.listVersions(artifactId)])
+    const olderVersionRecord = versionHistory.find(versionRecord => versionRecord.version === version)
+    if (!olderVersion || !olderVersionRecord) throw HttpError.notFound(`version ${version} of artifact ${artifactId}`)
     const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
       authorId: identity.userId,
-      publishedVia: identity.agentClient,
+      // The files are the older version's, so the source people see stays the one that made them.
+      publishedVia: olderVersionRecord.publishedVia,
       origin: { kind: 'restored', restoredFrom: version },
       note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
       files: olderVersion.files,

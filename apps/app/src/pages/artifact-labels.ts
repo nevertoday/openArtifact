@@ -1,10 +1,10 @@
-import type { ArtifactVisibility, WorkspaceRole } from '@open-artifact/core'
-import { relativeTimeText } from '../../public/static/time-text.js'
+import type { ArtifactSharing, ArtifactVisibility, WorkspaceRole } from '@open-artifact/core'
+import { dateText, relativeTimeText } from '../../public/static/time-text.js'
 
 const VISIBILITY_LABELS: Record<ArtifactVisibility, string> = {
   private: '私有',
   specified: '指定的人',
-  workspace: '整个 workspace',
+  workspace: 'workspace 内可见',
   public_link: '公开链接',
 }
 
@@ -18,6 +18,20 @@ const DAY = 24 * 60 * 60 * 1000
 export class ArtifactLabels {
   static visibility(visibility: ArtifactVisibility): string {
     return VISIBILITY_LABELS[visibility]
+  }
+
+  /** Every visibility's label, for page scripts that word visibility themselves; they get it in their page JSON. */
+  static visibilityLabels(): Record<ArtifactVisibility, string> {
+    return { ...VISIBILITY_LABELS }
+  }
+
+  /** The visibility as a badge says it: a public link also says whether it needs a password and when it ends. */
+  static sharingBadge(sharing: ArtifactSharing, now: number): string {
+    const label = VISIBILITY_LABELS[sharing.visibility]
+    if (sharing.visibility !== 'public_link') return label
+    const expiresAt = sharing.publicLinkExpiresAt
+    const expiry = expiresAt === null ? null : expiresAt > now ? `${dateText(expiresAt)} 过期` : '已过期'
+    return [label, sharing.publicLinkPasswordHash === null ? null : '有密码', expiry].filter(part => part !== null).join(' · ')
   }
 
   /** 下架 is an admin removing someone else's artifact; 删除 is the author removing their own. */
@@ -36,6 +50,11 @@ export class ArtifactLabels {
 
   static publishedVia(publishedVia: string | null): string {
     return publishedVia ?? WEB_PAGE_LABEL
+  }
+
+  /** 「devin 用 Claude Code 发布」 or 「devin 在网页上发布」. */
+  static publishedBy(authorName: string, publishedVia: string | null): string {
+    return publishedVia === null ? `${authorName} 在${WEB_PAGE_LABEL}上发布` : `${authorName} 用 ${publishedVia} 发布`
   }
 
   /** Prefer PageShell.relativeTime, which also carries the full time on hover. */

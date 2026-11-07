@@ -98,7 +98,7 @@ export class PageRoutes {
       search: searchParams.get('q') ?? '',
     }
     const authorNames = await this.#context.people.namesOf(listing.peopleIds())
-    const previewUrls = await this.#previewUrls(listing.matching(query))
+    const previewUrls = await this.#previewUrls(listing.matching(query, authorNames))
     const justRemoved = listing.restorable(searchParams.get('removed'))
     return HomePage.render({ identity, listing, query, authorNames, previewUrls, justRemoved, usercontentOrigin: this.#settings.usercontentOrigin, now: Date.now() })
   }

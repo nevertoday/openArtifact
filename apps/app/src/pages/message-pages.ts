@@ -103,6 +103,6 @@ export class MessagePages {
   }
 
   static #centered(content: SafeHtml): SafeHtml {
-    return html`${PageShell.brandBar()}<main class="app-center">${content}</main>`
+    return html`${PageShell.brandBar()}<main class="app-center" id="main" tabindex="-1">${content}</main>`
   }
 }
