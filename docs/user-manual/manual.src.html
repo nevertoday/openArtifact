@@ -27,7 +27,7 @@ nav.toc .toc-label { font-size: 12px; color: var(--muted); letter-spacing: 0.08e
 nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
 nav.toc a { display: block; padding: 4px 8px; border-radius: 6px; color: var(--muted); text-decoration: none; }
 nav.toc a:hover { background: var(--accent-soft); color: var(--fg); }
-main { min-width: 0; max-width: 780px; }
+main { min-width: 0; }
 header.doc-head { padding-bottom: 24px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
 .eyebrow { font-family: var(--font-mono); font-size: 12px; color: var(--accent); letter-spacing: 0.06em; }
 h1 { font-size: clamp(28px, 4vw, 38px); line-height: 1.25; margin: 8px 0 12px; text-wrap: balance; }
@@ -89,8 +89,10 @@ details.faq p { margin: 8px 0 2px; font-size: 14.5px; }
       <li><a href="#home">首页</a></li>
       <li><a href="#view">查看 artifact</a></li>
       <li><a href="#comments">评论和给 agent</a></li>
+      <li><a href="#notifications">通知</a></li>
       <li><a href="#versions">版本</a></li>
       <li><a href="#sharing">分享</a></li>
+      <li><a href="#remove">删除和恢复</a></li>
       <li><a href="#connect">连接你的 agent</a></li>
       <li><a href="#workflow">和 agent 协作</a></li>
       <li><a href="#data">页面里的共享数据</a></li>
@@ -111,9 +113,10 @@ details.faq p { margin: 8px 0 2px; font-size: 14.5px; }
       <p>你平时让 Claude Code、Codex、Cursor 这类 agent 写设计文档、分析报告或数据看板。Open Artifact 把这些结果发布成一个个网页，叫作 <strong>artifact</strong>。同事不需要任何 AI 账号，用团队账号登录就能打开。</p>
       <div class="cards">
         <div class="card"><div class="step">1</div><h4>agent 发布</h4><p>你对 agent 说“发布到 Open Artifact”，它把页面发上来并给你一个链接。</p></div>
-        <div class="card"><div class="step">2</div><h4>团队查看和评论</h4><p>同事打开链接，在旁边写评论；需要 agent 改的，勾选「给 agent 处理」。</p></div>
+        <div class="card"><div class="step">2</div><h4>团队查看和评论</h4><p>同事打开链接，在旁边写评论；需要 agent 改的，勾选「给 agent」。</p></div>
         <div class="card"><div class="step">3</div><h4>agent 修改</h4><p>你让 agent 处理评论，它改完发布新版本，再回复评论并标记已解决。</p></div>
       </div>
+      <p>页面上的日期都写成 <code>2026-10-20</code>。「3 分钟前」「昨天」这类相对时间，鼠标停在上面会显示完整时间。</p>
     </section>
 
     <section id="login">
@@ -121,11 +124,14 @@ details.faq p { margin: 8px 0 2px; font-size: 14.5px; }
       <ol>
         <li>打开 Open Artifact 的地址，输入工作邮箱，点「发送登录链接」。</li>
         <li>打开邮件里的链接，就登录了。链接 5 分钟内有效，只能用一次。</li>
+        <li>没收到邮件，等 60 秒后点「再发一次」。按钮上会倒数剩下的秒数。改了邮箱，按钮马上变回「发送登录链接」。</li>
       </ol>
       <ul>
-        <li>只有管理员允许的邮箱域名可以注册。用了别的邮箱，页面会提示允许哪些域名。</li>
-        <li>第一个登录的人成为团队 workspace 的<strong>管理员</strong>，之后登录的人自动成为<strong>成员</strong>。</li>
+        <li>能登录的邮箱：部署时允许的邮箱域名，和管理员邀请的人。其他邮箱会在输入框下面看到「这个邮箱不能登录 Open Artifact。请用公司邮箱，或请管理员邀请你。」</li>
+        <li><strong>邀请</strong>：管理员在「成员」里用邮箱邀请，或者生成一个邀请链接。收到邀请的人登录后就加入 workspace，不受邮箱域名限制。邀请 7 天后失效。</li>
+        <li>第一个登录的人成为 workspace 的<strong>管理员</strong>，之后加入的人是<strong>成员</strong>。</li>
         <li>如果团队配置了公司 SSO、GitHub 或 Google，登录页会多出对应的按钮。</li>
+        <li>从别人发来的链接被带到登录页时，登录页写着「登录后会打开你刚才的页面。」</li>
       </ul>
       <p class="note">本地试用时没有邮件服务，登录链接打印在运行 <code>pnpm dev</code> 的终端里，搜索 <code>[mail]</code>。</p>
     </section>
@@ -135,20 +141,49 @@ details.faq p { margin: 8px 0 2px; font-size: 14.5px; }
       <p>首页列出你能看到的 artifact，最近更新的在前面。每张卡片上有：</p>
       <ul>
         <li>页面的实时缩略预览（最前面的 12 张卡片）。</li>
-        <li>标题和可见范围（例如「Workspace 内可见」「公开链接」）。</li>
-        <li>作者、<strong>发布来源</strong>（哪个 agent 发布的，圆点颜色区分 agent）、版本号、更新时间。</li>
-        <li><span class="tag">N 条评论待 agent 处理</span>：有人留了给 agent 的评论，还没解决。</li>
+        <li>标题，以及谁用什么发布的，例如「devin 用 Claude Code 发布」「devin 在网页上发布」。</li>
+        <li>版本号和更新时间。</li>
+        <li>可见范围，例如「workspace 内可见」。公开链接还会写有没有密码、哪天过期，例如「公开链接 · 有密码 · 2026-12-06 过期」。</li>
+        <li><span class="tag">N 条未解决评论</span>：这个 artifact 上还有没解决的评论。</li>
       </ul>
-      <p>左侧可以筛选：全部、我发布的、共享给我（别人单独授权给你的）、待 agent 处理，以及按发布来源筛选。顶部可以按标题搜索。你属于多个 workspace 时，顶部可以切换。</p>
+      <h3>左侧筛选</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>分组</th><th>选项</th><th>列出什么</th></tr></thead>
+        <tbody>
+          <tr><td>筛选</td><td>全部</td><td>你能看到的全部 artifact</td></tr>
+          <tr><td></td><td>我发布的</td><td>你发布的，和你的 agent 代你发布的</td></tr>
+          <tr><td></td><td>分享给我的</td><td>作者把你加进分享名单的 artifact</td></tr>
+          <tr><td></td><td>最近删除</td><td>删除后 30 天内可以恢复的 artifact（见 <a href="#remove">删除和恢复</a>）</td></tr>
+          <tr><td>待处理</td><td>等我处理</td><td>有评论在等你回复</td></tr>
+          <tr><td></td><td>等我的 agent 处理</td><td>你的 artifact 上有给 agent 的评论还没解决</td></tr>
+          <tr><td>来源</td><td>每个 agent 一项，网页发布的叫「网页」</td><td>这个来源发布的 artifact</td></tr>
+        </tbody>
+      </table></div>
+      <p>每一项后面的数字是 artifact 的个数。列表标题跟着筛选变，下面一行写这个列表装的是什么，再下面是个数。</p>
+      <h3>搜索</h3>
+      <p>顶部搜索框写着「搜索标题、作者或 agent」。边打字边筛选，按回车也可以。搜索只在选中的筛选和来源里进行，结果行写成「搜索「季度」· 2 个」。</p>
+      <h3>列表为空时</h3>
+      <p>空列表会说明原因。例如搜索没有结果时写「没有找到「xyz」」，下面有「清除搜索」，只清掉搜索，保留筛选；「分享给我的」为空时写「还没有人把 artifact 分享给你」。</p>
+      <h3>其他</h3>
+      <ul>
+        <li>还没设名字的人，首页顶部会看到「设置你的名字」，点「去设置」到个人资料里填写（见 <a href="#settings">设置</a>）。</li>
+        <li>你属于多个 workspace 时，顶部可以切换。</li>
+      </ul>
     </section>
 
     <section id="view">
       <h2><span class="num">04</span>查看 artifact</h2>
-      <p>点开一张卡片进入查看页：左边是页面本身，右边是「评论」「版本」「数据」三个标签。</p>
+      <p>点开一张卡片进入查看页：左边是页面本身，右边是「评论」「版本」「数据」三个标签。顶部写着作者、发布来源和更新时间，旁边是可见范围。</p>
       <ul>
         <li>页面在<strong>沙箱</strong>里运行，和 Open Artifact 不在同一个网站。页面里的代码拿不到你的登录信息，所以 agent 写的任何页面都可以放心打开。</li>
-        <li>「新标签页打开」会单独打开页面本身。这个地址 6 小时内有效，过期后回到 Open Artifact 重新打开即可。</li>
+        <li>「在新标签页打开」用整个标签页显示页面。左上角「返回查看页」回到评论和版本。</li>
         <li>作者能看到「分享」按钮，用来改谁能看到（见 <a href="#sharing">分享</a>）。</li>
+        <li>右上角的「⋯」菜单里有「重命名」（能编辑的人）和「删除」或「下架」（见 <a href="#remove">删除和恢复</a>）。</li>
+      </ul>
+      <h3>没有权限时</h3>
+      <ul>
+        <li>同一个 workspace 的成员打开一个没分享给自己的 artifact，会看到「你没有这个 artifact 的访问权限」和作者的名字。点「请作者分享给你」，作者会在通知里和邮件里收到你的请求。</li>
+        <li>workspace 以外的人打开，只会看到「找不到这个 artifact」。</li>
       </ul>
     </section>
 
@@ -156,80 +191,121 @@ details.faq p { margin: 8px 0 2px; font-size: 14.5px; }
       <h2><span class="num">05</span>评论和「给 agent」</h2>
       <p>能评论的人在右侧「评论」标签底部写评论。</p>
       <ul>
-        <li><strong>在页面上标注位置</strong>：写评论前点「在页面上标注位置」，再点左边页面上要说的地方。页面上会出现带编号的标记，评论旁边显示同样的编号；点页面上的标记，右边会跳到对应的评论。已解决的评论不再显示标记。</li>
-        <li><strong>勾选「给 agent 处理」</strong>：这条评论是给 agent 的修改意见。agent 读取评论时只会拿到这类未解决的评论，不会被普通讨论干扰。这类评论用黄色底标出。</li>
+        <li><strong>在页面上标注位置</strong>：写评论前点「在页面上标注位置」，再点页面上要说的地方。页面上会出现带编号的标记，评论旁边显示同样的编号；点页面上的标记，右边会跳到对应的评论。已解决的评论不再显示标记。</li>
+        <li><strong>勾选「给 agent」</strong>：这条评论是给 agent 的修改意见。agent 读取评论时只会拿到这类未解决的评论，不会被普通讨论干扰。这类评论用黄色标出。</li>
         <li><strong>回复</strong>：每条评论下面可以回复。agent 的回复会标出是哪个 agent，例如「Claude Code（代 林舟）」。</li>
         <li><strong>标记已解决 / 重新打开</strong>：处理完的评论标记为已解决，需要时可以重新打开。</li>
         <li>上方的筛选：未解决、给 agent、全部。</li>
+        <li>别人刚写的评论会出现「有 N 条新评论」，点它显示。</li>
       </ul>
-      <p><strong>邮件通知</strong>：有人评论你发布的 artifact，或者回复你的评论时，你会收到邮件。自己的操作不会通知自己。</p>
+    </section>
+
+    <section id="notifications">
+      <h2><span class="num">06</span>通知</h2>
+      <p>右上角的铃铛列出和你有关的事，点一条打开对应的 artifact 或评论。「全部标为已读」清掉未读数。自己做的事不会通知自己。</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>什么时候</th><th>谁收到</th><th>邮件</th></tr></thead>
+        <tbody>
+          <tr><td>有人评论你的 artifact</td><td>作者</td><td>有</td></tr>
+          <tr><td>有人回复你参与的评论</td><td>参与这条评论的人</td><td>有</td></tr>
+          <tr><td>有人解决了你的评论</td><td>写这条评论的人</td><td>有</td></tr>
+          <tr><td>发布了新版本</td><td>还有未解决评论的参与者</td><td>没有</td></tr>
+          <tr><td>有人把 artifact 分享给你</td><td>被添加的人</td><td>有</td></tr>
+          <tr><td>你的 agent 把 artifact 设为公开链接</td><td>作者</td><td>有</td></tr>
+          <tr><td>有人请你分享</td><td>作者</td><td>有</td></tr>
+        </tbody>
+      </table></div>
     </section>
 
     <section id="versions">
-      <h2><span class="num">06</span>版本</h2>
+      <h2><span class="num">07</span>版本</h2>
       <ul>
-        <li>agent 每次修改都会发布一个新版本，旧版本全部保留。「版本」标签列出每个版本的发布人、发布来源、时间和一句改动说明，最新的版本标着「当前」。</li>
-        <li>点「查看」打开旧版本，页面顶部会写明你在看哪个版本、谁在什么时候发布的，点「看最新版」打开最新的版本。</li>
-        <li>能编辑的人可以点「用 v1 覆盖当前」（版本列表里是「用这个版本覆盖」）：确认后，旧版本的内容会作为一个<strong>新版本</strong>发布，列表里标着「恢复自 v1」，历史不会被改写。发布后提示里有「撤销」，点它会再发布一个版本，换回覆盖前的内容。</li>
+        <li>agent 每次修改都会发布一个新版本，旧版本全部保留。「版本」标签列出每个版本的发布人、发布来源、时间和一句改动说明，最新版本标着「最新」。</li>
+        <li>点「查看」打开旧版本。页面顶部写明你在看哪个版本、谁在什么时候发布的，以及最新版本是第几版。点「看最新版本」回到最新版本。</li>
+        <li>能编辑的人可以点「用 vN 覆盖最新版本」：确认后，vN 的内容作为一个<strong>新版本</strong>发布，列表里标着「恢复自 vN」，历史不会被改写。新版本的发布来源沿用 vN 的来源。发布后提示里有「撤销」，点它会再发布一个版本，换回覆盖前的内容。</li>
         <li>页面里存的共享数据（例如报名记录）和版本分开保存，覆盖版本不会丢数据。</li>
       </ul>
     </section>
 
     <section id="sharing">
-      <h2><span class="num">07</span>分享</h2>
-      <p>只有作者可以修改分享设置。在查看页点「分享」，选择谁能看到：</p>
+      <h2><span class="num">08</span>分享</h2>
+      <p>只有作者可以修改分享设置。在查看页点「分享」，改完点「保存」才生效；没保存就关掉，对话框会先问你要不要放弃修改。</p>
       <div class="table-wrap"><table>
-        <thead><tr><th>范围</th><th>谁能看到</th><th>说明</th></tr></thead>
+        <thead><tr><th>可见范围</th><th>谁能看到</th><th>说明</th></tr></thead>
         <tbody>
-          <tr><td>私有</td><td>只有你</td><td>单独授权也不生效</td></tr>
-          <tr><td>指定的人</td><td>你单独授权的人</td><td>每个人按角色获得权限</td></tr>
-          <tr><td>整个 workspace</td><td>workspace 全部成员</td><td><strong>默认</strong>。成员可以查看、评论、读写页面里的共享数据</td></tr>
-          <tr><td>任何拿到链接的人</td><td>不需要登录</td><td>访客只读，不能评论；成员照常评论</td></tr>
+          <tr><td>私有</td><td>只有你自己</td><td>添加的人也看不到</td></tr>
+          <tr><td>指定的人</td><td>只有你添加的人</td><td>每个人按权限使用</td></tr>
+          <tr><td>workspace 内可见</td><td>workspace 全部成员</td><td><strong>默认</strong>。成员可以查看、评论，也能读写页面里的共享数据</td></tr>
+          <tr><td>公开链接</td><td>任何拿到链接的人，不用登录</td><td>访客只看到最新版本的页面，看不到版本记录和数据；成员照常评论</td></tr>
         </tbody>
       </table></div>
-      <h3>单独授权</h3>
-      <p>输入对方的邮箱，选择角色。对方需要<strong>先登录过一次</strong>，才能被添加。</p>
+      <h3>添加的人</h3>
+      <p>输入对方的邮箱，选择权限。对方需要<strong>先登录过一次</strong>，才能被添加。保存后，新添加的人会收到通知和邮件。除了「私有」，其他可见范围下也可以添加人，给某个人比其他人更多的权限，比如可编辑。</p>
       <div class="table-wrap"><table>
-        <thead><tr><th>角色</th><th>可以做什么</th></tr></thead>
+        <thead><tr><th>权限</th><th>可以做什么</th></tr></thead>
         <tbody>
           <tr><td>可查看</td><td>打开页面，使用页面（包括读写共享数据）</td></tr>
           <tr><td>可评论</td><td>以上全部，再加评论</td></tr>
-          <tr><td>可编辑</td><td>以上全部，再加发布新版本、恢复旧版本</td></tr>
+          <tr><td>可编辑</td><td>以上全部，再加发布新版本、用旧版本覆盖最新版本、重命名</td></tr>
         </tbody>
       </table></div>
       <h3>公开链接</h3>
       <ul>
-        <li><strong>过期时间</strong>：7 天、30 天或永不过期。过期后访客打不开，成员不受影响。</li>
-        <li><strong>访问密码</strong>：可选。访客先输入密码才能打开；同一个访客每分钟最多试 10 次。改密码后，之前输入过的人需要重新输入。</li>
-        <li><strong>允许匿名访客写入共享数据</strong>：默认关闭。适合对外的报名表、问卷。</li>
-        <li>workspace 管理员可以在「Workspace 设置」里关闭公开链接；关闭后，现有的公开链接立即失效。</li>
+        <li><strong>有效期</strong>：永不过期、7 天后或 30 天后过期。过期后访客打不开，成员不受影响。agent 设公开链接时没说多久，链接 7 天后过期，作者会收到通知。</li>
+        <li><strong>访问密码</strong>：可选。访客先输入密码才能打开。密码输错会看到「密码不对，再试一次。」；同一个访客一分钟里试错太多次，会看到「1 分钟后可以再试」。改密码后，之前输入过的人需要重新输入。</li>
+        <li><strong>允许匿名访客写入共享数据</strong>：默认关闭。适合对外的报名表。</li>
+        <li><strong>对外显示评论</strong>：访客可以看到评论和评论人的名字，但不能发表评论。</li>
+        <li>workspace 管理员可以在「workspace 设置」里关闭公开链接；关闭后，现有的公开链接立即失效。</li>
+      </ul>
+    </section>
+
+    <section id="remove">
+      <h2><span class="num">09</span>删除和恢复</h2>
+      <ul>
+        <li>作者在查看页的「⋯」菜单里点「删除」。管理员处理别人的 artifact 时，这一项叫「下架」。</li>
+        <li>删除或下架后，所有人都看不到这个 artifact。首页会出现提示，里面有「撤销」。</li>
+        <li>它在「最近删除」里留 30 天，点「恢复」就回来了；30 天后彻底删除。</li>
+        <li>作者可以恢复自己删除的 artifact。被管理员下架的，作者不能自己恢复，只有管理员可以。</li>
       </ul>
     </section>
 
     <section id="connect">
-      <h2><span class="num">08</span>连接你的 agent</h2>
-      <p>只需要做一次。打开右上角头像菜单里的「Agent 接入」：</p>
+      <h2><span class="num">10</span>连接你的 agent</h2>
+      <p>只需要做一次。打开右上角头像菜单里的「Agent 接入」，按三步走：</p>
       <ol>
-        <li><strong>新建 token</strong>：起个名字（例如「Claude Code · 工作机」），选有效期（30 天、90 天、1 年或永不过期）。token 只显示这一次，马上复制。</li>
-        <li><strong>连接 MCP server</strong>：页面上有 Claude Code、Codex、Cursor、Gemini CLI 四种配置，选你用的那个，复制后把 <code>oa_pat_…</code> 换成刚才的 token。例如 Claude Code：</li>
+        <li><strong>给这个 agent 起个名字</strong>：例如「Claude Code · 工作机」。选<strong>有效期</strong>（90 天、30 天、1 年或永不过期）和<strong>权限</strong>，点「新建 token」。
+          <ul>
+            <li><strong>仅发布</strong>：发布、更新和读取 artifact，处理评论和共享数据；不能修改谁能看到它。</li>
+            <li><strong>完全权限</strong>：和你在网页上能做的一样，也能修改分享设置，比如设为公开链接。</li>
+          </ul>
+        </li>
+        <li><strong>把配置填进 agent</strong>：token 只显示这一次。选你用的 agent（Claude Code、Codex、Cursor、Gemini CLI 或其他（HTTP）），复制配置，token 已经填好了。改完配置后重启 agent。例如 Claude Code：</li>
       </ol>
       <pre><code>claude mcp add --transport http open-artifact http://localhost:8788/mcp \
   --header "Authorization: Bearer oa_pat_…"</code></pre>
       <ol start="3">
-        <li><strong>不支持 MCP 的 agent</strong>：复制「指南包」（AGENTS.md 片段、Claude Skill 或 Cursor rules），它告诉 agent 怎么用 HTTP API 发布。</li>
+        <li><strong>让 agent 发布一个测试页</strong>：把页面上的那句话发给 agent。页面发布后，这里会显示「连上了」。</li>
       </ol>
       <ul>
-        <li>agent 用你的身份工作，权限和你在这个 workspace 里一样，只在创建 token 的 workspace 里有效。</li>
-        <li>token 丢了或不用了，在同一页点「撤销」，立即失效。</li>
+        <li>不支持 MCP 的 agent 选「其他（HTTP）」，先让它读 <code>llms.txt</code>，里面写了全部接口。</li>
+        <li>「指南包」（AGENTS.md 片段、Claude Skill、Cursor rules、llms.txt）告诉 agent 什么时候发布、页面要遵守什么约定、该更新而不是新建。</li>
+        <li>agent 用你的身份工作，只在创建 token 的 workspace 里有效。</li>
+      </ul>
+      <h3>已有的 token</h3>
+      <ul>
+        <li>列表写着每个 token 的名字、权限、最近使用、到期（例如 <code>2027-02-04</code> 或「永不过期」）和状态。</li>
+        <li>token 丢了或不用了，点「撤销」，立即失效。撤销后不能恢复，只能新建一个。</li>
+        <li>已撤销和已过期的 token 收在「显示已失效的 token（N）」里，每个都可以「删除」。</li>
+        <li>agent 用了不能用的 token，会分别收到「已撤销」「已过期」「无效」三种错误，知道该请你新建一个。</li>
       </ul>
     </section>
 
     <section id="workflow">
-      <h2><span class="num">09</span>和 agent 协作</h2>
+      <h2><span class="num">11</span>和 agent 协作</h2>
       <p>连接好以后，直接用自然语言告诉 agent 要做什么，例如：</p>
       <span class="prompt">把这份设计文档整理成网页，发布到 Open Artifact。</span>
       <span class="prompt">去看看「Q4 迁移看板」上给 agent 的评论，改好后重新发布并回复。</span>
-      <span class="prompt">把「报名表」改成只让设计组的人看到。</span>
+      <span class="prompt">把「报名表」改成只让设计组的人看到。（需要完全权限的 token）</span>
       <p>完整的协作流程：</p>
       <!--DIAGRAM:workflow|和 agent 协作一份文档-->
       <h3>agent 能用的工具</h3>
@@ -238,19 +314,20 @@ details.faq p { margin: 8px 0 2px; font-size: 14.5px; }
         <tbody>
           <tr><td><code>publish</code></td><td>发布新的 artifact，返回链接</td></tr>
           <tr><td><code>update</code></td><td>基于读到的版本发布新版本；中间有人发布过时，拿到最新内容合并后再发</td></tr>
-          <tr><td><code>read</code></td><td>读取页面文件和当前版本</td></tr>
+          <tr><td><code>read</code></td><td>读取页面文件和最新版本</td></tr>
           <tr><td><code>list</code></td><td>列出你能看到的 artifact</td></tr>
-          <tr><td><code>list_comments</code></td><td>读取评论，默认只取未解决的「给 agent」评论</td></tr>
+          <tr><td><code>list_my_comments</code></td><td>列出你能编辑的所有 artifact 上未解决的「给 agent」评论</td></tr>
+          <tr><td><code>list_comments</code></td><td>读取一个 artifact 的评论，默认只取未解决的「给 agent」评论</td></tr>
           <tr><td><code>reply_comment</code></td><td>回复评论，并标记为已解决</td></tr>
           <tr><td><code>get_guide</code></td><td>读取完整的页面规范</td></tr>
         </tbody>
       </table></div>
-      <p class="note agent">agent 不会自己盯着评论。同事留了「给 agent」的评论后，需要你让 agent 去处理。</p>
+      <p class="note agent">agent 不会自己盯着评论。同事留了「给 agent」的评论后，需要你让 agent 去处理。首页的「等我的 agent 处理」列出这些 artifact。</p>
     </section>
 
     <section id="data">
-      <h2><span class="num">10</span>页面里的共享数据</h2>
-      <p>这一节给写页面的 agent 和开发者看。页面可以通过平台注入的 <code>window.openArtifact</code> 保存团队共享的数据，例如报名、投票、待办：</p>
+      <h2><span class="num">12</span>页面里的共享数据</h2>
+      <p>这一节给写页面的 agent 和开发者看。页面可以通过平台注入的 <code>window.openArtifact</code> 保存共享数据，例如报名、投票、待办：</p>
       <pre><code>const signups = window.openArtifact.db.collection('signups')
 await signups.put('lin', { session: '周三上午' })  // 按 id 新建或替换
 await signups.add({ session: '周四下午' })         // 自动生成 id
@@ -262,33 +339,40 @@ const viewer = await window.openArtifact.viewer()  // { userId, name }；匿名�
         <li>集合名和 id 只能用字母、数字、<code>-</code>、<code>_</code>，最多 64 个字符；每条记录最多 64 KB。</li>
         <li>发布的页面：每个版本最多 500 个文件，单个文件最多 10 MB，一次发布最多 25 MB。</li>
         <li>页面在沙箱里运行，<code>localStorage</code> 和 cookie 都用不了，需要保存的东西都放共享数据里。</li>
-        <li>共享数据只有在 Open Artifact 的查看页里打开时才能用，「新标签页打开」时不可用。</li>
+        <li>共享数据在查看页和「在新标签页打开」的页面里都能用。</li>
       </ul>
     </section>
 
     <section id="settings">
-      <h2><span class="num">11</span>设置</h2>
+      <h2><span class="num">13</span>设置</h2>
       <ul>
-        <li><strong>个人资料</strong>：修改显示名称。没设置时显示邮箱 @ 前面的部分。</li>
-        <li><strong>Agent 接入</strong>：token、MCP 配置、指南包（见 <a href="#connect">连接你的 agent</a>）。</li>
-        <li><strong>成员</strong>：查看 workspace 里的所有人和管理员。</li>
-        <li><strong>Workspace 设置</strong>：管理员可以开关公开链接。</li>
+        <li><strong>个人资料</strong>：修改名字，最多 60 个字。团队成员在评论、通知和成员列表里看到它。没设名字时，别人看到的是你邮箱 @ 前面的部分。邮箱用来登录，不能修改。</li>
+        <li><strong>Agent 接入</strong>：token、agent 配置、指南包（见 <a href="#connect">连接你的 agent</a>）。</li>
+        <li><strong>成员</strong>：workspace 里的所有人，管理员排在前面，你自己的名字后面写着「（你）」。角色是「管理员」或「成员」。管理员可以邀请同事、改角色、移除成员；workspace 至少要有一位管理员，管理员也不能移除自己。被移除的人发布的 artifact 会留在 workspace 里。</li>
+        <li><strong>workspace 设置</strong>：
+          <ul>
+            <li>管理员可以改 workspace 的名称，最多 40 个字。</li>
+            <li>「允许成员把 artifact 分享为公开链接」开关。管理员关闭时，确认框会写明「关闭后，N 个公开链接立即失效。」成员只能看到「已允许」或「已关闭」，旁边写着「只有管理员可以修改」。</li>
+            <li>管理员还能看到「内容管理」（workspace 里的全部 artifact，可以下架和恢复）和「管理记录」（删除、下架、恢复、重命名、邀请和成员变动）。</li>
+          </ul>
+        </li>
       </ul>
     </section>
 
     <section id="faq">
-      <h2><span class="num">12</span>常见问题</h2>
-      <details class="faq"><summary>收不到登录邮件</summary><p>先看垃圾邮件，再点「再发一次」。链接 5 分钟内有效。本地试用时链接在终端里，不会真的发邮件。</p></details>
-      <details class="faq"><summary>提示「只有这些邮箱域名可以注册」</summary><p>你的邮箱域名不在允许列表里。请管理员在部署配置 <code>ALLOWED_EMAIL_DOMAINS</code> 里加上你的域名。</p></details>
-      <details class="faq"><summary>看不到同事说的某个 artifact</summary><p>它可能是私有的，或者只授权给了指定的人。请作者在「分享」里把你加进去，或者改成整个 workspace 可见。</p></details>
+      <h2><span class="num">14</span>常见问题</h2>
+      <details class="faq"><summary>收不到登录邮件</summary><p>先看垃圾邮件，60 秒后再点「再发一次」。链接 5 分钟内有效。本地试用时链接在终端里，不会真的发邮件。</p></details>
+      <details class="faq"><summary>提示「这个邮箱不能登录 Open Artifact」</summary><p>你的邮箱不在允许的域名里，也没有收到邀请。请用公司邮箱，或者请管理员在「成员」里邀请你。</p></details>
+      <details class="faq"><summary>打开同事说的 artifact，提示没有访问权限</summary><p>它是私有的，或者只分享给了指定的人。点「请作者分享给你」，作者会收到通知和邮件。</p></details>
       <details class="faq"><summary>agent 说发布时遇到了冲突</summary><p>说明它读取之后，有人发布了新版本。agent 会拿到最新内容，把自己的修改合并进去再发布，不需要你处理。只有你明确要求时，它才会直接覆盖。</p></details>
-      <details class="faq"><summary>新标签页打开的页面提示「链接已过期或无效」</summary><p>单独打开的地址 6 小时内有效。回到 Open Artifact 重新打开这个 artifact 即可。</p></details>
+      <details class="faq"><summary>页面里提示 “This link has expired or is not valid”</summary><p>页面文件的地址 6 小时内有效。刷新 Open Artifact 的页面，或者回到首页重新打开这个 artifact。</p></details>
       <details class="faq"><summary>首页缩略图是空白的</summary><p>缩略图就是页面本身的缩小预览。页面需要登录后的数据才能显示内容时，预览里不会有这些数据；点开卡片就能看到完整页面。</p></details>
       <details class="faq"><summary>token 不小心泄露了</summary><p>在「Agent 接入」里撤销它，立即失效，再新建一个。</p></details>
+      <details class="faq"><summary>不小心删除了 artifact</summary><p>首页提示里点「撤销」；提示消失了，就到「最近删除」里点「恢复」。30 天内都可以恢复。</p></details>
     </section>
 
     <section id="feedback">
-      <h2><span class="num">13</span>这份手册有帮助吗？</h2>
+      <h2><span class="num">15</span>这份手册有帮助吗？</h2>
       <div class="feedback" id="feedback">
         <div class="choices" role="group" aria-label="是否有帮助">
           <button type="button" data-verdict="helpful" aria-pressed="false">有帮助</button>
