@@ -198,11 +198,12 @@ class NotificationBell {
   }
 
   #item(notification) {
+    // The dot shows unread to the eye; a screen reader hears 未读 at the start of the sentence instead.
     const link = element('a', { className: 'xxd-list__main', href: notification.url, onClick: event => this.#open(event, notification) },
-      element('span', { className: 'xxd-list__title app-notifications__text' }, notification.text),
-      element('span', { className: 'xxd-list__meta' }, notification.read ? timeAgo(notification.createdAt) : `未读 · ${timeAgo(notification.createdAt)}`))
-    return element('li', { className: 'xxd-list__item', 'data-unread': !notification.read },
-      notification.read ? null : element('span', { className: 'xxd-dot', 'data-tone': 'action', 'aria-hidden': 'true' }), link)
+      element('span', { className: 'xxd-list__title app-notifications__text' }, notification.read ? null : element('span', { className: 'xxd-sr-only' }, '未读：'), notification.text),
+      element('span', { className: 'xxd-list__meta' }, timeElement(notification.createdAt)))
+    const marker = element('span', { className: 'app-notifications__marker', 'aria-hidden': 'true' }, notification.read ? null : element('span', { className: 'xxd-dot', 'data-tone': 'action' }))
+    return element('li', { className: 'xxd-list__item', 'data-unread': !notification.read }, marker, link)
   }
 
   // Marking read first means the count is right when the person comes back.
