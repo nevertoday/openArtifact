@@ -1,7 +1,7 @@
 // Interface text lives in the dictionaries under apps/app/public/static/i18n, so every language can word it.
 // Chinese anywhere else in the source is text that one language would be stuck with. Comments may still quote
 // Chinese, English meant for agents may gloss an interface label in Chinese, as in "Share (分享)", and code that
-// reads people's own Chinese text (punctuation that ends a sentence) is listed by file.
+// reads people's own Chinese text (sentence ends, list separators) is listed by file.
 // `--report` prints the count of offending lines per file and always exits 0, for tracking a migration.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -12,7 +12,10 @@ const skippedDirectories = new Set(['i18n', 'vendor', 'node_modules'])
 const cjk = /[　-〿㐀-䶿一-鿿＀-￯]/
 
 const glossedLabel = /(?<=[A-Za-z0-9`)] )\([\p{Script=Han}\u3000-\u303f\uff00-\uffef A-Za-z›]+\)/gu
-const readsPeoplesText = new Map([['apps/app/src/api/page-excerpt.ts', /\['。', '！', '？'/]])
+const readsPeoplesText = new Map([
+  ['apps/app/src/api/page-excerpt.ts', /\['。', '！', '？'/],
+  ['apps/app/public/static/settings.js', /text\.split\(\/\[\\s,，;；\]\+\/\)/],
+])
 
 function sourceFilesUnder(directory) {
   return readdirSync(directory).flatMap(entry => {

@@ -435,7 +435,7 @@ class PendingInvites {
 }
 
 function emailsIn(text) {
-  return text.split(/[\s,\uFF0C;\uFF1B]+/).filter(email => email.length > 0)
+  return text.split(/[\s,，;；]+/).filter(email => email.length > 0)
 }
 
 function wireInvites() {

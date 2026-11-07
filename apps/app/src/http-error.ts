@@ -1,6 +1,6 @@
 /**
- * Stable names for what went wrong. Agents read the English `error`; the web pages map `code` to Chinese in
- * one table (ERROR_MESSAGES in public/static/common.js), so a code is renamed in both places or neither.
+ * Stable names for what went wrong. Agents read the English `error`; the web pages map `code` to the reader's
+ * language in the `client.errors` messages (public/static/i18n), so a code is renamed in both places or neither.
  */
 export type ErrorCode =
   | 'unauthenticated'
