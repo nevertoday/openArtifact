@@ -1,7 +1,6 @@
-import { api, element, icon, timeElement, userMessageOf } from '../common.js'
+import { api, element, icon, m, timeElement, userMessageOf } from '../common.js'
 import { BlockDiff } from './block-diff.js'
 
-const WEB_PAGE = '网页'
 
 /**
  * The versions of the artifact and which one is on screen. Showing another version swaps the page in place and
@@ -96,9 +95,9 @@ export class VersionHistory extends EventTarget {
   #syncShown() {
     const shown = this.shown
     const isOld = !this.isShowingLatest
-    this.#button.querySelector('[data-version-label]').textContent = isOld ? `v${shown} · 旧版` : `v${shown}`
+    this.#button.querySelector('[data-version-label]').textContent = isOld ? m.viewerClient.versions.oldLabel(shown) : `v${shown}`
     this.#button.toggleAttribute('data-old', isOld)
-    this.#button.setAttribute('aria-label', `版本 ${shown}${isOld ? '，不是最新版本' : ''}，选择版本`)
+    this.#button.setAttribute('aria-label', m.viewerClient.versions.buttonLabel({ version: shown, isOld }))
     const versionQuery = isOld ? `?v=${shown}` : ''
     history.replaceState(history.state, '', `${location.pathname}${versionQuery}${location.hash}`)
     this.#fullViewLink?.setAttribute('href', `/a/${encodeURIComponent(this.#config.artifactId)}/full${versionQuery}`)
@@ -113,9 +112,9 @@ export class VersionHistory extends EventTarget {
     const author = record.author.name
     switch (record.origin) {
       case 'restored':
-        return `${author} 用 v${record.restoredFrom} 覆盖`
+        return m.viewerClient.versions.restoredBy({ author, version: record.restoredFrom })
       case 'published':
-        return record.publishedVia ? `${author} 用 ${record.publishedVia} 发布` : `${author} 在${WEB_PAGE}上发布`
+        return record.publishedVia ? m.viewerClient.versions.publishedVia({ author, via: record.publishedVia }) : m.viewerClient.versions.publishedOnWeb(author)
       default:
         throw new Error(`unknown version origin ${record.origin}`)
     }
@@ -124,12 +123,12 @@ export class VersionHistory extends EventTarget {
   #renderNotice() {
     const shown = this.shown
     const record = this.#records.get(shown)
-    if (this.#missingVersion !== null) return this.#notice.replaceChildren(VersionHistory.#banner(`没有 v${this.#missingVersion}，显示的是最新的 v${this.#latest}。`, []))
+    if (this.#missingVersion !== null) return this.#notice.replaceChildren(VersionHistory.#banner(m.viewerClient.versions.missing({ missing: this.#missingVersion, latest: this.#latest }), []))
     if (this.isShowingLatest) return this.#notice.replaceChildren()
-    const published = record ? ['（', timeElement(record.createdAt), `，${record.author.name} 发布）`] : []
-    const showLatest = element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'ghost', 'data-size': 'sm', onClick: () => this.show(this.#latest).catch(error => this.#showFailure(error)) }, '看最新版本')
-    const overwrite = this.#config.permissions.canEdit ? element('button', { type: 'button', className: 'xxd-btn', 'data-size': 'sm', 'data-overwrite-with-version': shown }, `用 v${shown} 覆盖最新版本`) : null
-    this.#notice.replaceChildren(VersionHistory.#banner([`你在看 v${shown}`, ...published, '，不是最新版本。'], [showLatest, overwrite]))
+    const showLatest = element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'ghost', 'data-size': 'sm', onClick: () => this.show(this.#latest).catch(error => this.#showFailure(error)) }, m.viewerClient.versions.showLatest)
+    const overwrite = this.#config.permissions.canEdit ? element('button', { type: 'button', className: 'xxd-btn', 'data-size': 'sm', 'data-overwrite-with-version': shown }, m.viewerClient.versions.overwriteWith(shown)) : null
+    const viewingOld = record ? m.viewerClient.versions.viewingOldPublished({ version: shown, time: timeElement(record.createdAt), author: record.author.name }) : [m.viewerClient.versions.viewingOld(shown)]
+    this.#notice.replaceChildren(VersionHistory.#banner(viewingOld, [showLatest, overwrite]))
   }
 
   static #banner(text, actions) {
@@ -144,15 +143,15 @@ export class VersionHistory extends EventTarget {
     const records = [...this.#records.values()].sort((first, second) => second.version - first.version)
     const items = records.map(record => element('button', { type: 'button', className: 'xxd-menu__item viewer-version-menu__item', role: 'menuitemradio', 'aria-checked': String(record.version === this.shown), 'data-value': record.version },
       element('span', { className: 'viewer-version-menu__text' },
-        element('span', { className: 'viewer-version-menu__name' }, `v${record.version}`, record.version === this.#latest ? element('span', { className: 'xxd-badge' }, '最新') : null),
+        element('span', { className: 'viewer-version-menu__name' }, `v${record.version}`, record.version === this.#latest ? element('span', { className: 'xxd-badge' }, m.viewerClient.versions.latest) : null),
         element('small', {}, this.#describe(record)),
         record.note ? element('small', { className: 'viewer-version-menu__note' }, record.note) : null,
       ),
     ))
     const hasPrevious = this.previousOf(this.shown) !== null
-    const compare = element('button', { type: 'button', className: 'xxd-menu__item', role: 'menuitem', disabled: !hasPrevious, 'data-start-compare': true }, icon('Columns2', 14), '和上一版对比')
+    const compare = element('button', { type: 'button', className: 'xxd-menu__item', role: 'menuitem', disabled: !hasPrevious, 'data-start-compare': true }, icon('Columns2', 14), m.viewerClient.versions.compare)
     const status = this.#historyStatus()
-    this.#menu.replaceChildren(...[element('div', { role: 'group', 'aria-label': '版本' }, items), status, element('div', { className: 'xxd-menu__sep', role: 'separator' }), compare].filter(Boolean))
+    this.#menu.replaceChildren(...[element('div', { role: 'group', 'aria-label': m.viewerClient.versions.menuLabel }, items), status, element('div', { className: 'xxd-menu__sep', role: 'separator' }), compare].filter(Boolean))
     if (this.#historyLoaded === 'not yet') this.refresh()
   }
 
@@ -161,9 +160,9 @@ export class VersionHistory extends EventTarget {
       case 'yes':
         return null
       case 'not yet':
-        return element('p', { className: 'viewer-version-menu__status' }, element('span', { className: 'xxd-spinner', 'aria-hidden': 'true' }), '正在加载版本…')
+        return element('p', { className: 'viewer-version-menu__status' }, element('span', { className: 'xxd-spinner', 'aria-hidden': 'true' }), m.viewerClient.versions.loading)
       case 'failed':
-        return element('p', { className: 'viewer-version-menu__status' }, '版本没有加载出来，稍后再打开看看。')
+        return element('p', { className: 'viewer-version-menu__status' }, m.viewerClient.versions.loadFailed)
       default:
         throw new Error(`unknown history state ${this.#historyLoaded}`)
     }
@@ -196,20 +195,20 @@ export class VersionCompare {
     return !this.#bar.hidden
   }
 
-  // Each comparison has a number; one that a version switch or 退出对比 has overtaken while loading is dropped.
+  // Each comparison has a number; one that a version switch or leaving the comparison has overtaken while loading is dropped.
   async start() {
     const comparison = ++this.#comparison
     const to = this.#versions.shown
     const from = this.#versions.previousOf(to)
     if (from === null) return
     this.#bar.hidden = false
-    this.#bar.querySelector('[data-compare-title]').textContent = `对比 v${from} → v${to}`
+    this.#bar.querySelector('[data-compare-title]').textContent = m.viewerClient.versions.compareTitle({ from, to })
     const legend = this.#bar.querySelector('[data-compare-legend]')
-    legend.replaceChildren(element('span', {}, element('span', { className: 'xxd-spinner', 'aria-hidden': 'true' }), '正在对比…'))
+    legend.replaceChildren(element('span', {}, element('span', { className: 'xxd-spinner', 'aria-hidden': 'true' }), m.viewerClient.versions.comparing))
     try {
       const [before] = await Promise.all([this.#versions.pageUrlOf(from).then(url => this.#frame.blocksOf(url)), this.#frame.whenReady()])
       if (comparison !== this.#comparison) return
-      if (!before) return this.#fail(`v${from} 没有加载出来，稍后再试。`)
+      if (!before) return this.#fail(m.viewerClient.versions.versionFailed(from))
       this.#showDiff(BlockDiff.between(before, this.#frame.blocks))
     } catch (error) {
       if (comparison === this.#comparison) this.#fail(userMessageOf(error))
@@ -238,10 +237,10 @@ export class VersionCompare {
   #showDiff(diff) {
     this.#steps = BlockDiff.stepsOf(diff, this.#frame.blocks)
     this.#index = -1
-    const kind = (name, mark, label) => element('span', { className: 'viewer-compare__kind', 'data-kind': name }, element('i', { 'aria-hidden': 'true' }, mark), label)
+    const kind = (name, label) => element('span', { className: 'viewer-compare__kind', 'data-kind': name }, element('i', { 'aria-hidden': 'true' }, m.viewerClient.versions.marks[name]), label)
     const legend = BlockDiff.isEmpty(diff)
-      ? [element('span', {}, '两个版本的文字一样')]
-      : [kind('changed', '改', `改了 ${diff.changed.length} 处`), kind('added', '新', `新增 ${diff.added.length} 处`), kind('removed', '删', `删了 ${diff.removed.length} 处`)]
+      ? [element('span', {}, m.viewerClient.versions.sameText)]
+      : [kind('changed', m.viewerClient.versions.changedCount(diff.changed.length)), kind('added', m.viewerClient.versions.addedCount(diff.added.length)), kind('removed', m.viewerClient.versions.removedCount(diff.removed.length))]
     this.#bar.querySelector('[data-compare-legend]').replaceChildren(...legend)
     for (const button of this.#bar.querySelectorAll('[data-compare-next], [data-compare-previous]')) button.disabled = this.#steps.length === 0
     this.#frame.showDiff(diff)
@@ -273,10 +272,10 @@ export class VersionOverwrite {
     const latest = this.#versions.latest
     const nextVersion = latest + 1
     const confirmed = await Xxd.confirmDialog({
-      title: `用 v${olderVersion} 覆盖最新版本？`,
-      message: `会发布 v${nextVersion}，内容和 v${olderVersion} 一样。v${latest} 和更早的版本都会保留，随时可以再换回来。`,
-      cancelLabel: '取消',
-      confirmLabel: `覆盖并发布 v${nextVersion}`,
+      title: m.viewerClient.versions.overwriteTitle(olderVersion),
+      message: m.viewerClient.versions.overwriteMessage({ next: nextVersion, older: olderVersion, latest }),
+      cancelLabel: m.viewerClient.actions.cancel,
+      confirmLabel: m.viewerClient.versions.overwriteConfirm(nextVersion),
     })
     if (confirmed) await this.#overwrite(olderVersion, latest)
   }
@@ -286,8 +285,8 @@ export class VersionOverwrite {
       const { version: publishedVersion } = await api(`${this.#artifactPath}/versions/${olderVersion}/restore`, { method: 'POST', body: { baseVersion } })
       await this.#versions.refresh()
       await this.#versions.show(publishedVersion)
-      const undo = { label: '撤销', onClick: () => this.#overwrite(baseVersion, publishedVersion) }
-      Xxd.toast(`已用 v${olderVersion} 覆盖最新版本，发布为 v${publishedVersion}`, { tone: 'success', within: this.#stage, action: undo })
+      const undo = { label: m.viewerClient.actions.undo, onClick: () => this.#overwrite(baseVersion, publishedVersion) }
+      Xxd.toast(m.viewerClient.versions.overwritten({ older: olderVersion, published: publishedVersion }), { tone: 'success', within: this.#stage, action: undo })
     } catch (error) {
       Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#stage })
     }

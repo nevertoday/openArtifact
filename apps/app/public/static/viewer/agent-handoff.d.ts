@@ -1,3 +1,5 @@
+import type { Messages } from '../i18n/messages'
+
 export interface HandedOffArtifact {
   artifactId: string
   title: string
@@ -17,6 +19,6 @@ export interface HandedOffThread {
 }
 
 export class AgentHandoff {
-  constructor(artifact: HandedOffArtifact)
+  constructor(words: Messages['viewerClient']['agentPrompt'], artifact: HandedOffArtifact)
   promptFor(threads: HandedOffThread[]): string
 }

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { AgentHandoff, type HandedOffThread } from '../public/static/viewer/agent-handoff.js'
+import { messagesFor } from '../src/i18n/messages.ts'
+
+const words = messagesFor('zh-CN').viewerClient.agentPrompt
 
 const artifact = { artifactId: 'a1', title: '定价页', version: 4, url: 'http://app.test/a/a1', guideUrl: 'http://app.test/llms.txt' }
 
@@ -25,7 +28,7 @@ const onWholePage: HandedOffThread = { number: 7, root: { commentId: 'c7', body:
 
 describe('handing comments to an agent', () => {
   it('names the page, the version to build on, and how to answer', () => {
-    const prompt = new AgentHandoff(artifact).promptFor([pinnedOnTable])
+    const prompt = new AgentHandoff(words, artifact).promptFor([pinnedOnTable])
 
     expect(prompt).toContain('「定价页」')
     expect(prompt).toContain('http://app.test/a/a1')
@@ -37,7 +40,7 @@ describe('handing comments to an agent', () => {
   })
 
   it('lists each comment with where it points and its id, in the order given', () => {
-    const prompt = new AgentHandoff(artifact).promptFor([pinnedOnTable, onSelectedWords, onWholePage])
+    const prompt = new AgentHandoff(words, artifact).promptFor([pinnedOnTable, onSelectedWords, onWholePage])
 
     expect(prompt).toContain('3 条评论')
     expect(prompt.indexOf('评论 2')).toBeLessThan(prompt.indexOf('评论 5'))
@@ -50,13 +53,13 @@ describe('handing comments to an agent', () => {
   })
 
   it('speaks of one comment when one is handed off', () => {
-    const prompt = new AgentHandoff(artifact).promptFor([onWholePage])
+    const prompt = new AgentHandoff(words, artifact).promptFor([onWholePage])
 
     expect(prompt).toContain('1 条评论')
     expect(prompt).not.toContain('每条评论')
   })
 
   it('refuses to hand off nothing, since an empty prompt would send the agent off with no work', () => {
-    expect(() => new AgentHandoff(artifact).promptFor([])).toThrow('no comments to hand off')
+    expect(() => new AgentHandoff(words, artifact).promptFor([])).toThrow('no comments to hand off')
   })
 })
