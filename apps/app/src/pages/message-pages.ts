@@ -1,32 +1,36 @@
 import { html, type SafeHtml } from './html.ts'
 import { PageShell } from './page-shell.ts'
 
+/** Which password prompt to show; the unlock form redirects back with it, so the address never shows /unlock. */
+export type PasswordPrompt = 'ask' | 'wrong' | 'wait'
+
+const PASSWORD_ERRORS: Record<PasswordPrompt, string | null> = {
+  ask: null,
+  wrong: '密码不对，再试一次。',
+  wait: '试错次数太多。为了保护这个链接，1 分钟后可以再试。',
+}
+
+const PASSWORD_STATUSES: Record<PasswordPrompt, number> = { ask: 200, wrong: 401, wait: 429 }
+
 /** Small standalone pages: a password prompt for protected public links, and errors a person can act on. */
 export class MessagePages {
-  static publicLinkPassword(artifactId: string, wrongPassword: boolean): Response {
+  /** The prompt for a password-protected public link: first asked, after a wrong password, or after too many guesses. */
+  static publicLinkPassword(artifactId: string, prompt: PasswordPrompt): Response {
+    const fieldError = PASSWORD_ERRORS[prompt]
     const body = MessagePages.#centered(html`<form class="xxd-surface app-center__card" method="post" action="/a/${encodeURIComponent(artifactId)}/unlock" data-xxd-validate>
   ${PageShell.icon('LockKeyhole', 24)}
   <div class="xxd-text-pair">
     <h1 class="xxd-text" data-variant="heading2">这个链接需要密码</h1>
-    <p class="xxd-text" data-variant="secondary">分享这个 artifact 的人设置了访问密码。</p>
+    <p class="xxd-text" data-variant="secondary">这个页面设置了访问密码。向分享给你的人要密码。</p>
   </div>
   <div class="xxd-field">
     <label class="xxd-label" for="public-link-password">访问密码</label>
-    <input id="public-link-password" class="xxd-input" name="password" type="password" required autocomplete="off" autofocus ${wrongPassword ? html`aria-invalid="true" aria-describedby="public-link-password-error"` : ''}>
-    ${wrongPassword ? html`<p class="xxd-error" id="public-link-password-error">密码不对，再试一次。</p>` : ''}
+    <input id="public-link-password" class="xxd-input" name="password" type="password" required autocomplete="off" autofocus data-error-required="输入访问密码" ${fieldError ? html`aria-invalid="true" aria-describedby="public-link-password-error"` : ''}>
+    ${fieldError ? html`<p class="xxd-error" id="public-link-password-error">${fieldError}</p>` : ''}
   </div>
   <button type="submit" class="xxd-btn" data-variant="primary" data-block>打开</button>
 </form>`)
-    return PageShell.render({ title: '需要密码 · Open Artifact', body, status: wrongPassword ? 401 : 200 })
-  }
-
-  static tooManyPasswordAttempts(): Response {
-    const body = MessagePages.#centered(html`<section class="xxd-empty">
-  ${PageShell.icon('Clock', 24)}
-  <h1 class="xxd-empty__title">尝试次数太多</h1>
-  <p class="xxd-empty__text">为了保护这个链接，请一分钟后再试。</p>
-</section>`)
-    return PageShell.render({ title: '请稍后再试 · Open Artifact', body, status: 429 })
+    return PageShell.render({ title: '需要密码 · Open Artifact', body, status: PASSWORD_STATUSES[prompt] })
   }
 
   /** A member of the workspace who may not open this artifact; the author's name tells them whom to ask. */
@@ -44,12 +48,15 @@ export class MessagePages {
     return PageShell.render({ title: '没有访问权限 · Open Artifact', body, status: 403, scripts: ['common.js', 'access-request.js'] })
   }
 
-  static notFound(signedIn: boolean): Response {
+  /** `loginNextPath` is where sign-in should land for a visitor; null for a person already signed in. */
+  static notFound(loginNextPath: string | null): Response {
+    const signedIn = loginNextPath === null
+    const action = signedIn ? html`<a class="xxd-btn" data-variant="primary" href="/">回到首页</a>` : html`<a class="xxd-btn" data-variant="primary" href="/login?next=${encodeURIComponent(loginNextPath)}">登录</a>`
     const body = MessagePages.#centered(html`<section class="xxd-empty">
   ${PageShell.icon('FileX', 24)}
   <h1 class="xxd-empty__title">找不到这个 artifact</h1>
   <p class="xxd-empty__text">它可能已被删除，或者没有分享给你。${signedIn ? '' : '如果它是分享给你的，先登录再打开。'}</p>
-  <div class="xxd-empty__actions"><a class="xxd-btn" data-variant="primary" href="${signedIn ? '/' : '/login'}">${signedIn ? '回到首页' : '登录'}</a></div>
+  <div class="xxd-empty__actions">${action}</div>
 </section>`)
     return PageShell.render({ title: '找不到 · Open Artifact', body, status: 404 })
   }

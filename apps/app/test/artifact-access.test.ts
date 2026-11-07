@@ -309,7 +309,7 @@ describe('public links', () => {
     const afterPasswordChange = await app.request(`/a/${published.artifactId}`, { cookie: unlockCookie })
 
     expect(await locked.text()).toContain('这个链接需要密码')
-    expect(wrongPassword.status).toBe(401)
+    expect(wrongPassword.status).toBe(303)
     expect(rightPassword.status).toBe(303)
     expect(unlocked.status).toBe(200)
     expect(await unlocked.text()).toContain('artifact-frame')
@@ -350,10 +350,35 @@ describe('public links', () => {
     await setSharing(published.artifactId, { visibility: 'public_link', publicLinkPassword: 'right-one' })
 
     const attempts = []
-    for (let attempt = 0; attempt < 6; attempt++) attempts.push((await app.request(`/a/${published.artifactId}/unlock`, { method: 'POST', form: { password: `guess-${attempt}` } })).status)
+    for (let attempt = 0; attempt < 6; attempt++) attempts.push((await app.request(`/a/${published.artifactId}/unlock`, { method: 'POST', form: { password: `guess-${attempt}` } })).headers.get('Location'))
 
-    expect(attempts.slice(0, 5)).toEqual([401, 401, 401, 401, 401])
-    expect(attempts[5]).toBe(429)
+    expect(attempts.slice(0, 5)).toEqual(Array(5).fill(`/a/${published.artifactId}?password=wrong`))
+    expect(attempts[5]).toBe(`/a/${published.artifactId}?password=wait`)
+  })
+
+  it('answers each password with a redirect, so the address never shows /unlock and a reload never resubmits', async () => {
+    const published = await app.publish({ token: authorToken }, 'Redirected deck')
+    await setSharing(published.artifactId, { visibility: 'public_link', publicLinkPassword: 'right-one' })
+
+    const wrong = await app.request(`/a/${published.artifactId}/unlock`, { method: 'POST', form: { password: 'nope' } })
+    const wrongPrompt = await app.request(wrong.headers.get('Location') ?? '')
+    const waitPrompt = await app.request(`/a/${published.artifactId}?password=wait`)
+    const unlockOpenedDirectly = await app.request(`/a/${published.artifactId}/unlock`)
+
+    expect(wrong.status).toBe(303)
+    expect(wrongPrompt.status).toBe(401)
+    expect(await wrongPrompt.text()).toContain('密码不对，再试一次。')
+    expect(waitPrompt.status).toBe(429)
+    expect(await waitPrompt.text()).toContain('1 分钟后可以再试')
+    expect(unlockOpenedDirectly.status).toBe(303)
+    expect(unlockOpenedDirectly.headers.get('Location')).toBe(`/a/${published.artifactId}`)
+  })
+
+  it('sends a visitor who finds nothing to sign in and come back to the same address', async () => {
+    const missing = await app.request('/a/no-such-artifact')
+
+    expect(missing.status).toBe(404)
+    expect(await missing.text()).toContain('href="/login?next=%2Fa%2Fno-such-artifact"')
   })
 
   it('stops an expired link', async () => {

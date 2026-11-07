@@ -60,6 +60,8 @@ export class AppRoutes {
     })
     const unlockMatch = UNLOCK.exec(requestUrl)
     if (unlockMatch && request.method === 'POST') return pageRoutes.unlock(request, decodeURIComponent(unlockMatch.pathname.groups.artifactId ?? ''))
+    // The unlock address only takes the form; opened directly it leads to the artifact, which asks again.
+    if (unlockMatch) return new Response(null, { status: 303, headers: { Location: `/a/${unlockMatch.pathname.groups.artifactId ?? ''}` } })
     if (request.method !== 'GET' && request.method !== 'HEAD') return MessagePages.unknownAddress(405)
     if (requestUrl.pathname === '/') return pageRoutes.home(request)
     if (requestUrl.pathname === '/login') return pageRoutes.login(request)

@@ -7,7 +7,7 @@ import { AgentGuide } from '../guide/agent-guide.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { HOME_FILTERS, HomeListing, HomePage, type HomeFilter } from './home-page.ts'
 import { LoginPage } from './login-page.ts'
-import { MessagePages } from './message-pages.ts'
+import { MessagePages, type PasswordPrompt } from './message-pages.ts'
 import { SETTINGS_SECTIONS, SettingsPage, type SettingsSection, type WorkspaceAdministration } from './settings-page.ts'
 import { ViewerPage, type OlderVersion, type ViewerModel } from './viewer-page.ts'
 
@@ -117,13 +117,13 @@ export class PageRoutes {
   async #viewing(request: Request, artifactId: string): Promise<ViewerModel | Response> {
     const identity = await this.#context.identity()
     const openedArtifact = await this.#context.gate.open(artifactId, identity, request)
-    if (!openedArtifact) return MessagePages.notFound(identity !== null)
+    if (!openedArtifact) return MessagePages.notFound(identity ? null : PageRoutes.#pathOf(request))
     if (!openedArtifact.permissions.canView) return this.#refusal(request, openedArtifact, identity)
     const requestedVersion = Number(new URL(request.url).searchParams.get('v') ?? openedArtifact.summary.version)
     const versionExists = Number.isInteger(requestedVersion) && requestedVersion >= 1 && requestedVersion <= openedArtifact.summary.version
     const shownVersion = versionExists ? requestedVersion : openedArtifact.summary.version
     const showsOlderVersion = shownVersion !== openedArtifact.summary.version
-    if (showsOlderVersion && !openedArtifact.permissions.canSeeVersions) return identity ? MessagePages.notFound(true) : this.#redirectToLogin(request)
+    if (showsOlderVersion && !openedArtifact.permissions.canSeeVersions) return identity ? MessagePages.notFound(null) : this.#redirectToLogin(request)
     const now = Date.now()
     const signedPrefix = await this.#settings.usercontentSignature.signedPrefix(artifactId, shownVersion, now + SIGNED_URL_LIFETIME_MS)
     const authorNames = await this.#context.people.namesOf([openedArtifact.summary.authorId])
@@ -150,14 +150,14 @@ export class PageRoutes {
   async unlock(request: Request, artifactId: string): Promise<Response> {
     const summary = await this.#context.repositories.artifacts.findSummary(artifactId)
     const passwordHash = summary?.sharing.publicLinkPasswordHash ?? null
-    if (!summary || passwordHash === null) return MessagePages.notFound(false)
+    if (!summary || passwordHash === null) return MessagePages.notFound(`/a/${encodeURIComponent(artifactId)}`)
     // Each guess costs a PBKDF2 run, so guessing is limited per visitor and artifact.
     const visitorAddress = request.headers.get('CF-Connecting-IP') ?? 'unknown'
     const { success: withinAttemptLimit } = await this.#settings.unlockRateLimiter.limit({ key: `${artifactId}:${visitorAddress}` })
-    if (!withinAttemptLimit) return MessagePages.tooManyPasswordAttempts()
+    if (!withinAttemptLimit) return PageRoutes.#backToPasswordPrompt(artifactId, 'wait')
     const formData = await request.formData()
     const password = String(formData.get('password') ?? '')
-    if (!(await PublicLinkPassword.verify(password, passwordHash))) return MessagePages.publicLinkPassword(artifactId, true)
+    if (!(await PublicLinkPassword.verify(password, passwordHash))) return PageRoutes.#backToPasswordPrompt(artifactId, 'wrong')
     const unlockCookie = HttpCookies.serialize(
       ArtifactGate.unlockCookieName(artifactId),
       await this.#context.gate.unlockCookieValue(summary),
@@ -165,6 +165,11 @@ export class PageRoutes {
       new URL(request.url).protocol === 'https:',
     )
     return new Response(null, { status: 303, headers: { Location: `/a/${encodeURIComponent(artifactId)}`, 'Set-Cookie': unlockCookie } })
+  }
+
+  /** Reloading the result shows the prompt again instead of resubmitting the password. */
+  static #backToPasswordPrompt(artifactId: string, prompt: Exclude<PasswordPrompt, 'ask'>): Response {
+    return new Response(null, { status: 303, headers: { Location: `/a/${encodeURIComponent(artifactId)}?password=${prompt}` } })
   }
 
   async settings(request: Request, requestedSection: string | undefined): Promise<Response> {
@@ -217,17 +222,26 @@ export class PageRoutes {
 
   async #refusal(request: Request, openedArtifact: OpenedArtifact, identity: Identity | null): Promise<Response> {
     const { summary, permissions } = openedArtifact
-    if (permissions.needsPublicLinkPassword) return MessagePages.publicLinkPassword(summary.artifactId, false)
+    if (permissions.needsPublicLinkPassword) return MessagePages.publicLinkPassword(summary.artifactId, PageRoutes.#passwordPromptOf(request))
     if (!identity) return this.#redirectToLogin(request)
-    if (!ArtifactGate.mayAskForAccess(openedArtifact, identity)) return MessagePages.notFound(true)
+    if (!ArtifactGate.mayAskForAccess(openedArtifact, identity)) return MessagePages.notFound(null)
     const authorNames = await this.#context.people.namesOf([summary.authorId])
     return MessagePages.noAccess(summary.artifactId, authorNames.get(summary.authorId) ?? '')
   }
 
-  #redirectToLogin(request: Request): Response {
+  static #passwordPromptOf(request: Request): PasswordPrompt {
+    const requestedPrompt = new URL(request.url).searchParams.get('password')
+    return requestedPrompt === 'wrong' || requestedPrompt === 'wait' ? requestedPrompt : 'ask'
+  }
+
+  static #pathOf(request: Request): string {
     const requestUrl = new URL(request.url)
+    return requestUrl.pathname + requestUrl.search
+  }
+
+  #redirectToLogin(request: Request): Response {
     const loginUrl = new URL('/login', this.#context.appOrigin)
-    loginUrl.searchParams.set('next', requestUrl.pathname + requestUrl.search)
+    loginUrl.searchParams.set('next', PageRoutes.#pathOf(request))
     return Response.redirect(loginUrl.toString(), 302)
   }
 
