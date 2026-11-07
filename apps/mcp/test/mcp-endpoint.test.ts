@@ -85,17 +85,17 @@ describe('McpEndpoint', () => {
   })
 
   it('publishes through the app and hands back the link', async () => {
-    const fakeApp = new FakeApp(Response.json({ artifactId: 'a1', version: 1, url: 'http://app.test/a/a1' }, { status: 201 }))
+    const fakeApp = new FakeApp(Response.json({ artifactId: 'a1', version: 1, url: 'http://app.test/a/plan-k7f3q9x2m4ab' }, { status: 201 }))
 
     const result = await callTool(mcpEndpoint(fakeApp), 'publish', { title: 'Plan', files: [{ path: 'index.html', content: '<h1>Plan</h1>' }] })
 
     expect(fakeApp.calls[0]).toMatchObject({ method: 'POST', url: 'http://app.test/api/artifacts', body: { title: 'Plan', files: [{ path: 'index.html', content: '<h1>Plan</h1>' }] } })
     expect(result.isError).toBeUndefined()
-    expect(result.content[0]?.text).toContain('http://app.test/a/a1')
+    expect(result.content[0]?.text).toContain('http://app.test/a/plan-k7f3q9x2m4ab')
   })
 
   it('passes the note that says what this version changed', async () => {
-    const fakeApp = new FakeApp(Response.json({ artifactId: 'a1', version: 2, url: 'http://app.test/a/a1' }), Response.json({ artifactId: 'a2', version: 1, url: 'http://app.test/a/a2' }, { status: 201 }))
+    const fakeApp = new FakeApp(Response.json({ artifactId: 'a1', version: 2, url: 'http://app.test/a/plan-k7f3q9x2m4ab' }), Response.json({ artifactId: 'a2', version: 1, url: 'http://app.test/a/plan-p2r8w4n6c1zd' }, { status: 201 }))
     const endpoint = mcpEndpoint(fakeApp)
     const files = [{ path: 'index.html', content: '<h1>Plan</h1>' }]
 
@@ -108,8 +108,26 @@ describe('McpEndpoint', () => {
     expect(result.tools.filter(tool => 'note' in tool.inputSchema.properties).map(tool => tool.name)).toEqual(['publish', 'update'])
   })
 
+  it('offers a slug for the link on publish and update, and passes it to the app', async () => {
+    const fakeApp = new FakeApp(
+      Response.json({ artifactId: 'a1', shortId: 'k7f3q9x2m4ab', slug: 'quarterly-sales-review', version: 1, url: 'http://app.test/a/quarterly-sales-review-k7f3q9x2m4ab' }, { status: 201 }),
+      Response.json({ artifactId: 'a1', shortId: 'k7f3q9x2m4ab', slug: 'q3-sales-review', version: 2, url: 'http://app.test/a/q3-sales-review-k7f3q9x2m4ab' }),
+    )
+    const endpoint = mcpEndpoint(fakeApp)
+    const files = [{ path: 'index.html', content: '<h1>季度销售复盘</h1>' }]
+
+    const published = await callTool(endpoint, 'publish', { title: '季度销售复盘', slug: 'quarterly-sales-review', files })
+    await callTool(endpoint, 'update', { artifactId: 'a1', baseVersion: 1, slug: 'q3-sales-review', files })
+    const toolList = await rpc(endpoint, { jsonrpc: '2.0', id: 2, method: 'tools/list' })
+    const { result } = (await toolList.json()) as { result: { tools: { name: string; inputSchema: { properties: Record<string, { type: string }> } }[] } }
+
+    expect(fakeApp.calls.map(call => (call.body as { slug?: string }).slug)).toEqual(['quarterly-sales-review', 'q3-sales-review'])
+    expect(published.content[0]?.text).toContain('http://app.test/a/quarterly-sales-review-k7f3q9x2m4ab')
+    expect(result.tools.filter(tool => tool.inputSchema.properties.slug?.type === 'string').map(tool => tool.name)).toEqual(['publish', 'update'])
+  })
+
   it('passes the public link expiry the person chose, and leaves it out otherwise', async () => {
-    const created = () => Response.json({ artifactId: 'a1', version: 1, url: 'http://app.test/a/a1' }, { status: 201 })
+    const created = () => Response.json({ artifactId: 'a1', version: 1, url: 'http://app.test/a/plan-k7f3q9x2m4ab' }, { status: 201 })
     const fakeApp = new FakeApp(created(), created())
     const endpoint = mcpEndpoint(fakeApp)
     const files = [{ path: 'index.html', content: '<h1>Plan</h1>' }]
@@ -121,7 +139,7 @@ describe('McpEndpoint', () => {
   })
 
   it('renames the artifact along with the new version when update carries a title', async () => {
-    const fakeApp = new FakeApp(Response.json({ artifactId: 'a1', version: 4, url: 'http://app.test/a/a1' }))
+    const fakeApp = new FakeApp(Response.json({ artifactId: 'a1', version: 4, url: 'http://app.test/a/plan-k7f3q9x2m4ab' }))
 
     const result = await callTool(mcpEndpoint(fakeApp), 'update', { artifactId: 'a1', baseVersion: 3, title: 'Q3 plan', files: [{ path: 'index.html', content: 'v4' }] })
 
@@ -175,6 +193,14 @@ describe('McpEndpoint', () => {
     expect(fakeApp.calls[0]?.url).toBe('http://app.test/api/artifacts/..%2Ftokens')
     expect(result.isError).toBe(true)
     expect(result.content[0]?.text).toContain('404')
+  })
+
+  it('takes a pasted link as the artifact and sends the app only its address part', async () => {
+    const fakeApp = new FakeApp(Response.json({ artifactId: 'a1' }))
+
+    await callTool(mcpEndpoint(fakeApp), 'read', { artifactId: 'https://artifact.example.com/a/pricing-page-k7f3q9x2m4ab/full?v=2' })
+
+    expect(fakeApp.calls[0]?.url).toBe('http://app.test/api/artifacts/pricing-page-k7f3q9x2m4ab')
   })
 
   it('answers unknown methods and non-POST requests the MCP way', async () => {

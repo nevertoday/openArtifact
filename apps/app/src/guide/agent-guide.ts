@@ -52,6 +52,8 @@ export class AgentGuide {
 ### When to publish
 - Publish when the result is something people will read or use outside this chat: a design doc, report, dashboard, plan, sign-up sheet.
 - Before creating a new artifact for the same subject, \`list\` the existing ones and update the right one instead.
+- Always pass a \`slug\`: 3–6 lower-case English words joined by dashes that say what the page is (\`quarterly-sales-review\`), above all when the title is not in English. It goes into the link (\`/a/quarterly-sales-review-k7f3q9x2m4ab\`), so people who get the link in a chat can tell what it is before they sign in. Without one, the link takes the English words of the title, or has none.
+- Share the \`url\` the response returns. It stays valid when the title or slug changes later.
 
 ### How to connect
 - MCP (preferred): ${this.#mcpUrl}, header \`Authorization: Bearer <personal API token>\`. Tools: publish, update, read, list, list_my_comments, list_comments, reply_comment, get_guide.
@@ -69,7 +71,7 @@ export class AgentGuide {
 2. \`update\` with \`baseVersion\` set to that version, and a \`note\`: what you changed, in one sentence of at most 200 characters (\`"Linked up section 3 as the comment asked"\`). People read notes in the version list, so pass one on every update, above all when the change answers a comment.
 3. On a conflict (HTTP 409), someone published in between: merge your change into \`latestFiles\` from the response and update again with \`baseVersion = currentVersion\`.
 4. Pass \`force: true\` only when the person explicitly asks to overwrite.
-5. To rename, pass \`title\` with the update. Leave it out to keep the current title.
+5. To rename, pass \`title\` with the update. Leave it out to keep the current title. A new title keeps the link's words; pass \`slug\` to change them.
 
 ### Sharing and public links
 - Choose \`visibility\` when you publish: \`private\`, \`specified\` (only the people the author adds), \`workspace\` (the default), or \`public_link\`.
@@ -107,9 +109,9 @@ const viewer = await window.openArtifact.viewer()  // { userId, name } or null f
 Collection names and ids: letters, digits, \`-\`, \`_\`; at most 64 characters. A document is at most 64 KB of JSON.
 
 ### HTTP API
-- \`POST ${api}/artifacts\` \`{ title, visibility?, publicLinkExpiresAt?, listed?, summary?, note?, files: [{ path, content, encoding?: "utf8"|"base64", contentType? }] }\`
+- \`POST ${api}/artifacts\` \`{ title, slug?, visibility?, publicLinkExpiresAt?, listed?, summary?, note?, files: [{ path, content, encoding?: "utf8"|"base64", contentType? }] }\`
 - \`GET ${api}/artifacts\`, \`GET ${api}/artifacts/{id}\`
-- \`PUT ${api}/artifacts/{id}\` \`{ baseVersion, note, files, title?, summary? }\`; \`PATCH ${api}/artifacts/{id}\` \`{ title?, summary? }\` renames or re-summarizes without a new version
+- \`PUT ${api}/artifacts/{id}\` \`{ baseVersion, note, files, title?, slug?, summary? }\`; \`PATCH ${api}/artifacts/{id}\` \`{ title?, slug?, summary? }\` renames or re-summarizes without a new version. \`{id}\` is the \`artifactId\`; the address part of a link someone gave you (\`/a/{this-part}\`) works too
 - \`PUT ${api}/artifacts/{id}/sharing\` \`{ visibility?, publicLinkExpiresAt?, publicLinkPassword?, anonymousWriteEnabled?, publicLinkShowsComments?, listed? }\` (full token); fields left out keep their value
 - \`DELETE ${api}/artifacts/{id}\` removes it; \`GET ${api}/artifacts?removed=true\` lists what you can restore; \`POST ${api}/artifacts/{id}/restore\` brings it back
 - \`GET ${api}/comments?for=me&status=open\`: your agent's open comments across artifacts you can edit.

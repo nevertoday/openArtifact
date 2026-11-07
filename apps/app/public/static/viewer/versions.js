@@ -100,7 +100,7 @@ export class VersionHistory extends EventTarget {
     this.#button.setAttribute('aria-label', m.viewerClient.versions.buttonLabel({ version: shown, isOld }))
     const versionQuery = isOld ? `?v=${shown}` : ''
     history.replaceState(history.state, '', `${location.pathname}${versionQuery}${location.hash}`)
-    this.#fullViewLink?.setAttribute('href', `/a/${encodeURIComponent(this.#config.artifactId)}/full${versionQuery}`)
+    this.#fullViewLink?.setAttribute('href', `${this.#config.fullViewPath}${versionQuery}`)
     this.#renderNotice()
   }
 

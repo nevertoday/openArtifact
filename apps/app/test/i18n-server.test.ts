@@ -42,7 +42,7 @@ describe('server text in the reader’s language', () => {
 
     const linMail = app.mailer.lastTo('lin@example.com')
     expect(linMail?.subject).toBe('zhou commented on “Pricing page”')
-    expect(linMail?.text).toContain(`Open it: http://app.test/a/${published.artifactId}#comment-${question}`)
+    expect(linMail?.text).toContain(`Open it: http://app.test${published.path}#comment-${question}`)
     expect(`${linMail?.subject}${linMail?.text}`).not.toMatch(CHINESE_TEXT)
     expect(app.mailer.lastTo('zhou@example.com')?.subject).toBe('lin 在「Pricing page」回复了评论')
     expect(app.mailer.lastTo('zhou@example.com')?.text).toContain('打开查看：')

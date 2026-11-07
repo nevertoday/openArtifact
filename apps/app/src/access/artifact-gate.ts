@@ -1,4 +1,4 @@
-import { ArtifactAccess, type ArtifactPermission, type ArtifactPermissions, type ArtifactSummary, type ArtifactViewer, type SigningKey } from '@open-artifact/core'
+import { ArtifactAccess, type ArtifactPermission, type ArtifactPermissions, type ArtifactReference, type ArtifactSummary, type ArtifactViewer, type SigningKey } from '@open-artifact/core'
 import type { Identity } from '../auth/request-identity.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { HttpError } from '../http-error.ts'
@@ -28,12 +28,27 @@ export class ArtifactGate {
   }
 
   /** Returns null when the artifact does not exist. */
-  async open(artifactId: string, identity: Identity | null, request: Request): Promise<OpenedArtifact | null> {
-    const summary = await this.#repositories.artifacts.findSummary(artifactId)
+  open(artifactId: string, identity: Identity | null, request: Request): Promise<OpenedArtifact | null> {
+    return this.openReferenced({ kind: 'artifact_id', artifactId }, identity, request)
+  }
+
+  /** Like open, for the artifact a link's address names. */
+  async openReferenced(reference: ArtifactReference, identity: Identity | null, request: Request): Promise<OpenedArtifact | null> {
+    const summary = await this.find(reference)
     if (!summary) return null
-    const grants = identity ? await this.#repositories.artifactAccess.listGrants(artifactId) : []
+    const grants = identity ? await this.#repositories.artifactAccess.listGrants(summary.artifactId) : []
     const grantRole = grants.find(grant => grant.userId === identity?.userId)?.role ?? null
     return this.#opened(summary, identity, grantRole, await this.#publicLinkUnlocked(summary, request))
+  }
+
+  /** The artifact a link names, before any access rule; only for code that applies the rules itself. */
+  find(reference: ArtifactReference): Promise<ArtifactSummary | null> {
+    switch (reference.kind) {
+      case 'artifact_id':
+        return this.#repositories.artifacts.findSummary(reference.artifactId)
+      case 'short_id':
+        return this.#repositories.artifacts.findSummaryByShortId(reference.shortId)
+    }
   }
 
   /**

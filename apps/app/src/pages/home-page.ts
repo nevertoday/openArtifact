@@ -1,5 +1,5 @@
 import type { Messages } from '../i18n/messages.ts'
-import type { CommentThread } from '@open-artifact/core'
+import { ArtifactPath, type CommentThread } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
@@ -295,7 +295,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     // Visible to the workspace is the default, which the 全部 description states, so only a different reach gets a badge.
     const sharingBadge = summary.sharing.visibility === 'workspace' ? '' : html`<span class="xxd-badge">${ArtifactLabels.sharingBadge(model.m, summary.sharing, model.now)}</span>`
     const commentBadge = unresolvedCount > 0 ? html`<span class="xxd-badge" data-appearance="dot" data-tone="warning">${model.m.home.unresolvedComments({ count: unresolvedCount, forAgent: forAgentCount })}</span>` : ''
-    return html`<a class="xxd-card artifact-card" href="/a/${encodeURIComponent(summary.artifactId)}">
+    return html`<a class="xxd-card artifact-card" href="${ArtifactPath.of(summary)}">
   <div class="xxd-card__media artifact-cover" aria-hidden="true">
     <span class="artifact-cover__title"></span><span class="artifact-cover__line"></span><span class="artifact-cover__line"></span>
     <span class="artifact-cover__blocks"><span></span><span></span><span></span></span>

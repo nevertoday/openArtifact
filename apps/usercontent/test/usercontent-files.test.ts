@@ -24,6 +24,7 @@ describe('UsercontentFiles', () => {
       workspaceId: 'local-workspace',
       authorId: 'user-author',
       title: 'Report',
+      slug: 'report',
       visibility: 'workspace',
       publicLinkExpiresAt: null,
       publishedVia: null,

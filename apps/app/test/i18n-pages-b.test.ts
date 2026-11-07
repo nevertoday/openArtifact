@@ -6,12 +6,15 @@ const english = { 'Accept-Language': 'en' }
 let adminCookie = ''
 let memberCookie = ''
 let artifactId = ''
+let artifactPath = ''
 
 beforeAll(async () => {
   adminCookie = await app.signIn('ada@example.com')
   memberCookie = await app.signIn('ben@example.com')
   const token = await app.createToken(adminCookie)
-  artifactId = (await app.publish({ token, agentClient: 'Claude Code' }, 'Pricing page')).artifactId
+  const published = await app.publish({ token, agentClient: 'Claude Code' }, 'Pricing page')
+  artifactId = published.artifactId
+  artifactPath = published.path
   await app.request('/api/workspace', { method: 'PATCH', cookie: adminCookie, body: { name: 'Acme' } })
 })
 
@@ -34,7 +37,7 @@ const chineseLines = (markup: string) =>
 
 describe('server-rendered pages in English', () => {
   it('words the viewer in English', async () => {
-    const viewer = await englishPage(`/a/${artifactId}`, memberCookie)
+    const viewer = await englishPage(artifactPath, memberCookie)
 
     expect(viewer).toContain('Comment mode (C)')
     expect(viewer).toContain('Write a comment…')

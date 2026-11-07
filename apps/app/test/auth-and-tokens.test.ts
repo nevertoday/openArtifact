@@ -324,7 +324,7 @@ describe('tokens and workspaces', () => {
     const me = await app.json<{ user: { userId: string } }>('/api/me', { cookie: ownerCookie })
     await env.DB.prepare('INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?)').bind('workspace-other', 'Other team', Date.now()).run()
     await env.DB.prepare("INSERT INTO memberships (workspace_id, user_id, role, created_at) VALUES ('workspace-other', ?, 'member', ?)").bind(me.body.user.userId, Date.now()).run()
-    const otherArtifact = await app.repositories.artifacts.create({ workspaceId: 'workspace-other', authorId: 'someone-else', title: 'Other team plan', visibility: 'workspace', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: null, listed: false, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+    const otherArtifact = await app.repositories.artifacts.create({ workspaceId: 'workspace-other', authorId: 'someone-else', title: 'Other team plan', slug: 'other-team-plan', visibility: 'workspace', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: null, listed: false, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
 
     const withCookie = await app.request(`/api/artifacts/${otherArtifact.artifactId}`, { cookie: ownerCookie })
     const withToken = await app.request(`/api/artifacts/${otherArtifact.artifactId}`, { token })

@@ -31,11 +31,12 @@ describe('CloudflareArtifactRepository', () => {
     await env.DB.prepare('INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES (?, ?, ?)').bind(workspaceId, 'Design team', Date.now()).run()
   })
 
-  async function createDesignDoc() {
-    return artifactRepository.create({
+  function designDocBy(repository: CloudflareArtifactRepository) {
+    return repository.create({
       workspaceId,
       authorId,
       title: 'Design doc',
+      slug: 'design-doc',
       visibility: 'workspace',
       publicLinkExpiresAt: null,
       publishedVia: 'Claude Code',
@@ -45,6 +46,10 @@ describe('CloudflareArtifactRepository', () => {
       summary: null,
       files: [htmlPage('draft'), { path: 'assets/app.css', contentType: 'text/css', body: new TextEncoder().encode('h1{}') }],
     })
+  }
+
+  function createDesignDoc() {
+    return designDocBy(artifactRepository)
   }
 
   it('reads back the first version with every file', async () => {
@@ -147,6 +152,51 @@ describe('CloudflareArtifactRepository', () => {
     ])
     expect(firstVersion?.files.map(file => file.path)).toEqual(['assets/app.css', 'index.html'])
     expect(summary?.publishedVia).toBe('Codex')
+  })
+
+  it('finds an artifact by the short id in its address, and renames its title and words together', async () => {
+    const designDoc = await createDesignDoc()
+
+    await artifactRepository.rename(designDoc.artifactId, { title: 'Launch plan', slug: 'launch-plan' })
+    const found = await artifactRepository.findSummaryByShortId(designDoc.shortId)
+
+    expect(designDoc.shortId).toMatch(/^[0-9a-z]{12}$/)
+    expect(found).toMatchObject({ artifactId: designDoc.artifactId, shortId: designDoc.shortId, title: 'Launch plan', slug: 'launch-plan' })
+    expect(await artifactRepository.findSummaryByShortId('zzzzzzzzzzzz')).toBeNull()
+  })
+
+  it('gives a short id to rows inserted without one, as the previous app does while a deploy is under way', async () => {
+    const insertTheOldWay = (id: string) =>
+      env.DB.prepare("INSERT INTO artifacts (id, workspace_id, author_id, title, visibility, current_version, current_upload_id, created_at, updated_at) VALUES (?, ?, ?, 'Old way', 'workspace', 1, 'upload', 0, 0)").bind(id, workspaceId, authorId).run()
+    const firstId = `old-${crypto.randomUUID()}`
+    const secondId = `old-${crypto.randomUUID()}`
+
+    await insertTheOldWay(firstId)
+    await insertTheOldWay(secondId)
+    const shortIds = await Promise.all([firstId, secondId].map(async id => (await env.DB.prepare('SELECT short_id FROM artifacts WHERE id = ?').bind(id).first<{ short_id: string }>())?.short_id))
+
+    expect(shortIds[0]).toMatch(/^[0-9a-z]{12}$/)
+    expect(shortIds[1]).toMatch(/^[0-9a-z]{12}$/)
+    expect(shortIds[0]).not.toBe(shortIds[1])
+  })
+
+  it('draws another short id when the first one is taken', async () => {
+    const takenShortId = (await createDesignDoc()).shortId
+    const freshShortId = `t${crypto.randomUUID().replaceAll('-', '').slice(0, 11)}`
+    const draws = [takenShortId, freshShortId]
+    const clashingRepository = new CloudflareArtifactRepository(env.DB, env.FILES, () => draws.shift() ?? 'unexpected-draw')
+
+    const created = await designDocBy(clashingRepository)
+
+    expect(created.shortId).toBe(freshShortId)
+    expect((await artifactRepository.findSummaryByShortId(takenShortId))?.artifactId).not.toBe(created.artifactId)
+  })
+
+  it('gives up after a few short ids that are all taken', async () => {
+    const takenShortId = (await createDesignDoc()).shortId
+    const alwaysTakenRepository = new CloudflareArtifactRepository(env.DB, env.FILES, () => takenShortId)
+
+    await expect(designDocBy(alwaysTakenRepository)).rejects.toThrow('could not be saved')
   })
 
   it('reports an unknown artifact as not found and keeps no uploaded files', async () => {

@@ -171,7 +171,7 @@ export class CommentApi {
       artifactId: root.artifactId,
       title: openedArtifact.summary.title,
       version: openedArtifact.summary.version,
-      url: NotificationLink.to(this.#context.viewerUrl(root.artifactId), root.commentId),
+      url: NotificationLink.to(this.#context.artifactUrl(openedArtifact.summary), root.commentId),
       anchor: root.anchor,
       body: root.body,
       author: { userId: root.authorId, name: names.get(root.authorId) },

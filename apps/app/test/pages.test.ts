@@ -209,7 +209,7 @@ describe('viewer page', () => {
   it('puts the artifact first with a slim bar, comments on the page, and the page data out of reach of markup injection', async () => {
     const published = await app.publish({ token: agentToken }, '</script><script>alert(1)</script>', '<h1>v1</h1>')
 
-    const authorMarkup = await pageText(`/a/${published.artifactId}`, authorCookie)
+    const authorMarkup = await pageText(published.path, authorCookie)
 
     expect(authorMarkup).toMatch(/<button [^>]*aria-pressed="false" aria-keyshortcuts="C"[^>]*data-comment-mode/)
     expect(authorMarkup).toContain('aria-controls="viewer-drawer"')
@@ -225,8 +225,8 @@ describe('viewer page', () => {
     const published = await app.publish({ token: agentToken }, 'Two versions to choose from', '<h1>v1</h1>')
     await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
 
-    const authorMarkup = await pageText(`/a/${published.artifactId}?v=1`, authorCookie)
-    const reviewerMarkup = await pageText(`/a/${published.artifactId}?v=1`, reviewerCookie)
+    const authorMarkup = await pageText(`${published.path}?v=1`, authorCookie)
+    const reviewerMarkup = await pageText(`${published.path}?v=1`, reviewerCookie)
 
     expect(authorMarkup).toContain('aria-label="版本 1，选择版本"')
     expect(configOf(authorMarkup)).toMatchObject({ shownVersion: 1, currentVersion: 2, olderVersion: { version: 1, authorName: 'lin' }, permissions: { canEdit: true } })
@@ -236,7 +236,7 @@ describe('viewer page', () => {
   it('shows the latest version when the address asks for one that does not exist, and says so', async () => {
     const published = await app.publish({ token: agentToken }, 'Missing version', '<h1>v1</h1>')
 
-    const markup = await pageText(`/a/${published.artifactId}?v=99`, authorCookie)
+    const markup = await pageText(`${published.path}?v=99`, authorCookie)
 
     expect(configOf(markup)).toMatchObject({ shownVersion: 1, missingVersion: 99 })
     expect(markup).toMatch(new RegExp(`<iframe [^>]*src="http://usercontent\\.test/s/[^"]+/${published.artifactId}/v1/index\\.html"`))
@@ -246,9 +246,9 @@ describe('viewer page', () => {
 describe('full-screen view', () => {
   it('opens in a new tab through an app address that checks access on every visit', async () => {
     const published = await app.publish({ token: agentToken }, 'Private draft', '<h1>draft</h1>', 'private')
-    const fullViewPath = `/a/${published.artifactId}/full`
+    const fullViewPath = `${published.path}/full`
 
-    const viewerMarkup = await pageText(`/a/${published.artifactId}`, authorCookie)
+    const viewerMarkup = await pageText(published.path, authorCookie)
     const authorResponse = await app.request(fullViewPath, { cookie: authorCookie })
     const authorMarkup = await authorResponse.text()
     const reviewerResponse = await app.request(fullViewPath, { cookie: reviewerCookie })
@@ -268,12 +268,12 @@ describe('full-screen view', () => {
     const published = await app.publish({ token: agentToken }, 'Two versions', '<h1>v1</h1>')
     await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
 
-    const oldVersionViewer = await pageText(`/a/${published.artifactId}?v=1`, authorCookie)
-    const oldVersionFullView = await pageText(`/a/${published.artifactId}/full?v=1`, authorCookie)
+    const oldVersionViewer = await pageText(`${published.path}?v=1`, authorCookie)
+    const oldVersionFullView = await pageText(`${published.path}/full?v=1`, authorCookie)
 
-    expect(oldVersionViewer).toContain(`href="/a/${published.artifactId}/full?v=1"`)
+    expect(oldVersionViewer).toContain(`href="${published.path}/full?v=1"`)
     expect(oldVersionFullView).toContain(`/${published.artifactId}/v1/index.html`)
-    expect(oldVersionFullView).toContain(`href="/a/${published.artifactId}?v=1">`)
+    expect(oldVersionFullView).toContain(`href="${published.path}?v=1">`)
     expect(oldVersionFullView).toContain('返回查看页')
   })
 })
@@ -296,7 +296,7 @@ describe('content security policy', () => {
   it('runs only our own scripts and lets only pages that show artifacts frame the usercontent origin', async () => {
     const published = await app.publish({ token: agentToken }, 'Policy check')
 
-    const viewerPolicy = (await app.request(`/a/${published.artifactId}`, { cookie: authorCookie })).headers.get('Content-Security-Policy') ?? ''
+    const viewerPolicy = (await app.request(published.path, { cookie: authorCookie })).headers.get('Content-Security-Policy') ?? ''
     const settingsPolicy = (await app.request('/settings/agents', { cookie: authorCookie })).headers.get('Content-Security-Policy') ?? ''
 
     expect(viewerPolicy).toContain("script-src 'self'")
@@ -420,7 +420,8 @@ describe('settings', () => {
     expect(llmsTxt).toContain('window.openArtifact.db')
     expect(llmsTxt).toContain('`publish` (the default)')
     expect(llmsTxt).toContain('expires in 7 days')
-    expect(llmsTxt).toContain('{ baseVersion, note, files, title?, summary? }')
+    expect(llmsTxt).toContain('{ baseVersion, note, files, title?, slug?, summary? }')
+    expect(llmsTxt).toContain('Always pass a `slug`')
     expect(llmsTxt).toContain(`DELETE ${APP_ORIGIN}/api/artifacts/{id}`)
     expect(llmsTxt).toContain(`POST ${APP_ORIGIN}/api/artifacts/{id}/restore`)
     expect(llmsTxt).toContain('list_my_comments')

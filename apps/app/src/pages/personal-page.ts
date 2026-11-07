@@ -1,5 +1,5 @@
 import type { Messages } from '../i18n/messages.ts'
-import type { ArtifactSummary, Profile } from '@open-artifact/core'
+import { ArtifactPath, type ArtifactSummary, type Profile } from '@open-artifact/core'
 import { dayText } from '../../public/static/time-text.js'
 import { PersonalPages } from '../personal-pages.ts'
 import { html, type SafeHtml } from './html.ts'
@@ -78,7 +78,7 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
   static #cover(entry: ArtifactSummary, model: PersonalPageModel): SafeHtml {
     return html`<section class="personal-cover" aria-label="${model.m.personal.pinnedLabel}" data-entry="${entry.artifactId}">
   <p class="personal-label">${model.m.personal.pinnedLabel}</p>
-  <a class="personal-cover__link" href="${PersonalPage.#viewerPath(entry)}">
+  <a class="personal-cover__link" href="${ArtifactPath.of(entry)}">
     <h2 class="personal-cover__title">${entry.title}</h2>
     ${entry.summary ? html`<p class="personal-cover__summary" data-summary>${entry.summary}</p>` : ''}
     <p class="personal-cover__meta"><b>${model.m.personal.read} ${PageShell.icon('ArrowRight', 14)}</b>${PersonalPage.#day(model.m, entry)}<span>${model.m.personal.version(entry.version)}</span></p>
@@ -104,7 +104,7 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
     const previewUrl = model.previewUrls.get(entry.artifactId)
     const recentlyRevised = PersonalPages.recentlyRevised(entry, model.now)
     return html`<li class="personal-entry" data-entry="${entry.artifactId}" data-preview-url="${previewUrl ?? ''}">
-  <a class="personal-entry__link" href="${PersonalPage.#viewerPath(entry)}">
+  <a class="personal-entry__link" href="${ArtifactPath.of(entry)}">
     <span class="personal-entry__arrow" aria-hidden="true">${PageShell.icon('ArrowRight', 16)}</span>
     <h3 class="personal-entry__title">${entry.title}${recentlyRevised ? html`<span class="personal-fresh" title="${entry.currentVersionNote ?? ''}">${model.m.personal.justUpdated}</span>` : ''}</h3>
     ${entry.summary ? html`<p class="personal-entry__summary" data-summary>${entry.summary}</p>` : ''}
@@ -128,9 +128,5 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
 
   static #day(m: Messages, entry: ArtifactSummary): SafeHtml {
     return html`<time datetime="${new Date(entry.updatedAt).toISOString()}" data-day>${dayText(m.time, entry.updatedAt)}</time>`
-  }
-
-  static #viewerPath(entry: ArtifactSummary): string {
-    return `/a/${encodeURIComponent(entry.artifactId)}`
   }
 }

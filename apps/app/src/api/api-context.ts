@@ -8,7 +8,7 @@ import { HttpError } from '../http-error.ts'
 import { Notifier } from '../notifications/notifier.ts'
 import { People } from '../people.ts'
 import { PersonalPages } from '../personal-pages.ts'
-import type { Locale, Repositories } from '@open-artifact/core'
+import { ArtifactPath, type AddressedArtifact, type Locale, type Repositories } from '@open-artifact/core'
 import { messagesFor, type Messages } from '../i18n/messages.ts'
 import { resolveLocale, type LocaleSignals } from '../i18n/resolve-locale.ts'
 
@@ -48,7 +48,7 @@ export class ApiContext {
     this.requestIdentity = fields.requestIdentity
     this.people = new People(fields.repositories.users, async () => (await this.messages()).server.deletedPerson)
     this.mailer = fields.mailer
-    this.notifier = new Notifier(fields.repositories, fields.mailer, artifactId => this.viewerUrl(artifactId), fields.localeSignals.fallback)
+    this.notifier = new Notifier(fields.repositories, fields.mailer, artifact => this.artifactUrl(artifact), fields.localeSignals.fallback)
     this.auth = fields.auth
     this.admission = fields.admission
     this.appOrigin = fields.appOrigin
@@ -96,7 +96,7 @@ export class ApiContext {
     return `${this.appOrigin}/invite/${encodeURIComponent(inviteCode)}`
   }
 
-  viewerUrl(artifactId: string): string {
-    return `${this.appOrigin}/a/${encodeURIComponent(artifactId)}`
+  artifactUrl(artifact: AddressedArtifact): string {
+    return `${this.appOrigin}${ArtifactPath.of(artifact)}`
   }
 }
