@@ -1,8 +1,17 @@
 # Open Artifact
 
-Any AI agent publishes HTML pages ("artifacts"); the whole team opens, comments on and uses them, without a Claude account. Everything runs on the team's own Cloudflare account.
+[中文](README.zh-CN.md)
 
-Design doc: `docs/open-artifact-design.html` (published at https://claude.ai/artifact/8mif9MYis5SpNi5tH4ocns).
+Any AI agent publishes HTML pages ("artifacts"); the whole team opens, comments on and uses them, without a Claude account. Everything runs on your own Cloudflare account.
+
+- **Publish from any agent.** Claude Code, Codex, Cursor or anything else, through MCP or a plain HTTP API.
+- **Comment on the page itself.** Pin a comment to a spot or a selected passage, and hand open comments to an agent with one copy.
+- **Versions, sharing and public links.** Private, named people, the whole workspace, or a public link with an expiry and an optional password.
+- **A personal page.** Authors list public artifacts at `/@name`, with share cards and search-engine indexing for those pages only.
+
+The interface is in Chinese for now.
+
+> **License.** Open Artifact is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE). It is free for noncommercial use. Commercial use, including a company running it for its own staff, needs a separate license: https://ui.xiaoxiaodong.ai/license
 
 ## Run it locally
 
@@ -62,3 +71,19 @@ pnpm run check   # storage boundary, type checks, all tests (Workers runtime, lo
 Bindings besides variables: the app needs `DB` (D1), `FILES` (R2) and `UNLOCK_RATE_LIMITER` (rate limit for public-link passwords), plus the `EMAIL` `send_email` binding (Cloudflare Email Service) when `MAILER=cloudflare`; usercontent needs the `ARTIFACT_FILES` service binding to the app; MCP needs the `APP` service binding.
 
 The usercontent Worker must run on a different site from the app (another domain, not only another port in production), so artifact pages can never read the app's cookies.
+
+## Deploy
+
+Step-by-step deployment to your own Cloudflare account: [docs/deploy.md](docs/deploy.md).
+
+## Security
+
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+
+## Contributing
+
+Issues and suggestions are welcome. Code contributions are not accepted yet; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[PolyForm Noncommercial License 1.0.0](LICENSE). The bundled UI kit in `apps/app/public/static/vendor/xxd` is under the same license. Commercial licenses: https://ui.xiaoxiaodong.ai/license

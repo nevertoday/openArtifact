@@ -2,6 +2,7 @@ node_modules/
 .wrangler/
 .dev.vars
 *.log
-.archify/**/review-*/
 .claude/scheduled_tasks.lock
 .claude/worktrees/
+.archify/
+x-drafts/
