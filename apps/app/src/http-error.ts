@@ -1,6 +1,6 @@
 /**
- * Stable names for what went wrong. Agents read the English `error`; the web pages map `code` to Chinese in
- * one table (ERROR_MESSAGES in public/static/common.js), so a code is renamed in both places or neither.
+ * Stable names for what went wrong. Agents read the English `error`; the web pages map `code` to the reader's
+ * language in the `client.errors` messages (public/static/i18n), so a code is renamed in both places or neither.
  */
 export type ErrorCode =
   | 'unauthenticated'
@@ -80,7 +80,7 @@ export class HttpError extends Error {
 
   /** The person may do this, but the API token they sent was made for publishing only. */
   static outsideTokenScope(action: string): HttpError {
-    return new HttpError(403, 'outside_token_scope', `this token may only publish; to ${action}, create a token with full access in 设置 › Agent 接入, or use the web page`)
+    return new HttpError(403, 'outside_token_scope', `this token may only publish; to ${action}, create a token with full access in Settings › Agent access (设置 › Agent 接入), or use the web page`)
   }
 
   /** Also used when the caller may not know the thing exists, so its existence is not revealed. */

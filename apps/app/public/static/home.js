@@ -1,4 +1,4 @@
-import { readJsonData, removalWord, renderServerTimes, restoreArtifact, userMessageOf } from './common.js'
+import { m, readJsonData, removalText, renderServerTimes, restoreArtifact, userMessageOf } from './common.js'
 
 const homeConfig = readJsonData('home-config')
 const SEARCH_DELAY_MS = 250
@@ -8,9 +8,9 @@ function offerUndo(justRemoved) {
   const homeUrl = new URL(location.href)
   homeUrl.searchParams.delete('removed')
   history.replaceState(null, '', homeUrl.pathname + homeUrl.search)
-  Xxd.toast(`已${removalWord(justRemoved.removedAsAdmin)}「${justRemoved.title}」`, {
+  Xxd.toast(removalText(justRemoved.removedAsAdmin).done(justRemoved.title), {
     tone: 'success',
-    action: { label: '撤销', onClick: () => undoRemoval(justRemoved) },
+    action: { label: m.client.home.undo, onClick: () => undoRemoval(justRemoved) },
   })
 }
 
@@ -19,7 +19,7 @@ async function undoRemoval(justRemoved) {
     const { url } = await restoreArtifact(justRemoved.artifactId)
     location.href = url
   } catch (error) {
-    Xxd.toast(`撤销失败：${userMessageOf(error)}`, { tone: 'danger' })
+    Xxd.toast(m.client.home.undoFailed(userMessageOf(error)), { tone: 'danger' })
   }
 }
 
@@ -29,9 +29,9 @@ async function restoreFromList(restoreButton) {
     const { url } = await restoreArtifact(restoreButton.dataset.restoreArtifact)
     restoreButton.closest('tr')?.remove()
     showOneFewerRemoved()
-    Xxd.toast(`已恢复「${restoreButton.dataset.title}」`, { tone: 'success', action: { label: '打开', onClick: () => { location.href = url } } })
+    Xxd.toast(m.client.restore.done(restoreButton.dataset.title), { tone: 'success', action: { label: m.client.restore.open, onClick: () => { location.href = url } } })
   } catch (error) {
-    Xxd.toast(`恢复失败：${userMessageOf(error)}`, { tone: 'danger' })
+    Xxd.toast(m.client.restore.failed(userMessageOf(error)), { tone: 'danger' })
   } finally {
     restoreButton.removeAttribute('aria-busy')
   }
@@ -42,7 +42,7 @@ function showOneFewerRemoved() {
   if (!removedCount) return
   const remaining = Math.max(0, Number(removedCount.textContent) - 1)
   removedCount.textContent = remaining > 0 ? String(remaining) : ''
-  removedCount.title = `${remaining} 个 artifact`
+  removedCount.title = m.client.home.artifactCount(remaining)
 }
 
 /**

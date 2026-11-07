@@ -1,4 +1,4 @@
-import { api, confirmArtifactRemoval, element, removalWord, removeArtifact, userMessageOf } from '../common.js'
+import { api, confirmArtifactRemoval, element, m, removeArtifact, userMessageOf } from '../common.js'
 
 const MAX_TITLE_LENGTH = 200
 
@@ -33,7 +33,7 @@ export class ViewerTopBar extends EventTarget {
     const badge = this.#bar.querySelector('[data-comment-count]')
     if (!badge) return
     badge.toggleAttribute('data-zero', count === 0)
-    badge.closest('button').setAttribute('aria-label', `评论，${count} 条待处理`)
+    badge.closest('button').setAttribute('aria-label', m.viewerClient.topBar.openComments(count))
     const isFirstCount = badge.textContent === ''
     if (isFirstCount) badge.textContent = String(count)
     else Xxd.rollText(badge, String(count))
@@ -45,7 +45,7 @@ export class ViewerTopBar extends EventTarget {
 
   showDataCount(count) {
     const dataItem = this.#bar.querySelector('[data-open-data]')
-    if (dataItem) dataItem.lastChild.textContent = count > 0 ? `数据（${count} 条）` : '数据'
+    if (dataItem) dataItem.lastChild.textContent = count > 0 ? m.viewerClient.topBar.dataCount(count) : m.viewerClient.topBar.data
   }
 
   // The full title shows on hover and focus only when the bar had to cut it.
@@ -66,7 +66,7 @@ export class ViewerTopBar extends EventTarget {
   // The title turns into a field where it stands: Enter or leaving the field saves, Esc keeps the old title.
   #rename() {
     const title = this.#title
-    const input = element('input', { className: 'xxd-input viewer-bar__rename', 'data-size': 'sm', value: this.#config.title, maxlength: String(MAX_TITLE_LENGTH), 'aria-label': '新标题', autocomplete: 'off' })
+    const input = element('input', { className: 'xxd-input viewer-bar__rename', 'data-size': 'sm', value: this.#config.title, maxlength: String(MAX_TITLE_LENGTH), 'aria-label': m.viewerClient.topBar.newTitle, autocomplete: 'off' })
     title.hidden = true
     title.after(input)
     input.focus()
@@ -98,7 +98,7 @@ export class ViewerTopBar extends EventTarget {
     try {
       const { title } = await api(`/api/artifacts/${encodeURIComponent(this.#config.artifactId)}`, { method: 'PATCH', body: { title: newTitle } })
       this.#showTitle(title)
-      Xxd.toast('已重命名', { tone: 'success', within: this.#stage })
+      Xxd.toast(m.viewerClient.topBar.renamed, { tone: 'success', within: this.#stage })
     } catch (error) {
       this.#showTitle(previousTitle)
       Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#stage })
@@ -108,13 +108,13 @@ export class ViewerTopBar extends EventTarget {
   async #copyLink() {
     try {
       await navigator.clipboard.writeText(`${location.origin}${location.pathname}${location.search}`)
-      Xxd.toast('已复制链接', { tone: 'success', within: this.#stage })
+      Xxd.toast(m.viewerClient.topBar.linkCopied, { tone: 'success', within: this.#stage })
     } catch {
-      Xxd.toast('复制不了，浏览器没给剪贴板权限', { tone: 'danger', within: this.#stage })
+      Xxd.toast(m.viewerClient.topBar.linkCopyFailed, { tone: 'danger', within: this.#stage })
     }
   }
 
-  // After removing, home offers 撤销 for this artifact.
+  // After removing, home offers to undo it for this artifact.
   async #remove() {
     const takesDown = this.#config.removalTakesDown
     const confirmed = await confirmArtifactRemoval(this.#config.title, takesDown)
@@ -123,7 +123,7 @@ export class ViewerTopBar extends EventTarget {
       await removeArtifact(this.#config.artifactId)
       location.href = `/?removed=${encodeURIComponent(this.#config.artifactId)}`
     } catch (error) {
-      Xxd.toast(`${removalWord(takesDown)}没有成功：${userMessageOf(error)}`, { tone: 'danger', within: this.#stage })
+      Xxd.toast(m.viewerClient.topBar.removeFailed({ takesDown, reason: userMessageOf(error) }), { tone: 'danger', within: this.#stage })
     }
   }
 }

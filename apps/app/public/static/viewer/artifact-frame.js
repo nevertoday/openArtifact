@@ -4,6 +4,7 @@ const SCROLLED_TIMEOUT_MS = 1000
 const FADE_IN_MS = 180
 const THEME_TOKENS = ['ink', 'paper', 'muted', 'action', 'success-solid', 'success-on-solid', 'success-tint', 'warning-solid', 'warning-on-solid', 'warning-tint', 'danger-solid', 'danger-on-solid', 'danger-text', 'font-body']
 const PICK_SOURCES = new Set(['click', 'long-press', 'selection'])
+const BLOCK_KINDS = new Set(['heading', 'table', 'figure', 'image', 'video', 'code', 'quote', 'listItem', 'paragraph', 'term', 'definition', 'block', 'selection'])
 const FORWARDED_KEYS = new Set(['c', 'C', 'j', 'J', 'k', 'K', '?', 'Escape'])
 const MAX_BLOCKS = 20000
 const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)')
@@ -79,7 +80,13 @@ class FrameMessage {
     const anchor = FrameMessage.#anchorOf(message.anchor)
     const rect = FrameMessage.#rectOf(message.rect)
     if (!PICK_SOURCES.has(message.source) || !anchor || !rect) return null
-    return { source: message.source, anchor, rect, label: FrameMessage.#textOf(message.label, 40), excerpt: FrameMessage.#textOf(message.excerpt, 120) }
+    return { source: message.source, anchor, rect, label: FrameMessage.#labelOf(message.label), excerpt: FrameMessage.#textOf(message.excerpt, 120) }
+  }
+
+  // The frame names what was picked by its kind; the viewer words it in the page's language.
+  static #labelOf(label) {
+    const kind = BLOCK_KINDS.has(label?.kind) ? label.kind : 'block'
+    return { kind, text: FrameMessage.#textOf(label?.text, 40) }
   }
 
   static #rectOf(rect) {
@@ -108,7 +115,7 @@ class FrameMessage {
  * its messages arrive from the opaque origin "null" and its window object is what identifies it; and "*" is the
  * only target that reaches it, so every message goes to that one window.
  *
- * It keeps what the frame should show (theme, comment mode, pins, version marks) and hands it to every frame it
+ * It keeps what the frame should show (language, theme, comment mode, pins, version marks) and hands it to every frame it
  * loads, so another version can take the place of the one on screen without the rest of the viewer noticing.
  * What the frame reports arrives as events: ready, target-picked, viewport, pins-placed, pin-selected, key.
  */
@@ -126,6 +133,7 @@ export class ArtifactFrame extends EventTarget {
     window.addEventListener('message', event => this.#receive(event))
     new MutationObserver(() => this.#send('theme', ArtifactFrame.#themeOfPage())).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-mode', 'data-accent', 'style'] })
     for (const query of [DARK_SCHEME, REDUCED_MOTION]) query.addEventListener('change', () => this.#send('theme', ArtifactFrame.#themeOfPage()))
+    this.#send('language', { locale: document.documentElement.lang })
     // The page may have loaded before this script ran and its ready gone unheard; it says ready again when asked.
     this.#send('sync', {})
   }
@@ -268,6 +276,7 @@ export class ArtifactFrame extends EventTarget {
   }
 
   #showEverything() {
+    this.#send('language', { locale: document.documentElement.lang })
     this.#send('theme', ArtifactFrame.#themeOfPage())
     this.#send('mode', this.#shown.mode)
     this.#send('pins', { pins: this.#shown.pins })

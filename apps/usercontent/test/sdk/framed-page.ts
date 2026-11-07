@@ -62,6 +62,11 @@ export class FramedPage {
     return host?.shadowRoot ?? null
   }
 
+  get marksOverlay(): ShadowRoot | null {
+    const host = this.document.querySelector('div[data-open-artifact-ui="marks"]')
+    return host?.shadowRoot ?? null
+  }
+
   async click(selector: string): Promise<void> {
     const element = this.document.querySelector(selector)
     if (!element) throw new Error(`no element matches ${selector}`)

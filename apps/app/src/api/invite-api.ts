@@ -1,7 +1,8 @@
-import { InviteCode, type Invite } from '@open-artifact/core'
+import { InviteCode, LOCALES, type Invite } from '@open-artifact/core'
 import { Admission } from '../auth/admission.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
+import { messagesFor } from '../i18n/messages.ts'
 import type { ApiContext } from './api-context.ts'
 import { JsonBody } from './json-body.ts'
 
@@ -63,14 +64,17 @@ export class InviteApi {
   }
 
   // The invites already exist and each link can be copied from settings, so a mail failure is logged and never fails the request.
+  // Nobody knows the invitee's language yet, so the mail says it in every language, the inviter's first.
   async #mail(admin: Identity, invites: Invite[]): Promise<void> {
-    const workspaceName = admin.membership.workspace.name
+    const inviterLocale = await this.#context.locale()
+    const inviteWords = [inviterLocale, ...LOCALES.filter(locale => locale !== inviterLocale)].map(locale => messagesFor(locale).mail.invite)
+    const details = { inviter: admin.name, workspace: admin.membership.workspace.name, days: INVITE_LIFETIME_DAYS }
     const deliveries = await Promise.allSettled(
       invites.map(invite =>
         this.#context.mailer.send({
           to: InviteApi.#addressOf(invite),
-          subject: `${admin.name} 邀请你加入 ${workspaceName}`,
-          text: `${admin.name} 邀请你加入 Open Artifact 上的 ${workspaceName}。团队的 agent 在这里发布页面，大家一起查看和评论。\n\n点下面的链接，用这个邮箱登录就能加入，${INVITE_LIFETIME_DAYS} 天内有效：\n\n${this.#context.inviteUrl(invite.code)}`,
+          subject: inviteWords.map(words => words.subject(details)).join(' / '),
+          text: inviteWords.map(words => words.body({ ...details, url: this.#context.inviteUrl(invite.code) })).join('\n\n---\n\n'),
         }),
       ),
     )

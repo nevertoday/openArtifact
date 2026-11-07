@@ -1,4 +1,4 @@
-import { api } from '../common.js'
+import { api, m } from '../common.js'
 
 // A thread resolved a moment ago stays where it was for a while, so it does not vanish under the pointer.
 const LINGER_MS = 6000
@@ -39,7 +39,7 @@ export class Thread {
   /** What the comment points at, as the reader saw it: the selected words in quotes, or the start of the element. */
   get excerpt() {
     const anchor = this.root.anchor
-    if (anchor?.quote) return `「${Thread.#clip(anchor.quote.exact)}」`
+    if (anchor?.quote) return m.viewerClient.quoted(Thread.#clip(anchor.quote.exact))
     return anchor?.textQuote ? Thread.#clip(anchor.textQuote) : ''
   }
 
@@ -56,7 +56,7 @@ export class Thread {
     return this.root.author.userId === userId
   }
 
-  /** Whether the filter counts this thread: 待处理 and 给 agent count open threads, 全部 counts every thread. */
+  /** Whether the filter counts this thread: open and agent count open threads, all counts every thread. */
   isCountedIn(filter) {
     switch (filter) {
       case 'open':

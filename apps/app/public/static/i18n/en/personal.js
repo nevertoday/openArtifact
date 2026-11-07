@@ -1,0 +1,29 @@
+// @ts-check
+export default /** @satisfies {import('../messages').Messages['personal']} */ ({
+  description: ({ name, count }) => `${count} ${count === 1 ? 'document' : 'documents'} ${name} has made public on Open Artifact`,
+  colophon: product => ['Published with ', product],
+  ownerBar: {
+    text: 'This is your page, exactly as others see it. Turn on “List on my page” in a document\'s “Share” panel and it shows up here.',
+    back: 'Back to workspace',
+  },
+  shareText: name => `Writing by ${name}`,
+  entryCount: count => `${count} ${count === 1 ? 'document' : 'documents'}`,
+  sharePage: 'Share page',
+  bio: {
+    edit: 'Click to edit your bio',
+    add: 'Add a line about yourself',
+    placeholder: 'Add a line about yourself…',
+  },
+  pinnedLabel: 'Pinned',
+  read: 'Read',
+  version: version => `Version ${version}`,
+  year: year => `${year}`,
+  justUpdated: 'Just updated',
+  pin: 'Pin',
+  unpin: 'Unpin',
+  editSummary: 'Edit summary',
+  empty: {
+    owner: 'Nothing listed yet. Open a document, turn on its public link under “Share”, then turn on “List on my page”.',
+    visitor: 'Nothing public here yet.',
+  },
+})

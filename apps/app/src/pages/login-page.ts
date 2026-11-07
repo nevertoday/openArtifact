@@ -1,4 +1,4 @@
-import { Admission } from '../auth/admission.ts'
+import type { Messages } from '../i18n/messages.ts'
 import type { LoginProvider } from '../auth/open-artifact-auth.ts'
 import { html, type SafeHtml } from './html.ts'
 import { PageShell } from './page-shell.ts'
@@ -15,44 +15,45 @@ export interface LoginInvitation {
 
 export class LoginPage {
   /** `nextPath` is where to land after sign-in; only same-site paths are accepted. */
-  static render(providers: LoginProvider[], nextPath: string, invitation: LoginInvitation | null = null): Response {
+  static render(m: Messages, providers: LoginProvider[], nextPath: string, invitation: LoginInvitation | null = null): Response {
     const providerButtons = providers.map((provider, index) =>
-      html`<button type="button" class="xxd-btn" data-block ${index === 0 ? html`data-variant="primary"` : ''} data-provider-id="${provider.providerId}" data-provider-kind="${provider.kind}">用 ${provider.label} 登录</button>`)
+      html`<button type="button" class="xxd-btn" data-block ${index === 0 ? html`data-variant="primary"` : ''} data-provider-id="${provider.providerId}" data-provider-kind="${provider.kind}">${m.login.signInWith(provider.label ?? m.login.companySso)}</button>`)
     const body = html`<div class="login-page">
   <section class="login-story" data-theme="dark">
     ${PageShell.brandLink()}
     <div class="login-story__pitch">
-      <h1 class="xxd-text" data-variant="display">任何 agent 发布，<br>整个团队都能用。</h1>
-      <p class="xxd-text" data-variant="secondary">Claude Code、Codex、Cursor 等 agent 发布的页面都在这里。查看、评论，再让 agent 去改。</p>
+      <h1 class="xxd-text" data-variant="display">${m.login.story.headlineFirst}<br>${m.login.story.headlineSecond}</h1>
+      <p class="xxd-text" data-variant="secondary">${m.login.story.pitch}</p>
       <div class="xxd-cluster">${AGENTS_ON_STAGE.map(agent => html`<span class="xxd-badge">${PageShell.icon('Bot', 14)}${agent}</span>`)}</div>
     </div>
-    <footer class="xxd-text" data-variant="caption">页面和数据都存在团队自己的 Cloudflare 账号里。</footer>
+    <footer class="xxd-text" data-variant="caption">${m.login.story.storage}</footer>
   </section>
   <main class="login-panel" id="main" tabindex="-1">
+    <div class="login-panel__locale">${PageShell.localeSwitch(m)}</div>
     <div class="xxd-auth login-card" data-next-path="${nextPath}">
-      <h2 class="xxd-auth__name">登录</h2>
-      ${invitation ? LoginPage.#invitationBanner(invitation) : html`<p class="xxd-auth__line">输入邮箱，我们发一个登录链接，不用密码。</p>`}
-      ${nextPath !== '/' && !invitation ? html`<p class="xxd-auth__line">登录后会打开你刚才的页面。</p>` : ''}
-      <div class="xxd-banner" data-tone="success" id="magic-link-sent" role="status" hidden>${PageShell.icon('MailCheck')}<p class="xxd-banner__text">登录链接已发送到 <strong class="login-card__address" data-sent-to></strong>，5 分钟内有效。没收到的话，检查垃圾邮件，或者再发一次。</p></div>
+      <h2 class="xxd-auth__name">${m.login.heading}</h2>
+      ${invitation ? LoginPage.#invitationBanner(m, invitation) : html`<p class="xxd-auth__line">${m.login.intro}</p>`}
+      ${nextPath !== '/' && !invitation ? html`<p class="xxd-auth__line">${m.login.returnsToPage}</p>` : ''}
+      <div class="xxd-banner" data-tone="success" id="magic-link-sent" role="status" hidden>${PageShell.icon('MailCheck')}<p class="xxd-banner__text">${m.login.linkSent(html`<strong class="login-card__address" data-sent-to></strong>`)}</p></div>
       <div class="xxd-banner" data-tone="danger" id="login-error" role="alert" hidden>${PageShell.icon('TriangleAlert')}<p class="xxd-banner__text" data-error-text></p></div>
       <form id="magic-link-form" data-xxd-validate>
-        ${providers.length > 0 ? html`${providerButtons}<div class="xxd-auth__or">或者用邮箱</div>` : ''}
+        ${providers.length > 0 ? html`${providerButtons}<div class="xxd-auth__or">${m.login.orWithEmail}</div>` : ''}
         <div class="xxd-field">
-          <label class="xxd-label" for="login-email">邮箱</label>
-          <input id="login-email" class="xxd-input" name="email" type="email" autocomplete="email" required placeholder="name@example.com" data-error-required="输入邮箱" data-error-type="请输入有效的邮箱，比如 name@example.com" data-error-not-admitted="${Admission.REFUSAL}">
+          <label class="xxd-label" for="login-email">${m.login.emailLabel}</label>
+          <input id="login-email" class="xxd-input" name="email" type="email" autocomplete="email" required placeholder="name@example.com" data-error-required="${m.login.errorRequired}" data-error-type="${m.login.errorInvalid}" data-error-not-admitted="${m.login.errorNotAdmitted}">
         </div>
-        <button type="submit" class="xxd-btn" data-variant="primary" data-block>发送登录链接</button>
+        <button type="submit" class="xxd-btn" data-variant="primary" data-block>${m.login.sendLink}</button>
       </form>
     </div>
   </main>
 </div>`
-    return PageShell.render({ title: '登录 · Open Artifact', body, scripts: ['login.js'] })
+    return PageShell.render({ m, title: m.login.pageTitle, body, scripts: ['login.js'] })
   }
 
-  static #invitationBanner(invitation: LoginInvitation): SafeHtml {
-    const howToJoin = invitation.email === null ? '登录后就会加入。' : html`用 <strong>${invitation.email}</strong> 登录后就会加入。`
+  static #invitationBanner(m: Messages, invitation: LoginInvitation): SafeHtml {
+    const howToJoin = invitation.email === null ? m.login.invitation.joinAfterSignIn : html`${m.login.invitation.joinAs(html`<strong>${invitation.email}</strong>`)}`
     return html`<div class="xxd-banner" data-size="sm" role="status">${PageShell.icon('UserPlus')}<div>
-  <p class="xxd-banner__title">${invitation.inviterName} 邀请你加入 ${invitation.workspaceName}</p>
+  <p class="xxd-banner__title">${m.login.invitation.title({ inviter: invitation.inviterName, workspace: invitation.workspaceName })}</p>
   <p class="xxd-banner__text">${howToJoin}</p>
 </div></div>`
   }

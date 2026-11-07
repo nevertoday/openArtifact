@@ -6,20 +6,23 @@ import type { OpenArtifactAuth } from '../auth/open-artifact-auth.ts'
 import type { Identity, RequestIdentity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
 import { Notifier } from '../notifications/notifier.ts'
-import type { People } from '../people.ts'
+import { People } from '../people.ts'
 import { PersonalPages } from '../personal-pages.ts'
-import type { Repositories } from '@open-artifact/core'
+import type { Locale, Repositories } from '@open-artifact/core'
+import { messagesFor, type Messages } from '../i18n/messages.ts'
+import { resolveLocale, type LocaleSignals } from '../i18n/resolve-locale.ts'
 
 export interface ApiContextFields {
   repositories: Repositories
   gate: ArtifactGate
   requestIdentity: RequestIdentity
-  people: People
   mailer: Mailer
   auth: OpenArtifactAuth
   admission: Admission
   appOrigin: string
   artifactPages: ArtifactPageAddress
+  /** What the request says about language before anyone is identified; the account's choice is added later. */
+  localeSignals: Omit<LocaleSignals, 'account'>
 }
 
 /** What every API handler of one request shares. */
@@ -36,19 +39,34 @@ export class ApiContext {
   readonly appOrigin: string
   readonly artifactPages: ArtifactPageAddress
   readonly personalPages: PersonalPages
+  readonly #localeSignals: Omit<LocaleSignals, 'account'>
+  #locale: Promise<Locale> | null = null
 
   constructor(fields: ApiContextFields) {
     this.repositories = fields.repositories
     this.gate = fields.gate
     this.requestIdentity = fields.requestIdentity
-    this.people = fields.people
+    this.people = new People(fields.repositories.users, async () => (await this.messages()).server.deletedPerson)
     this.mailer = fields.mailer
-    this.notifier = new Notifier(fields.repositories, fields.mailer, artifactId => this.viewerUrl(artifactId))
+    this.notifier = new Notifier(fields.repositories, fields.mailer, artifactId => this.viewerUrl(artifactId), fields.localeSignals.fallback)
     this.auth = fields.auth
     this.admission = fields.admission
     this.appOrigin = fields.appOrigin
     this.artifactPages = fields.artifactPages
     this.personalPages = new PersonalPages(fields.repositories, fields.appOrigin)
+    this.#localeSignals = fields.localeSignals
+  }
+
+  /** The language this request is answered in. A request whose identity cannot be resolved still gets one. */
+  locale(): Promise<Locale> {
+    this.#locale ??= this.identity()
+      .catch(() => null)
+      .then(identity => resolveLocale({ account: identity?.locale ?? null, ...this.#localeSignals }))
+    return this.#locale
+  }
+
+  async messages(): Promise<Messages> {
+    return messagesFor(await this.locale())
   }
 
   identity(): Promise<Identity | null> {

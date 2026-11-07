@@ -1,8 +1,9 @@
-import { CommentThread, type ArtifactComment, type ArtifactSummary, type GrantRole, type NewNotification, type NotificationKind, type Repositories } from '@open-artifact/core'
+import { CommentThread, type ArtifactComment, type ArtifactSummary, type GrantRole, type Locale, type NewNotification, type NotificationKind, type Repositories } from '@open-artifact/core'
 import { dateText } from '../../public/static/time-text.js'
 import type { Mailer } from '../auth/mailer.ts'
 import type { Identity } from '../auth/request-identity.ts'
-import { NotificationText } from './notification-text.ts'
+import { messagesFor, type Messages } from '../i18n/messages.ts'
+import { NotificationLink } from './notification-link.ts'
 
 /** What happened on an artifact. The notifier decides who hears about it, and through which channel. */
 export type ArtifactEvent =
@@ -20,21 +21,23 @@ export type Actor = Pick<Identity, 'userId' | 'name' | 'agentClient'>
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const RECENT_NOTIFICATIONS_CHECKED = 50
-const ROLE_LABELS: Record<GrantRole, string> = { viewer: '可查看', commenter: '可评论', editor: '可编辑' }
 
 /**
  * Tells people what happened on artifacts they care about: always in the app, and by mail for comments.
  * The change it reports is already saved, so a failure here is logged and never fails the request.
+ * Mail goes out in each recipient's chosen language, else `fallbackLocale`; the app words its notifications when they are read.
  */
 export class Notifier {
   readonly #repositories: Repositories
   readonly #mailer: Mailer
   readonly #viewerUrl: (artifactId: string) => string
+  readonly #fallbackLocale: Locale
 
-  constructor(repositories: Repositories, mailer: Mailer, viewerUrl: (artifactId: string) => string) {
+  constructor(repositories: Repositories, mailer: Mailer, viewerUrl: (artifactId: string) => string, fallbackLocale: Locale) {
     this.#repositories = repositories
     this.#mailer = mailer
     this.#viewerUrl = viewerUrl
+    this.#fallbackLocale = fallbackLocale
   }
 
   async notify(actor: Actor, artifact: NotifiedArtifact, event: ArtifactEvent): Promise<void> {
@@ -107,13 +110,14 @@ export class Notifier {
 
   async #mail(actor: Actor, artifact: NotifiedArtifact, event: ArtifactEvent, newNotifications: NewNotification[]): Promise<void> {
     const recipients = await this.#repositories.users.profilesOf(newNotifications.map(newNotification => newNotification.recipientId))
-    const actorLabel = NotificationText.actorLabel(actor.name, actor.agentClient)
-    const link = NotificationText.link(this.#viewerUrl(artifact.artifactId), Notifier.#commentIdOf(event), event.kind === 'access_requested' ? actor.userId : null)
+    const link = NotificationLink.to(this.#viewerUrl(artifact.artifactId), Notifier.#commentIdOf(event), event.kind === 'access_requested' ? actor.userId : null)
     const mails = newNotifications.flatMap(newNotification => {
       const recipient = recipients.get(newNotification.recipientId)
-      const mailContent = Notifier.#mailContentOf(newNotification.kind, event, actorLabel, artifact.title)
-      if (!recipient || mailContent === null) return []
-      return [{ to: recipient.email, subject: mailContent.subject, text: `${mailContent.body}\n\n打开查看：${link}` }]
+      if (!recipient) return []
+      const m = messagesFor(recipient.locale ?? this.#fallbackLocale)
+      const mailContent = Notifier.#mailContentOf(m, newNotification.kind, event, actor, artifact.title)
+      if (mailContent === null) return []
+      return [{ to: recipient.email, subject: mailContent.subject, text: `${mailContent.body}\n\n${m.mail.notification.openLink(link)}` }]
     })
     const deliveries = await Promise.allSettled(mails.map(mail => this.#mailer.send(mail)))
     for (const failedDelivery of deliveries.filter(delivery => delivery.status === 'rejected')) {
@@ -122,47 +126,47 @@ export class Notifier {
   }
 
   /** Null for kinds that stay in the app. */
-  static #mailContentOf(kind: NotificationKind, event: ArtifactEvent, actorLabel: string, artifactTitle: string): { subject: string; body: string } | null {
+  static #mailContentOf(m: Messages, kind: NotificationKind, event: ArtifactEvent, actor: Actor, artifactTitle: string): { subject: string; body: string } | null {
+    const words = m.mail.notification
+    const actorLabel = m.notification.actorLabel({ name: actor.name, agentClient: actor.agentClient })
+    const sentence = m.notification.sentences[kind]({ actor: actorLabel, title: artifactTitle })
     switch (kind) {
       case 'comment_on_my_artifact':
       case 'reply_to_my_comment':
       case 'my_comment_resolved':
-        return Notifier.#commentMailOf(kind, event, actorLabel, artifactTitle)
+        return Notifier.#commentMailOf(words, kind, event, actorLabel, artifactTitle)
       case 'new_version':
         return null
       case 'shared_with_me': {
         if (event.kind !== 'artifact_shared') return null
-        const subject = NotificationText.sentence(kind, actorLabel, artifactTitle)
-        return { subject, body: `${subject}，你的权限是「${ROLE_LABELS[event.role]}」。` }
+        return { subject: sentence, body: words.sharedBody({ sentence, role: m.labels.grantRoles[event.role] }) }
       }
       case 'public_link_opened': {
         if (event.kind !== 'public_link_opened_by_agent') return null
         const daysLeft = Math.round((event.expiresAt - Date.now()) / DAY_MS)
-        const expiryDate = dateText(event.expiresAt)
-        const subject = `${NotificationText.sentence(kind, actorLabel, artifactTitle)}，${daysLeft} 天后过期`
-        return { subject, body: `${subject}（${expiryDate}）。拿到链接的人不用登录就能打开。要改有效期或取消公开，打开页面后点「分享」。` }
+        const subject = words.publicLinkSubject({ sentence, daysLeft })
+        return { subject, body: words.publicLinkBody({ subject, expiryDate: dateText(event.expiresAt) }) }
       }
       case 'access_requested': {
         if (event.kind !== 'access_requested') return null
-        const subject = NotificationText.sentence(kind, actorLabel, artifactTitle)
-        return { subject, body: `${subject}。TA 的邮箱是 ${event.requesterEmail}。打开页面后点「分享」，把这个邮箱加进来。` }
+        return { subject: sentence, body: words.accessRequestedBody({ subject: sentence, email: event.requesterEmail }) }
       }
     }
   }
 
   // Mail about a comment quotes it: the one just written, or the one just resolved.
-  static #commentMailOf(kind: NotificationKind, event: ArtifactEvent, actorLabel: string, artifactTitle: string): { subject: string; body: string } | null {
+  static #commentMailOf(words: Messages['mail']['notification'], kind: NotificationKind, event: ArtifactEvent, actorLabel: string, artifactTitle: string): { subject: string; body: string } | null {
     const quotedComment = Notifier.#quotedCommentOf(event)
     if (quotedComment === null) return null
-    const action = kind === 'comment_on_my_artifact' ? Notifier.#commentAction(quotedComment) : kind === 'reply_to_my_comment' ? '回复了评论' : '解决了你的评论'
-    const subject = `${actorLabel}在「${artifactTitle}」${action}`
+    const action = kind === 'comment_on_my_artifact' ? Notifier.#commentAction(quotedComment) : kind === 'reply_to_my_comment' ? 'reply' : 'resolved'
+    const subject = words.commentSubjects[action]({ actor: actorLabel, title: artifactTitle })
     return { subject, body: `${subject}\n\n${quotedComment.body}` }
   }
 
-  static #commentAction(comment: ArtifactComment): string {
-    if (comment.parentId !== null) return '回复了评论'
-    if (comment.forAgent) return '留了一条给 agent 的评论'
-    return '发表了评论'
+  static #commentAction(comment: ArtifactComment): keyof Messages['mail']['notification']['commentSubjects'] {
+    if (comment.parentId !== null) return 'reply'
+    if (comment.forAgent) return 'forAgent'
+    return 'comment'
   }
 
   /** Mail quotes the comment it is about: the one just written, or the one just resolved. */

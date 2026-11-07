@@ -67,10 +67,17 @@ pnpm run check   # storage boundary, type checks, all tests (Workers runtime, lo
 | `APP_ORIGIN` | usercontent, mcp | Public address of the app |
 | `GITHUB_CLIENT_ID` / `_SECRET`, `GOOGLE_CLIENT_ID` / `_SECRET` | app | Optional sign-in providers |
 | `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_DISPLAY_NAME` | app | Optional company SSO |
+| `DEFAULT_LOCALE` | app | Interface language when neither the person nor their browser picks one: `zh-CN` (default) or `en` |
 
 Bindings besides variables: the app needs `DB` (D1), `FILES` (R2) and `UNLOCK_RATE_LIMITER` (rate limit for public-link passwords), `SIGN_IN_EMAIL_RATE_LIMITER` and `SIGN_IN_ADDRESS_RATE_LIMITER` (sign-in links per address and per sender), plus the `EMAIL` `send_email` binding (Cloudflare Email Service) when `MAILER=cloudflare`; usercontent needs the `ARTIFACT_FILES` service binding to the app; MCP needs the `APP` service binding.
 
 The usercontent Worker must run on a different site from the app (another domain, not only another port in production), so artifact pages can never read the app's cookies.
+
+## Languages
+
+The interface speaks Chinese and English. A person's choice in the language switch wins and follows their account to every browser and into their mail; otherwise the browser's `Accept-Language` decides, then `DEFAULT_LOCALE`. Artifacts, comments and names are shown as written.
+
+The words live in `apps/app/public/static/i18n`, one file per area and language, shared by the Worker and the page scripts. `zh-CN` is the reference: `pnpm typecheck` fails when another language misses a key, adds one or takes different parameters. `pnpm check` also fails on Chinese written anywhere outside the dictionaries (`scripts/check-no-hardcoded-cjk.mjs`). To add a language, add it to `LOCALES` in `packages/core/src/locale.ts`, copy `en.js` and the `en/` folder under its code, translate, and register it in `apps/app/src/i18n/messages.ts` and the SDK dictionary in `apps/usercontent/src/i18n`.
 
 ## Deploy
 

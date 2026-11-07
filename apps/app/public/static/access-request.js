@@ -1,4 +1,4 @@
-import { api, userMessageOf } from './common.js'
+import { api, m, userMessageOf } from './common.js'
 
 // The no-access page: one click asks the author to share; the button then says it was sent and stays off.
 const accessRequest = document.querySelector('[data-access-request]')
@@ -9,8 +9,8 @@ requestButton.addEventListener('click', async () => {
   requestButton.disabled = true
   try {
     await Xxd.runBusy(requestButton, () => api(`/api/artifacts/${encodeURIComponent(accessRequest.dataset.accessRequest)}/access-requests`, { method: 'POST' }))
-    requestButton.textContent = '已请作者分享'
-    requestStatus.textContent = `已通知 ${accessRequest.dataset.authorName}。TA 分享给你后，你会收到通知。`
+    requestButton.textContent = m.client.accessRequest.requested
+    requestStatus.textContent = m.client.accessRequest.notified(accessRequest.dataset.authorName)
   } catch (error) {
     requestButton.disabled = false
     requestStatus.textContent = userMessageOf(error)

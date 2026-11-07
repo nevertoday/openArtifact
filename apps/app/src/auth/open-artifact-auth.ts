@@ -1,9 +1,11 @@
-import type { Repositories } from '@open-artifact/core'
+import { parseLocale, type Locale, type Repositories } from '@open-artifact/core'
 import { betterAuth } from 'better-auth'
 import { APIError } from 'better-auth/api'
 import { genericOAuth, magicLink } from 'better-auth/plugins'
 import type { AppEnv } from '../env.ts'
 import { HttpCookies } from '../http-cookies.ts'
+import { messagesFor, type Messages } from '../i18n/messages.ts'
+import { fallbackLocaleOf, requestLocaleSignals, resolveLocale } from '../i18n/resolve-locale.ts'
 import { Admission, INVITE_COOKIE } from './admission.ts'
 import type { Mailer } from './mailer.ts'
 
@@ -11,11 +13,13 @@ export interface SignedInUser {
   userId: string
   name: string
   email: string
+  locale: Locale | null
 }
 
 export interface LoginProvider {
   providerId: string
-  label: string
+  /** null for company SSO without a configured name; the login page words it in the reader's language. */
+  label: string | null
   /** Generic OIDC providers sign in through a different Better Auth endpoint than built-in social ones. */
   kind: 'social' | 'oidc'
 }
@@ -30,7 +34,7 @@ interface AuthEndpointContext {
 interface BetterAuthInstance {
   handler(request: Request): Promise<Response>
   api: {
-    getSession(context: { headers: Headers }): Promise<{ user: { id: string; name: string; email: string } } | null>
+    getSession(context: { headers: Headers }): Promise<{ user: { id: string; name: string; email: string; locale?: string | null | undefined } } | null>
     updateUser(context: { headers: Headers; body: { name: string } }): Promise<unknown>
   }
 }
@@ -45,9 +49,11 @@ export class OpenArtifactAuth {
   readonly #admission: Admission
   readonly #repositories: Repositories
   readonly #mailer: Mailer
+  readonly #fallbackLocale: Locale
 
   constructor(env: AppEnv, appOrigin: string, mailer: Mailer, repositories: Repositories, admission: Admission) {
     this.#loginProviders = OpenArtifactAuth.#configuredProviders(env)
+    this.#fallbackLocale = fallbackLocaleOf(env)
     this.#admission = admission
     this.#repositories = repositories
     this.#mailer = mailer
@@ -57,6 +63,8 @@ export class OpenArtifactAuth {
       baseURL: appOrigin,
       basePath: '/api/auth',
       session: { expiresIn: SESSION_DAYS * 24 * 60 * 60 },
+      // Read with the session so every page knows the person's language without another query; set only through /locale.
+      user: { additionalFields: { locale: { type: 'string', required: false, input: false } } },
       socialProviders: OpenArtifactAuth.#socialProviders(env),
       plugins: [
         magicLink({ sendMagicLink: ({ email, url }, endpointContext) => this.#sendSignInLink(email, url, endpointContext) }),
@@ -71,7 +79,9 @@ export class OpenArtifactAuth {
             },
             // Every person belongs to a workspace from their first sign-in on, so the first to sign up becomes its admin.
             after: async (createdUser, endpointContext) => {
-              await this.#admission.join({ userId: createdUser.id, email: createdUser.email }, OpenArtifactAuth.#inviteCodeIn(endpointContext))
+              const headers = OpenArtifactAuth.#headersOf(endpointContext)
+              const firstWorkspaceName = this.requestMessages(headers, null).server.firstWorkspaceName
+              await this.#admission.join({ userId: createdUser.id, email: createdUser.email }, OpenArtifactAuth.#inviteCodeIn(endpointContext), firstWorkspaceName)
             },
           },
         },
@@ -82,10 +92,16 @@ export class OpenArtifactAuth {
 
   // A link is mailed only to a person who has an account or may create one, so a refused address hears why at once.
   async #sendSignInLink(email: string, url: string, endpointContext: AuthEndpointContext | null | undefined): Promise<void> {
-    const hasAccount = (await this.#repositories.users.findByEmail(email)) !== null
-    const mayCreateAccount = hasAccount || (await this.#admission.mayCreateAccount(email, OpenArtifactAuth.#inviteCodeIn(endpointContext)))
+    const account = await this.#repositories.users.findByEmail(email)
+    const mayCreateAccount = account !== null || (await this.#admission.mayCreateAccount(email, OpenArtifactAuth.#inviteCodeIn(endpointContext)))
     if (!mayCreateAccount) throw OpenArtifactAuth.#refusal()
-    await this.#mailer.send({ to: email, subject: '登录 Open Artifact', text: `点下面的链接登录 Open Artifact，链接 5 分钟内有效：\n\n${url}\n\n如果不是你本人操作，忽略这封邮件即可。` })
+    const m = this.requestMessages(OpenArtifactAuth.#headersOf(endpointContext), account?.locale ?? null)
+    await this.#mailer.send({ to: email, subject: m.mail.signIn.subject, text: m.mail.signIn.body(url) })
+  }
+
+  /** The language of a request that may come before anyone is signed in: `account` is the person's choice, if known. */
+  requestMessages(headers: Headers | null, account: Locale | null): Messages {
+    return messagesFor(resolveLocale({ account, ...requestLocaleSignals(headers), fallback: this.#fallbackLocale }))
   }
 
   get loginProviders(): LoginProvider[] {
@@ -99,7 +115,7 @@ export class OpenArtifactAuth {
   async signedInUser(request: Request): Promise<SignedInUser | null> {
     const session = await this.#auth.api.getSession({ headers: request.headers })
     if (!session) return null
-    return { userId: session.user.id, name: session.user.name, email: session.user.email }
+    return { userId: session.user.id, name: session.user.name, email: session.user.email, locale: parseLocale(session.user.locale) }
   }
 
   async rename(request: Request, name: string): Promise<void> {
@@ -111,8 +127,12 @@ export class OpenArtifactAuth {
   }
 
   static #inviteCodeIn(endpointContext: AuthEndpointContext | null | undefined): string | null {
-    const headers = endpointContext?.request?.headers ?? endpointContext?.headers
+    const headers = OpenArtifactAuth.#headersOf(endpointContext)
     return headers ? HttpCookies.read({ headers }, INVITE_COOKIE) : null
+  }
+
+  static #headersOf(endpointContext: AuthEndpointContext | null | undefined): Headers | null {
+    return endpointContext?.request?.headers ?? endpointContext?.headers ?? null
   }
 
   static #socialProviders(env: AppEnv) {
@@ -142,7 +162,7 @@ export class OpenArtifactAuth {
 
   static #configuredProviders(env: AppEnv): LoginProvider[] {
     const providers: LoginProvider[] = []
-    if (OpenArtifactAuth.#companySsoConfigured(env)) providers.push({ providerId: OIDC_PROVIDER_ID, label: env.OIDC_DISPLAY_NAME ?? '公司 SSO', kind: 'oidc' })
+    if (OpenArtifactAuth.#companySsoConfigured(env)) providers.push({ providerId: OIDC_PROVIDER_ID, label: env.OIDC_DISPLAY_NAME ?? null, kind: 'oidc' })
     if (OpenArtifactAuth.#githubConfigured(env)) providers.push({ providerId: 'github', label: 'GitHub', kind: 'social' })
     if (OpenArtifactAuth.#googleConfigured(env)) providers.push({ providerId: 'google', label: 'Google', kind: 'social' })
     return providers

@@ -1,7 +1,7 @@
-import { api, confirmArtifactRemoval, element, initialOf, readJsonData, removalWord, removeArtifact, restoreArtifact, dateText, timeElement, userMessageOf } from './common.js'
+import { api, confirmArtifactRemoval, element, initialOf, m, readJsonData, removalText, removeArtifact, restoreArtifact, dateText, timeElement, userMessageOf } from './common.js'
 
 const settingsConfig = readJsonData('settings-config')
-const TOKEN_SCOPE_LABELS = { publish: '仅发布', full: '完全权限' }
+const tokenText = m.client.settings.tokens
 
 function secondaryText(text) {
   return element('span', { className: 'xxd-text', 'data-variant': 'secondary' }, text)
@@ -11,19 +11,19 @@ const POLL_INTERVAL_MS = 5000
 const JUST_CREATED_HIGHLIGHT_MS = 2500
 
 function tokenStateOf(accessToken) {
-  if (accessToken.revokedAt) return { label: '已撤销', tone: undefined, isActive: false }
-  if (accessToken.expiresAt && accessToken.expiresAt <= Date.now()) return { label: '已过期', tone: 'warning', isActive: false }
-  return { label: '有效', tone: 'success', isActive: true }
+  if (accessToken.revokedAt) return { label: tokenText.states.revoked, tone: undefined, isActive: false }
+  if (accessToken.expiresAt && accessToken.expiresAt <= Date.now()) return { label: tokenText.states.expired, tone: 'warning', isActive: false }
+  return { label: tokenText.states.active, tone: 'success', isActive: true }
 }
 
 // One entry per column, so a new column is one line here; the label also heads the cell on a phone.
 const TOKEN_COLUMNS = [
-  { label: '名字', cell: accessToken => accessToken.name },
-  { label: '权限', cell: accessToken => secondaryText(TOKEN_SCOPE_LABELS[accessToken.scope]) },
-  { label: '最近使用', cell: accessToken => secondaryText(accessToken.lastUsedAt ? timeElement(accessToken.lastUsedAt) : '还没用过') },
-  { label: '到期', cell: accessToken => secondaryText(accessToken.expiresAt ? dateText(accessToken.expiresAt) : '永不过期') },
+  { label: tokenText.columns.name, cell: accessToken => accessToken.name },
+  { label: tokenText.columns.scope, cell: accessToken => secondaryText(tokenText.scopes[accessToken.scope]) },
+  { label: tokenText.columns.lastUsed, cell: accessToken => secondaryText(accessToken.lastUsedAt ? timeElement(accessToken.lastUsedAt) : tokenText.neverUsed) },
+  { label: tokenText.columns.expires, cell: accessToken => secondaryText(accessToken.expiresAt ? dateText(accessToken.expiresAt) : tokenText.neverExpires) },
   {
-    label: '状态',
+    label: tokenText.columns.state,
     cell: accessToken => {
       const state = tokenStateOf(accessToken)
       return element('span', { className: 'xxd-badge', 'data-appearance': 'dot', 'data-tone': state.tone, 'data-token-state': accessToken.tokenId, tabindex: '-1' }, state.label)
@@ -45,16 +45,16 @@ class TokenTable {
 
   render(accessTokens, { justCreatedTokenId = null, showInactive = false } = {}) {
     if (accessTokens.length === 0) {
-      this.container.replaceChildren(secondaryText('还没有 token。'))
+      this.container.replaceChildren(secondaryText(tokenText.none))
       return
     }
     const activeTokens = accessTokens.filter(accessToken => tokenStateOf(accessToken).isActive)
     const inactiveTokens = accessTokens.filter(accessToken => !tokenStateOf(accessToken).isActive)
     const inactiveFold = element('details', { className: 'xxd-collapse token-fold', open: showInactive },
-      element('summary', {}, `显示已失效的 token（${inactiveTokens.length}）`), this.#table(inactiveTokens, null))
+      element('summary', {}, tokenText.showInactive(inactiveTokens.length)), this.#table(inactiveTokens, null))
     // replaceChildren writes a null child out as the text "null", so the fold is left out rather than passed as null.
     this.container.replaceChildren(
-      activeTokens.length > 0 ? this.#table(activeTokens, justCreatedTokenId) : secondaryText('没有有效的 token。'),
+      activeTokens.length > 0 ? this.#table(activeTokens, justCreatedTokenId) : secondaryText(tokenText.noneActive),
       ...(inactiveTokens.length > 0 ? [inactiveFold] : []),
     )
   }
@@ -66,7 +66,7 @@ class TokenTable {
   }
 
   #table(accessTokens, justCreatedTokenId) {
-    const actionsHeader = element('th', { className: 'xxd-table__actions' }, element('span', { className: 'xxd-sr-only' }, '操作'))
+    const actionsHeader = element('th', { className: 'xxd-table__actions' }, element('span', { className: 'xxd-sr-only' }, tokenText.actions))
     return element('div', { className: 'xxd-table-wrap' }, element('table', { className: 'xxd-table token-table' },
       element('thead', {}, element('tr', {}, TOKEN_COLUMNS.map(column => element('th', {}, column.label)), actionsHeader)),
       element('tbody', {}, accessTokens.map(accessToken => this.#row(accessToken, accessToken.tokenId === justCreatedTokenId))),
@@ -76,8 +76,8 @@ class TokenTable {
   #row(accessToken, justCreated) {
     const isActive = tokenStateOf(accessToken).isActive
     const action = isActive
-      ? element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'xs', onClick: () => this.#revoke(accessToken) }, '撤销')
-      : element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'ghost', 'data-size': 'xs', 'aria-label': `删除「${accessToken.name}」`, onClick: event => this.#delete(accessToken, event.currentTarget) }, '删除')
+      ? element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'xs', onClick: () => this.#revoke(accessToken) }, tokenText.revoke)
+      : element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'ghost', 'data-size': 'xs', 'aria-label': tokenText.deleteLabel(accessToken.name), onClick: event => this.#delete(accessToken, event.currentTarget) }, tokenText.delete)
     return element('tr', { 'data-just-created': justCreated },
       TOKEN_COLUMNS.map(column => element('td', { 'data-label': column.label }, column.cell(accessToken))),
       element('td', { className: 'xxd-table__actions' }, action),
@@ -86,22 +86,22 @@ class TokenTable {
 
   async #revoke(accessToken) {
     const confirmed = await Xxd.confirmDialog({
-      title: `撤销「${accessToken.name}」？`,
-      message: '用这个 token 的 agent 会立即失去访问权限。撤销后不能恢复，只能新建一个。',
-      confirmLabel: '撤销',
-      cancelLabel: '取消',
-      closeLabel: '关闭',
+      title: tokenText.revokeTitle(accessToken.name),
+      message: tokenText.revokeMessage,
+      confirmLabel: tokenText.revoke,
+      cancelLabel: m.client.dialog.cancel,
+      closeLabel: m.client.dialog.close,
       tone: 'danger',
     })
     if (!confirmed) return
     try {
       await api(`/api/tokens/${encodeURIComponent(accessToken.tokenId)}`, { method: 'DELETE' })
-      Xxd.toast(`已撤销「${accessToken.name}」`, { tone: 'success' })
+      Xxd.toast(tokenText.revoked(accessToken.name), { tone: 'success' })
       this.#onRevoked(accessToken.tokenId)
       await this.refresh({ showInactive: true })
       this.container.querySelector(`[data-token-state="${CSS.escape(accessToken.tokenId)}"]`)?.focus()
     } catch (error) {
-      Xxd.toast(`撤销失败：${userMessageOf(error)}`, { tone: 'danger' })
+      Xxd.toast(tokenText.revokeFailed(userMessageOf(error)), { tone: 'danger' })
     }
   }
 
@@ -109,11 +109,11 @@ class TokenTable {
   async #delete(accessToken, deleteButton) {
     try {
       await Xxd.runBusy(deleteButton, () => api(`/api/tokens/${encodeURIComponent(accessToken.tokenId)}`, { method: 'DELETE' }))
-      Xxd.toast(`已删除「${accessToken.name}」`, { tone: 'success' })
+      Xxd.toast(tokenText.deleted(accessToken.name), { tone: 'success' })
       await this.refresh({ showInactive: true })
       this.container.focus()
     } catch (error) {
-      Xxd.toast(`删除失败：${userMessageOf(error)}`, { tone: 'danger' })
+      Xxd.toast(tokenText.deleteFailed(userMessageOf(error)), { tone: 'danger' })
     }
   }
 }
@@ -145,7 +145,7 @@ class AgentConnection {
     this.#setupStep.querySelector('[data-token-name]').textContent = createdToken.name
     this.#setupStep.hidden = false
     this.#checkStep.hidden = false
-    this.#showStatus(AgentConnection.#waiting('等 agent 连上…'))
+    this.#showStatus(AgentConnection.#waiting(m.client.settings.connection.waiting))
     this.#stopWatching()
     this.#pollTimer = setInterval(() => this.#checkWhileVisible(), POLL_INTERVAL_MS)
     this.#setupStep.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -190,7 +190,7 @@ class AgentConnection {
     const stillWatched = watchedToken === this.#createdToken
     if (!stillWatched) return
     if (!firstPage) {
-      this.#showStatus(AgentConnection.#waiting('agent 已经连上了，等它发布测试页…'))
+      this.#showStatus(AgentConnection.#waiting(m.client.settings.connection.waitingForPage))
       return
     }
     this.#stopWatching()
@@ -207,8 +207,8 @@ class AgentConnection {
 
   static #connected(firstPage) {
     return element('div', { className: 'xxd-banner', 'data-tone': 'success' },
-      element('div', {}, element('p', { className: 'xxd-banner__title' }, `连上了：${firstPage.publishedVia} 刚刚发布了「${firstPage.title}」`)),
-      element('div', { className: 'xxd-banner__actions' }, element('a', { className: 'xxd-btn', 'data-size': 'sm', href: `/a/${encodeURIComponent(firstPage.artifactId)}` }, '打开')),
+      element('div', {}, element('p', { className: 'xxd-banner__title' }, m.client.settings.connection.connected({ agent: firstPage.publishedVia, title: firstPage.title }))),
+      element('div', { className: 'xxd-banner__actions' }, element('a', { className: 'xxd-btn', 'data-size': 'sm', href: `/a/${encodeURIComponent(firstPage.artifactId)}` }, m.client.settings.connection.open)),
     )
   }
 }
@@ -240,20 +240,20 @@ function wireAgentConnection() {
       agentConnection.show(createdToken)
       await tokenTable.refresh({ justCreatedTokenId: createdToken.tokenId })
     } catch (error) {
-      Xxd.toast(`新建失败：${userMessageOf(error)}`, { tone: 'danger' })
+      Xxd.toast(tokenText.createFailed(userMessageOf(error)), { tone: 'danger' })
     } finally {
       createButton.disabled = false
     }
   })
 }
 
-/** Shows a failed save under the field it concerns, in Chinese. */
+/** Shows a failed save under the field it concerns, in the page language. */
 function showFieldError(input, error) {
   Xxd.setFieldError(input, userMessageOf(error))
   input.focus()
 }
 
-// 保存 stays off until the name differs from the saved one; after saving, the top bar shows the new name at once.
+// Save stays off until the name differs from the saved one; after saving, the top bar shows the new name at once.
 function wireProfileForm() {
   const profileForm = document.getElementById('profile-form')
   if (!profileForm) return
@@ -271,7 +271,7 @@ function wireProfileForm() {
       await Xxd.runBusy(saveButton, () => api('/api/me', { method: 'PATCH', body: { name } }))
       savedName = name
       showAccountName(name)
-      Xxd.toast('已保存', { tone: 'success' })
+      Xxd.toast(m.client.settings.profile.saved, { tone: 'success' })
     } catch (error) {
       saveButton.disabled = false
       showFieldError(nameInput, error)
@@ -282,7 +282,7 @@ function wireProfileForm() {
 function showAccountName(name) {
   for (const accountName of document.querySelectorAll('[data-account-name]')) accountName.textContent = name
   for (const accountInitial of document.querySelectorAll('[data-account-initial]')) accountInitial.textContent = initialOf(name)
-  document.querySelector('[data-account-button]')?.setAttribute('aria-label', `账户菜单：${name}`)
+  document.querySelector('[data-account-button]')?.setAttribute('aria-label', m.shell.accountMenu(name))
 }
 
 function wireThemeChoice() {
@@ -316,11 +316,11 @@ function wireWorkspaceNameForm() {
 function confirmPublicLinksOff(publicLinkCount) {
   if (publicLinkCount === 0) return Promise.resolve(true)
   return Xxd.confirmDialog({
-    title: '关闭公开链接？',
-    message: `关闭后，${publicLinkCount} 个公开链接立即失效。`,
-    confirmLabel: '关闭公开链接',
-    cancelLabel: '取消',
-    closeLabel: '关闭',
+    title: m.client.settings.publicLinks.offTitle,
+    message: m.client.settings.publicLinks.offMessage(publicLinkCount),
+    confirmLabel: m.client.settings.publicLinks.offConfirm,
+    cancelLabel: m.client.dialog.cancel,
+    closeLabel: m.client.dialog.close,
     tone: 'danger',
   })
 }
@@ -336,7 +336,7 @@ function wirePublicLinksSwitch() {
     }
     try {
       await api('/api/workspace', { method: 'PATCH', body: { publicLinksEnabled: publicLinksSwitch.checked } })
-      Xxd.toast(publicLinksSwitch.checked ? '已允许公开链接' : '已关闭公开链接', { tone: 'success' })
+      Xxd.toast(publicLinksSwitch.checked ? m.client.settings.publicLinks.allowed : m.client.settings.publicLinks.turnedOff, { tone: 'success' })
     } catch (error) {
       publicLinksSwitch.checked = !publicLinksSwitch.checked
       Xxd.toast(userMessageOf(error), { tone: 'danger' })
@@ -352,10 +352,10 @@ function wireMemberAdministration() {
       try {
         await api(`/api/workspace/members/${encodeURIComponent(roleSelect.dataset.memberRole)}`, { method: 'PATCH', body: { role: roleSelect.value } })
         savedRole = roleSelect.value
-        Xxd.toast(`已把 ${memberName} 设为${roleSelect.selectedOptions[0].textContent}`, { tone: 'success' })
+        Xxd.toast(m.client.settings.members.roleChanged({ name: memberName, role: roleSelect.selectedOptions[0].textContent }), { tone: 'success' })
       } catch (error) {
         roleSelect.value = savedRole
-        Xxd.toast(`修改角色失败：${userMessageOf(error)}`, { tone: 'danger' })
+        Xxd.toast(m.client.settings.members.roleChangeFailed(userMessageOf(error)), { tone: 'danger' })
       }
     })
   }
@@ -367,20 +367,20 @@ function wireMemberAdministration() {
 async function removeMember(removeButton) {
   const memberName = removeButton.dataset.name
   const confirmed = await Xxd.confirmDialog({
-    title: `移除 ${memberName}？`,
-    message: 'TA 会立即失去访问权限，个人 API token 也会被撤销，再次登录也不会自动加入，除非你用邮箱重新邀请 TA。TA 发布的 artifact 会留在 workspace 里。',
-    confirmLabel: '移除',
-    cancelLabel: '取消',
-    closeLabel: '关闭',
+    title: m.client.settings.members.removeTitle(memberName),
+    message: m.client.settings.members.removeMessage,
+    confirmLabel: m.client.settings.members.remove,
+    cancelLabel: m.client.dialog.cancel,
+    closeLabel: m.client.dialog.close,
     tone: 'danger',
   })
   if (!confirmed) return
   try {
     await api(`/api/workspace/members/${encodeURIComponent(removeButton.dataset.removeMember)}`, { method: 'DELETE' })
     removeButton.closest('tr')?.remove()
-    Xxd.toast(`已移除 ${memberName}`, { tone: 'success' })
+    Xxd.toast(m.client.settings.members.removed(memberName), { tone: 'success' })
   } catch (error) {
-    Xxd.toast(`移除失败：${userMessageOf(error)}`, { tone: 'danger' })
+    Xxd.toast(m.client.settings.members.removeFailed(userMessageOf(error)), { tone: 'danger' })
   }
 }
 
@@ -399,26 +399,26 @@ class PendingInvites {
 
   render(invites) {
     if (invites.length === 0) {
-      this.container.replaceChildren(secondaryText('没有待接受的邀请。'))
+      this.container.replaceChildren(secondaryText(m.client.settings.invites.none))
       return
     }
     this.container.replaceChildren(
-      element('h3', { className: 'xxd-text', 'data-variant': 'body' }, `待接受的邀请（${invites.length}）`),
+      element('h3', { className: 'xxd-text', 'data-variant': 'body' }, m.client.settings.invites.heading(invites.length)),
       element('ul', { className: 'xxd-list' }, invites.map(invite => this.#item(invite))),
     )
   }
 
   #item(invite) {
-    const subject = invite.email ?? '邀请链接 · 任何人可用'
+    const subject = invite.email ?? m.client.settings.invites.anyoneLink
     const expiry = dateText(invite.expiresAt)
     return element('li', { className: 'xxd-list__item' },
       element('span', { className: 'xxd-list__main' },
         element('span', { className: 'xxd-list__title' }, subject),
-        element('span', { className: 'xxd-list__meta' }, `${invite.invitedBy.name} 邀请 · ${expiry} 到期`),
+        element('span', { className: 'xxd-list__meta' }, m.client.settings.invites.meta({ inviter: invite.invitedBy.name, expiry })),
       ),
       element('span', { className: 'xxd-cluster invite-actions' },
-        element('button', { type: 'button', className: 'xxd-btn', 'data-size': 'xs', 'data-copy': invite.url, 'data-copy-done': '已复制邀请链接' }, '复制链接'),
-        element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'xs', onClick: () => this.#revoke(invite, subject) }, '撤销'),
+        element('button', { type: 'button', className: 'xxd-btn', 'data-size': 'xs', 'data-copy': invite.url, 'data-copy-done': m.client.settings.invites.copyDone }, m.client.settings.invites.copy),
+        element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'xs', onClick: () => this.#revoke(invite, subject) }, m.client.settings.invites.revoke),
       ),
     )
   }
@@ -426,10 +426,10 @@ class PendingInvites {
   async #revoke(invite, subject) {
     try {
       await api(`/api/workspace/invites/${encodeURIComponent(invite.inviteId)}`, { method: 'DELETE' })
-      Xxd.toast(`已撤销「${subject}」`, { tone: 'success' })
+      Xxd.toast(m.client.settings.invites.revoked(subject), { tone: 'success' })
       await this.refresh()
     } catch (error) {
-      Xxd.toast(`撤销失败：${userMessageOf(error)}`, { tone: 'danger' })
+      Xxd.toast(m.client.settings.invites.revokeFailed(userMessageOf(error)), { tone: 'danger' })
     }
   }
 }
@@ -442,17 +442,17 @@ function wireInvites() {
   const pendingContainer = document.getElementById('pending-invites')
   if (!pendingContainer) return
   const pendingInvites = new PendingInvites(pendingContainer)
-  pendingInvites.refresh().catch(error => Xxd.toast(`读取邀请失败：${userMessageOf(error)}`, { tone: 'danger' }))
+  pendingInvites.refresh().catch(error => Xxd.toast(m.client.settings.invites.loadFailed(userMessageOf(error)), { tone: 'danger' }))
 
   const linkButton = document.getElementById('create-invite-link')
   linkButton.addEventListener('click', async () => {
     linkButton.disabled = true
     try {
       await Xxd.runBusy(linkButton, () => api('/api/workspace/invites/link', { method: 'POST' }))
-      Xxd.toast('已生成邀请链接。点「复制链接」发给同事。', { tone: 'success' })
+      Xxd.toast(m.client.settings.invites.linkCreated, { tone: 'success' })
       await pendingInvites.refresh()
     } catch (error) {
-      Xxd.toast(`生成失败：${userMessageOf(error)}`, { tone: 'danger' })
+      Xxd.toast(m.client.settings.invites.linkFailed(userMessageOf(error)), { tone: 'danger' })
     } finally {
       linkButton.disabled = false
     }
@@ -464,15 +464,15 @@ function wireInvites() {
     event.preventDefault()
     const emails = emailsIn(emailsInput.value)
     const malformedEmail = emails.find(email => !EMAIL_SHAPE.test(email))
-    if (emails.length === 0) return Xxd.setFieldError(emailsInput, '填一个或多个邮箱')
-    if (malformedEmail) return Xxd.setFieldError(emailsInput, `「${malformedEmail}」不是邮箱地址`)
+    if (emails.length === 0) return Xxd.setFieldError(emailsInput, m.client.settings.invites.emailsRequired)
+    if (malformedEmail) return Xxd.setFieldError(emailsInput, m.client.settings.invites.notAnEmail(malformedEmail))
     Xxd.setFieldError(emailsInput, '')
     const sendButton = event.submitter
     sendButton.disabled = true
     try {
       const { invites, alreadyMembers } = await Xxd.runBusy(sendButton, () => api('/api/workspace/invites/email', { method: 'POST', body: { emails } }))
       emailForm.reset()
-      Xxd.toast(invitationSummary(invites.length, alreadyMembers), { tone: 'success' })
+      Xxd.toast(m.client.settings.invites.sent({ invitedCount: invites.length, alreadyMembers }), { tone: 'success' })
       await pendingInvites.refresh()
     } catch (error) {
       Xxd.setFieldError(emailsInput, userMessageOf(error))
@@ -480,12 +480,6 @@ function wireInvites() {
       sendButton.disabled = false
     }
   })
-}
-
-function invitationSummary(invitedCount, alreadyMembers) {
-  const invited = invitedCount > 0 ? `已邀请 ${invitedCount} 人。` : ''
-  const skipped = alreadyMembers.length > 0 ? `${alreadyMembers.join('、')} 已经是成员。` : ''
-  return invited + skipped
 }
 
 // The table and the audit log below it both change, so the page reloads after each action.
@@ -499,7 +493,7 @@ function wireContentAdministration() {
         await removeArtifact(removeButton.dataset.removeArtifact)
         location.reload()
       } catch (error) {
-        Xxd.toast(`${removalWord(takesDown)}失败：${userMessageOf(error)}`, { tone: 'danger' })
+        Xxd.toast(removalText(takesDown).failed(userMessageOf(error)), { tone: 'danger' })
       }
     })
   }
@@ -509,7 +503,7 @@ function wireContentAdministration() {
         await restoreArtifact(restoreButton.dataset.restoreArtifact)
         location.reload()
       } catch (error) {
-        Xxd.toast(`恢复失败：${userMessageOf(error)}`, { tone: 'danger' })
+        Xxd.toast(m.client.restore.failed(userMessageOf(error)), { tone: 'danger' })
       }
     })
   }

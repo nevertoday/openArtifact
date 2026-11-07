@@ -1,3 +1,4 @@
+import type { Locale } from './locale.ts'
 export const WORKSPACE_ROLES = ['admin', 'member'] as const
 export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number]
 
@@ -23,6 +24,8 @@ export interface UserProfile {
   name: string
   email: string
   image: string | null
+  /** The interface language the person chose; null until they choose one. */
+  locale: Locale | null
 }
 
 export interface WorkspaceMember extends UserProfile {
@@ -53,4 +56,5 @@ export interface UserDirectory {
   hasAnyUser(): Promise<boolean>
   profilesOf(userIds: string[]): Promise<Map<string, UserProfile>>
   findByEmail(email: string): Promise<UserProfile | null>
+  setLocale(userId: string, locale: Locale): Promise<void>
 }

@@ -1,10 +1,11 @@
 export type GuideFormat = 'agents-md' | 'claude-skill' | 'cursor-rule' | 'llms-txt'
 
-export interface GuideFile {
-  format: GuideFormat
-  label: string
-  /** Where the person saves it; shown next to the copy button. */
-  savePath: string
+/** The formats the settings page offers to copy; llms.txt is served at its own address instead. */
+export const GUIDE_PACK_FORMATS = ['agents-md', 'claude-skill', 'cursor-rule'] as const satisfies readonly GuideFormat[]
+export type GuidePackFormat = (typeof GUIDE_PACK_FORMATS)[number]
+
+export interface GuideFile<Format extends GuideFormat = GuideFormat> {
+  format: Format
   content: string
 }
 
@@ -23,20 +24,24 @@ export class AgentGuide {
     this.#mcpUrl = mcpUrl
   }
 
-  files(): GuideFile[] {
-    return (['agents-md', 'claude-skill', 'cursor-rule'] as const).map(format => this.file(format))
+  files(): GuideFile<GuidePackFormat>[] {
+    return GUIDE_PACK_FORMATS.map(format => ({ format, content: this.#content(format) }))
   }
 
   file(format: GuideFormat): GuideFile {
+    return { format, content: this.#content(format) }
+  }
+
+  #content(format: GuideFormat): string {
     switch (format) {
       case 'agents-md':
-        return { format, label: 'AGENTS.md 片段', savePath: '追加到仓库根目录的 AGENTS.md', content: `## Open Artifact\n\n${this.#body()}` }
+        return `## Open Artifact\n\n${this.#body()}`
       case 'claude-skill':
-        return { format, label: 'Claude Skill', savePath: '~/.claude/skills/open-artifact/SKILL.md', content: `---\nname: open-artifact\ndescription: ${SKILL_DESCRIPTION}\n---\n\n# Open Artifact\n\n${this.#body()}` }
+        return `---\nname: open-artifact\ndescription: ${SKILL_DESCRIPTION}\n---\n\n# Open Artifact\n\n${this.#body()}`
       case 'cursor-rule':
-        return { format, label: 'Cursor rules', savePath: '.cursor/rules/open-artifact.mdc', content: `---\ndescription: ${SKILL_DESCRIPTION}\nalwaysApply: false\n---\n\n# Open Artifact\n\n${this.#body()}` }
+        return `---\ndescription: ${SKILL_DESCRIPTION}\nalwaysApply: false\n---\n\n# Open Artifact\n\n${this.#body()}`
       case 'llms-txt':
-        return { format, label: 'llms.txt', savePath: `${this.#appOrigin}/llms.txt`, content: `# Open Artifact\n\n> ${SKILL_DESCRIPTION}\n\n${this.#body()}` }
+        return `# Open Artifact\n\n> ${SKILL_DESCRIPTION}\n\n${this.#body()}`
     }
   }
 
@@ -61,7 +66,7 @@ export class AgentGuide {
 
 ### Update, never overwrite blindly
 1. \`read\` the artifact; note its \`version\`.
-2. \`update\` with \`baseVersion\` set to that version, and a \`note\`: what you changed, in one sentence of at most 200 characters (\`"按评论把第 3 节的连线补上"\`). People read notes in the version list, so pass one on every update, above all when the change answers a comment.
+2. \`update\` with \`baseVersion\` set to that version, and a \`note\`: what you changed, in one sentence of at most 200 characters (\`"Linked up section 3 as the comment asked"\`). People read notes in the version list, so pass one on every update, above all when the change answers a comment.
 3. On a conflict (HTTP 409), someone published in between: merge your change into \`latestFiles\` from the response and update again with \`baseVersion = currentVersion\`.
 4. Pass \`force: true\` only when the person explicitly asks to overwrite.
 5. To rename, pass \`title\` with the update. Leave it out to keep the current title.
@@ -70,7 +75,7 @@ export class AgentGuide {
 - Choose \`visibility\` when you publish: \`private\`, \`specified\` (only the people the author adds), \`workspace\` (the default), or \`public_link\`.
 - A public link opens for anyone without signing in. Visitors see the current page only: no comments, versions or shared-data overview, unless the author turns comments on.
 - When you set \`public_link\` without \`publicLinkExpiresAt\`, the link expires in 7 days and your person gets a mail saying so. Pass \`publicLinkExpiresAt\` (milliseconds, or \`null\` for never) only when the person told you how long it should stay open.
-- Changing sharing after publishing needs a \`full\` token. Usually leave it to the person: the 分享 button on the artifact's page.
+- Changing sharing after publishing needs a \`full\` token. Usually leave it to the person: the Share (分享) button on the artifact's page.
 
 ### Personal page
 - Each person has a public page at \`/@name\` listing the artifacts they chose to show strangers; search engines may index it.
@@ -78,11 +83,11 @@ export class AgentGuide {
 - Pass \`summary\` (at most 300 characters) to say what the page is about; otherwise its \`<meta name="description">\` or first paragraph is shown, so give pages a description.
 
 ### Removing
-- Remove an artifact only when the person asks. MCP has no tool for it: use the HTTP API below, or ask the person to choose 删除 on the artifact's page. It disappears for everyone at once and can be restored for 30 days; then it is deleted for good.
+- Remove an artifact only when the person asks. MCP has no tool for it: use the HTTP API below, or ask the person to choose Delete (删除) on the artifact's page. It disappears for everyone at once and can be restored for 30 days; then it is deleted for good.
 - Removing and restoring need a \`full\` token. You may remove and restore only what your person may: their own artifacts, or any artifact when they are a workspace admin. If an admin took it down, only an admin can restore it.
 
 ### Comments addressed to you
-People mark comments 给 agent when they want an agent to act. When you start a session, or the person asks you to check:
+People turn on For agent (给 agent) on a comment when they want an agent to act. When you start a session, or the person asks you to check:
 1. \`list_my_comments\` returns the unresolved comments addressed to an agent on every artifact you can edit, oldest first. Each names the artifact, its current \`version\`, the comment's \`anchor\` and any replies.
 2. \`read\` the artifact and find the spot: \`anchor.selector\` is a CSS path to the element the person clicked and \`anchor.textQuote\` the start of its text, both as of \`anchor.version\`. When the person selected words, \`anchor.quote.exact\` holds them, with \`prefix\` and \`suffix\` from the text around them. Older comments only have \`x\` and \`y\`, fractions of the page's width and height.
 3. Make the change and publish it with \`update\`, with a \`note\` that says which comment it answers.
@@ -113,7 +118,7 @@ Collection names and ids: letters, digits, \`-\`, \`_\`; at most 64 characters. 
 - \`PATCH ${api}/comments/{commentId}\` \`{ resolved: true }\` resolves without a reply; \`false\` reopens.
 - \`GET ${api}/artifacts/{id}/data\`: the page's shared data collections, each \`{ collection, documentCount }\`.
 - \`GET ${api}/artifacts/{id}/data/{collection}\`: its documents, each \`{ id, data, createdBy, updatedBy, createdAt, updatedAt }\`. Read these to answer questions about sign-ups, votes or other data people entered.
-- Errors answer \`{ error, code }\`: \`error\` says in English what to do, \`code\` is stable (\`token_revoked\`, \`token_expired\`, \`token_invalid\`, \`outside_token_scope\`, \`version_conflict\`, \`not_found\`, \`field_required\`…); a field error also names its \`field\`. On \`token_revoked\` or \`token_expired\`, ask the person for a new token from 设置 › Agent 接入.
+- Errors answer \`{ error, code }\`: \`error\` says in English what to do, \`code\` is stable (\`token_revoked\`, \`token_expired\`, \`token_invalid\`, \`outside_token_scope\`, \`version_conflict\`, \`not_found\`, \`field_required\`…); a field error also names its \`field\`. On \`token_revoked\` or \`token_expired\`, ask the person for a new token from Settings › Agent access (设置 › Agent 接入).
 `
   }
 }

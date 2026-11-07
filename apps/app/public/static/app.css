@@ -15,6 +15,8 @@
 .app-brand { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; color: var(--ink); font-weight: var(--weight-strong); text-decoration: none; }
 .app-topbar__end { display: inline-flex; align-items: center; gap: var(--space-2); margin-inline-start: auto; }
 .app-topbar__context { white-space: nowrap; }
+.app-locale-switch { display: contents; }
+.xxd-btn-group.app-locale-switch { display: inline-flex; }
 .app-search { flex: 0 1 360px; min-width: 0; }
 .app-account-head { padding-block: var(--space-1); }
 .app-bell { position: relative; }
@@ -163,6 +165,8 @@
 .login-story .xxd-badge { gap: var(--space-1); }
 /* The card hangs from a fixed top, so a banner appearing above the form never makes it jump. */
 .login-panel { flex: 1 1 420px; min-width: 0; display: grid; justify-items: center; align-content: start; padding: clamp(var(--space-8), 22vh, 240px) var(--space-4) var(--space-6); background: var(--paper-raised); }
+.login-panel { position: relative; }
+.login-panel__locale { position: absolute; inset-block-start: var(--space-4); inset-inline-end: var(--space-4); }
 .login-card { max-width: 380px; padding-block: 0; }
 .login-card .xxd-banner { justify-self: stretch; text-align: left; }
 .login-card__address { white-space: nowrap; }

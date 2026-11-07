@@ -29,4 +29,6 @@ export interface AppEnv {
   OIDC_CLIENT_ID?: string
   OIDC_CLIENT_SECRET?: string
   OIDC_DISPLAY_NAME?: string
+  /** The interface language when neither the person nor their browser picks one: "zh-CN" (the default) or "en". */
+  DEFAULT_LOCALE?: string
 }

@@ -2,7 +2,6 @@ import type { Invite, JoinResult, Membership, Repositories } from '@open-artifac
 
 /** Set when someone opens an invite link, so sign-up and the first visit after sign-in can use it. */
 export const INVITE_COOKIE = 'oa_invite'
-const FIRST_WORKSPACE_NAME = '我的团队'
 
 /** A signed-in person, as far as joining a workspace goes. */
 export interface Joiner {
@@ -26,8 +25,8 @@ export type InviteAcceptance = JoinResult | { status: 'other_address'; invitedEm
  * | Anyone else                                    | no                    |                                              |
  */
 export class Admission {
-  /** Shown under the email field; it never names the allowed domains or the setting behind them. */
-  static readonly REFUSAL = '这个邮箱不能登录 Open Artifact。请用公司邮箱，或请管理员邀请你。'
+  /** The API's answer; it never names the allowed domains or the setting behind them. The login page words its own. */
+  static readonly REFUSAL = "This email can't sign in to Open Artifact. Use your work email, or ask an admin to invite you."
   static readonly REFUSAL_CODE = 'EMAIL_NOT_ADMITTED'
   /** In ALLOWED_EMAIL_DOMAINS, opens sign-up to every address. */
   static readonly ANY_DOMAIN = '*'
@@ -53,10 +52,13 @@ export class Admission {
     return !(await this.#repositories.users.hasAnyUser())
   }
 
-  /** For a person who belongs to no workspace yet; null when an admin removed them and no invite brings them back. */
-  async join(joiner: Joiner, inviteCode: string | null): Promise<Membership | null> {
+  /**
+   * For a person who belongs to no workspace yet; null when an admin removed them and no invite brings them back.
+   * `firstWorkspaceName` names the first workspace if this join creates it.
+   */
+  async join(joiner: Joiner, inviteCode: string | null, firstWorkspaceName: string): Promise<Membership | null> {
     const invite = await this.#inviteFor(joiner.email, inviteCode)
-    if (invite === null) return this.#repositories.workspaces.joinFirstWorkspace(joiner.userId, FIRST_WORKSPACE_NAME)
+    if (invite === null) return this.#repositories.workspaces.joinFirstWorkspace(joiner.userId, firstWorkspaceName)
     const joinResult = await this.#joinThrough(invite, joiner)
     return joinResult.status === 'removed' ? null : joinResult.membership
   }

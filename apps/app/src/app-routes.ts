@@ -10,9 +10,9 @@ import { OpenArtifactAuth } from './auth/open-artifact-auth.ts'
 import { RequestIdentity } from './auth/request-identity.ts'
 import type { AppEnv } from './env.ts'
 import { HttpError, RemovedFromWorkspaceError } from './http-error.ts'
+import { fallbackLocaleOf, requestLocaleSignals } from './i18n/resolve-locale.ts'
 import { MessagePages } from './pages/message-pages.ts'
 import { PageRoutes } from './pages/page-routes.ts'
-import { People } from './people.ts'
 import type { Repositories } from '@open-artifact/core'
 
 const VIEWER = new URLPattern({ pathname: '/a/:artifactId' })
@@ -53,7 +53,7 @@ export class AppRoutes {
     try {
       return await this.#page(request, requestUrl, context)
     } catch (error) {
-      if (error instanceof RemovedFromWorkspaceError) return MessagePages.removedFromWorkspace()
+      if (error instanceof RemovedFromWorkspaceError) return MessagePages.removedFromWorkspace(await context.messages())
       throw error
     }
   }
@@ -68,7 +68,8 @@ export class AppRoutes {
     if (unlockMatch && request.method === 'POST') return pageRoutes.unlock(request, decodeURIComponent(unlockMatch.pathname.groups.artifactId ?? ''))
     // The unlock address only takes the form; opened directly it leads to the artifact, which asks again.
     if (unlockMatch) return new Response(null, { status: 303, headers: { Location: `/a/${unlockMatch.pathname.groups.artifactId ?? ''}` } })
-    if (request.method !== 'GET' && request.method !== 'HEAD') return MessagePages.unknownAddress(405)
+    if (requestUrl.pathname === '/locale' && request.method === 'POST') return pageRoutes.chooseLocale(request)
+    if (request.method !== 'GET' && request.method !== 'HEAD') return MessagePages.unknownAddress(await context.messages(), 405)
     if (requestUrl.pathname === '/') return pageRoutes.home(request)
     if (requestUrl.pathname === '/login') return pageRoutes.login(request)
     if (requestUrl.pathname === '/llms.txt') return pageRoutes.llmsTxt()
@@ -82,7 +83,7 @@ export class AppRoutes {
     if (personalPageMatch) return pageRoutes.personalPage(request, decodeURIComponent(personalPageMatch.pathname.groups.handle ?? ''))
     const settingsMatch = SETTINGS.exec(requestUrl)
     if (settingsMatch) return pageRoutes.settings(request, settingsMatch.pathname.groups.section)
-    return MessagePages.unknownAddress(404)
+    return MessagePages.unknownAddress(await context.messages(), 404)
   }
 
   #contextFor(request: Request, appOrigin: string): ApiContext {
@@ -93,12 +94,12 @@ export class AppRoutes {
       repositories,
       gate: new ArtifactGate(repositories, this.#signingKey, Date.now()),
       requestIdentity: new RequestIdentity(auth, repositories, admission, request),
-      people: new People(repositories.users),
       mailer,
       auth,
       admission,
       appOrigin,
       artifactPages: this.#artifactPages,
+      localeSignals: { ...requestLocaleSignals(request.headers), fallback: fallbackLocaleOf(env) },
     })
   }
 

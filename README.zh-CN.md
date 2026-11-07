@@ -67,10 +67,17 @@ pnpm run check   # 存储边界检查、类型检查、全部测试（Workers �
 | `APP_ORIGIN` | usercontent、mcp | app 的公网地址 |
 | `GITHUB_CLIENT_ID` / `_SECRET`、`GOOGLE_CLIENT_ID` / `_SECRET` | app | 可选的登录方式 |
 | `OIDC_DISCOVERY_URL`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`、`OIDC_DISPLAY_NAME` | app | 可选的公司单点登录 |
+| `DEFAULT_LOCALE` | app | 用户和浏览器都没指定语言时的界面语言：`zh-CN`（默认）或 `en` |
 
 除了变量，还需要这些绑定：app 需要 `DB`（D1）、`FILES`（R2）、`UNLOCK_RATE_LIMITER`（公开链接密码的频率限制）、`SIGN_IN_EMAIL_RATE_LIMITER` 和 `SIGN_IN_ADDRESS_RATE_LIMITER`（每个收件地址、每个发起方请求登录链接的频率限制），`MAILER=cloudflare` 时还需要 `EMAIL`（`send_email`，Cloudflare Email Service）；usercontent 需要指向 app 的 `ARTIFACT_FILES` 服务绑定；MCP 需要指向 app 的 `APP` 服务绑定。
 
 usercontent Worker 必须和 app 放在不同的站点上（生产环境要用另一个域名，只换端口不够），这样 artifact 页面永远读不到 app 的 cookie。
+
+## 语言
+
+界面支持中文和英文。用户在语言切换里的选择优先，并且跟着账户走，换浏览器、收邮件都一样；没选过时按浏览器的 `Accept-Language`，再按 `DEFAULT_LOCALE`。artifact、评论和人名按原样显示。
+
+文案在 `apps/app/public/static/i18n`，每个区域、每种语言一个文件，Worker 和页面脚本共用。`zh-CN` 是基准：其他语言少 key、多 key 或参数不一致时 `pnpm typecheck` 会失败。词典之外的代码里写了中文，`pnpm check` 也会失败（`scripts/check-no-hardcoded-cjk.mjs`）。新增一种语言：在 `packages/core/src/locale.ts` 的 `LOCALES` 里加上它，按它的代码复制 `en.js` 和 `en/` 目录并翻译，再在 `apps/app/src/i18n/messages.ts` 和 `apps/usercontent/src/i18n` 的 SDK 词典里登记。
 
 ## 部署
 

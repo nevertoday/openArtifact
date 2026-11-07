@@ -1,6 +1,6 @@
 import { CommentThread, type ArtifactComment, type CommentAnchor, type CommentQuote } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
-import { NotificationText } from '../notifications/notification-text.ts'
+import { NotificationLink } from '../notifications/notification-link.ts'
 import { HttpError } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { JsonBody } from './json-body.ts'
@@ -171,7 +171,7 @@ export class CommentApi {
       artifactId: root.artifactId,
       title: openedArtifact.summary.title,
       version: openedArtifact.summary.version,
-      url: NotificationText.link(this.#context.viewerUrl(root.artifactId), root.commentId),
+      url: NotificationLink.to(this.#context.viewerUrl(root.artifactId), root.commentId),
       anchor: root.anchor,
       body: root.body,
       author: { userId: root.authorId, name: names.get(root.authorId) },
