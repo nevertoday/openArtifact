@@ -37,6 +37,10 @@ const SUMMARY = {
   type: 'string',
   description: 'Optional: one or two sentences, at most 300 characters, saying what the page is about, shown on the personal page and in link previews. Left out, the page\'s own description or first paragraph is used.',
 }
+const SLUG = {
+  type: 'string',
+  description: '3–6 English words describing the page, e.g. quarterly-sales-review; shown in the link people share. Always pass one, above all when the title is not in English.',
+}
 const ARTIFACT_ID = { type: 'string', description: 'The artifactId returned by publish or list.' }
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
@@ -63,6 +67,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           default: false,
           description: 'Only when the person asks to put it on their personal page (/@name), where strangers and search engines find it. Needs visibility public_link and a full-access token; the link then does not expire.',
         },
+        slug: SLUG,
         summary: SUMMARY,
         note: NOTE,
       },
@@ -80,6 +85,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         files: FILES_SCHEMA,
         note: NOTE,
         title: { type: 'string', description: 'Optional new name, at most 200 characters. Leave it out to keep the current one.' },
+        slug: { ...SLUG, description: 'Optional new words for the link, e.g. quarterly-sales-review. Leave it out to keep the current ones; links sent earlier keep working either way.' },
         summary: SUMMARY,
         force: { type: 'boolean', default: false },
       },
@@ -158,14 +164,14 @@ export class AgentTools {
   }
 
   async #publish(toolArguments: Record<string, unknown>): Promise<ToolResult> {
-    const { title, files, visibility, note, publicLinkExpiresAt, listed, summary } = toolArguments
-    const published = await this.#appClient.call('POST', '/api/artifacts', { title, files, visibility, note, publicLinkExpiresAt, listed, summary })
+    const { title, slug, files, visibility, note, publicLinkExpiresAt, listed, summary } = toolArguments
+    const published = await this.#appClient.call('POST', '/api/artifacts', { title, slug, files, visibility, note, publicLinkExpiresAt, listed, summary })
     return AgentTools.#result(published, 'Published. Share the url with the person:')
   }
 
   async #update(toolArguments: Record<string, unknown>): Promise<ToolResult> {
-    const { artifactId, baseVersion, files, note, title, summary, force } = toolArguments
-    const updated = await this.#appClient.call('PUT', `/api/artifacts/${AgentTools.#segment(artifactId)}`, { baseVersion, files, note, title, summary, force })
+    const { artifactId, baseVersion, files, note, title, slug, summary, force } = toolArguments
+    const updated = await this.#appClient.call('PUT', `/api/artifacts/${AgentTools.#segment(artifactId)}`, { baseVersion, files, note, title, slug, summary, force })
     if (updated.status === 409) return AgentTools.#text(`Conflict: someone published in between. Merge your change into latestFiles and call update again with baseVersion = currentVersion.\n\n${JSON.stringify(updated.body, null, 2)}`)
     return AgentTools.#result(updated, 'Published a new version:')
   }
