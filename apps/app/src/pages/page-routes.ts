@@ -37,7 +37,7 @@ export class PageRoutes {
   async login(request: Request): Promise<Response> {
     const nextPath = PageRoutes.#safeNextPath(new URL(request.url).searchParams.get('next'), this.#context.appOrigin)
     if (await this.#context.identity()) return Response.redirect(new URL(nextPath, this.#context.appOrigin).toString(), 302)
-    return LoginPage.render(this.#context.auth.loginProviders, nextPath, new URL(this.#context.appOrigin).host)
+    return LoginPage.render(this.#context.auth.loginProviders, nextPath)
   }
 
   /**
@@ -66,7 +66,7 @@ export class PageRoutes {
     if (!workspace) throw new Error(`Invite ${invite.inviteId} names workspace ${invite.workspaceId}, which does not exist`)
     const invitation = { inviterName: inviterNames.get(invite.invitedBy) ?? '', workspaceName: workspace.name, email: invite.email }
     const invitePath = new URL(request.url).pathname
-    const loginPage = LoginPage.render(this.#context.auth.loginProviders, invitePath, new URL(this.#context.appOrigin).host, invitation)
+    const loginPage = LoginPage.render(this.#context.auth.loginProviders, invitePath, invitation)
     const secondsLeft = Math.ceil((invite.expiresAt - Date.now()) / 1000)
     loginPage.headers.append('Set-Cookie', HttpCookies.serialize(INVITE_COOKIE, invite.code, { maxAgeSeconds: secondsLeft }, this.#isSecure(request)))
     return loginPage

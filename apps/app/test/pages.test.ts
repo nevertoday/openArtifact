@@ -27,6 +27,15 @@ describe('login page', () => {
     expect(loginMarkup).not.toContain('data-provider-id')
   })
 
+  it('says sign-in will lead back to the page the person came from, only when there is one', async () => {
+    const fromSharedLink = await pageText('/login?next=/a/some-artifact')
+    const plain = await pageText('/login')
+
+    expect(fromSharedLink).toContain('登录后会打开你刚才的页面。')
+    expect(plain).not.toContain('登录后会打开你刚才的页面。')
+    expect(plain).toContain('输入工作邮箱，我们发一个登录链接，不用密码。')
+  })
+
   it.each(['//evil.example/steal', '/\t/evil.example', '/\\evil.example', 'https://evil.example/'])('never redirects off the site after sign-in (next=%s)', async nextPath => {
     const loginMarkup = await pageText(`/login?next=${encodeURIComponent(nextPath)}`)
     const signedInRedirect = await app.request(`/login?next=${encodeURIComponent(nextPath)}`, { cookie: authorCookie })
