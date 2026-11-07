@@ -23,7 +23,7 @@ async function englishPage(path: string, cookie: string): Promise<string> {
 
 // Allowed: the switch names 中文 in Chinese, agent-facing guide text glosses labels as `Label (标签)`, the audit log
 // quotes the workspace's stored first name, and ArtifactLabels' wording is migrated by another area.
-const ALLOWED = ['我的团队', '私有', '指定的人', 'workspace 内可见', '公开链接', '管理员', '成员', '删除']
+const ALLOWED = ['我的团队']
 const chineseLines = (markup: string) =>
   markup
     .replace(/lang="zh-CN">(<i [^>]*><\/i>)?中文/g, '')
