@@ -13,6 +13,7 @@ const SIGN_IN_ERRORS = {
   [EMAIL_NOT_ADMITTED]: emailInput.dataset.errorNotAdmitted,
   EXPIRED_TOKEN: '登录链接已过期，请重新发送。',
   INVALID_TOKEN: '登录链接无效或已用过，请重新发送。',
+  rate_limited: '登录链接发得太频繁了，请等一分钟再试。',
 }
 const UNKNOWN_SIGN_IN_ERROR = '登录没有成功，请重新发送登录链接。'
 

@@ -322,3 +322,33 @@ describe('tokens and workspaces', () => {
     expect(withToken.status).toBe(404)
   })
 })
+
+describe('asking for sign-in links', () => {
+  const limitedApp = new TestApp({ allowedEmailDomains: 'example.com', productionSignInLimits: true })
+  const askForLink = (email: string, senderAddress?: string) => {
+    const headers = new Headers({ 'Content-Type': 'application/json', Origin: 'http://app.test' })
+    if (senderAddress) headers.set('CF-Connecting-IP', senderAddress)
+    return limitedApp.routes.respond(new Request('http://app.test/api/auth/sign-in/magic-link', { method: 'POST', headers, body: JSON.stringify({ email, callbackURL: '/' }) }))
+  }
+
+  it('mails one address at most three links a minute, whatever letter case is used', async () => {
+    const answers = await Promise.all(['Flood@example.com', 'flood@example.com', 'FLOOD@example.com'].map(email => askForLink(email)))
+    const fourth = await askForLink('flood@example.com')
+    const someoneElse = await askForLink('calm@example.com')
+
+    expect(answers.map(answer => answer.status)).toEqual([200, 200, 200])
+    expect(fourth.status).toBe(429)
+    expect(fourth.headers.get('Retry-After')).toBe('60')
+    expect(await fourth.json()).toMatchObject({ code: 'rate_limited' })
+    expect(someoneElse.status).toBe(200)
+  })
+
+  it('stops one sender from asking for links to many addresses', async () => {
+    const statuses: number[] = []
+    for (let index = 0; index < 21; index++) statuses.push((await askForLink(`sender-${index}@example.com`, '203.0.113.7')).status)
+
+    expect(statuses.slice(0, 20).every(status => status === 200)).toBe(true)
+    expect(statuses[20]).toBe(429)
+    expect((await askForLink('other-network@example.com', '198.51.100.1')).status).toBe(200)
+  })
+})

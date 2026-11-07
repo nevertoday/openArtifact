@@ -2,6 +2,10 @@ export interface AppEnv {
   DB: D1Database
   FILES: R2Bucket
   UNLOCK_RATE_LIMITER: RateLimit
+  /** Sign-in links mailed to one address. */
+  SIGN_IN_EMAIL_RATE_LIMITER: RateLimit
+  /** Sign-in links asked for from one network address. */
+  SIGN_IN_ADDRESS_RATE_LIMITER: RateLimit
   USERCONTENT_ORIGIN: string
   /** Where the MCP Worker runs; the settings page shows agents this address. */
   MCP_ORIGIN: string

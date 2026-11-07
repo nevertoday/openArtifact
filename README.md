@@ -68,7 +68,7 @@ pnpm run check   # storage boundary, type checks, all tests (Workers runtime, lo
 | `GITHUB_CLIENT_ID` / `_SECRET`, `GOOGLE_CLIENT_ID` / `_SECRET` | app | Optional sign-in providers |
 | `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_DISPLAY_NAME` | app | Optional company SSO |
 
-Bindings besides variables: the app needs `DB` (D1), `FILES` (R2) and `UNLOCK_RATE_LIMITER` (rate limit for public-link passwords), plus the `EMAIL` `send_email` binding (Cloudflare Email Service) when `MAILER=cloudflare`; usercontent needs the `ARTIFACT_FILES` service binding to the app; MCP needs the `APP` service binding.
+Bindings besides variables: the app needs `DB` (D1), `FILES` (R2) and `UNLOCK_RATE_LIMITER` (rate limit for public-link passwords), `SIGN_IN_EMAIL_RATE_LIMITER` and `SIGN_IN_ADDRESS_RATE_LIMITER` (sign-in links per address and per sender), plus the `EMAIL` `send_email` binding (Cloudflare Email Service) when `MAILER=cloudflare`; usercontent needs the `ARTIFACT_FILES` service binding to the app; MCP needs the `APP` service binding.
 
 The usercontent Worker must run on a different site from the app (another domain, not only another port in production), so artifact pages can never read the app's cookies.
 

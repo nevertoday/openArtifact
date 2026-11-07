@@ -4,6 +4,7 @@ import { ArtifactPageAddress } from './access/artifact-page-address.ts'
 import { ApiContext } from './api/api-context.ts'
 import { ApiRoutes } from './api/api-routes.ts'
 import { Admission } from './auth/admission.ts'
+import { SignInLimits } from './auth/sign-in-limits.ts'
 import type { Mailer } from './auth/mailer.ts'
 import { OpenArtifactAuth } from './auth/open-artifact-auth.ts'
 import { RequestIdentity } from './auth/request-identity.ts'
@@ -33,18 +34,20 @@ export class AppRoutes {
   readonly #dependencies: AppDependencies
   readonly #signingKey: SigningKey
   readonly #artifactPages: ArtifactPageAddress
+  readonly #signInLimits: SignInLimits
 
   constructor(dependencies: AppDependencies) {
     this.#dependencies = dependencies
     this.#signingKey = new SigningKey(dependencies.env.USERCONTENT_SIGNING_KEY)
     this.#artifactPages = new ArtifactPageAddress(dependencies.env.USERCONTENT_ORIGIN, new UsercontentSignature(this.#signingKey))
+    this.#signInLimits = new SignInLimits({ byEmail: dependencies.env.SIGN_IN_EMAIL_RATE_LIMITER, byAddress: dependencies.env.SIGN_IN_ADDRESS_RATE_LIMITER })
   }
 
   async respond(request: Request): Promise<Response> {
     const requestUrl = new URL(request.url)
     if (requestUrl.pathname === '/health') return Response.json({ service: 'open-artifact-app', status: 'ok' })
     const context = this.#contextFor(request, requestUrl.origin)
-    if (requestUrl.pathname.startsWith('/api/auth/')) return context.auth.handle(request)
+    if (requestUrl.pathname.startsWith('/api/auth/')) return (await this.#signInLimits.refusalFor(request)) ?? context.auth.handle(request)
     if (this.#isCrossSiteWrite(request, context)) return new HttpError(403, 'cross_site_request', 'send this request from the Open Artifact page').toResponse()
     if (requestUrl.pathname.startsWith('/api/')) return ApiRoutes.respond(request, context)
     try {

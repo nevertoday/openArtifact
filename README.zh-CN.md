@@ -68,7 +68,7 @@ pnpm run check   # 存储边界检查、类型检查、全部测试（Workers �
 | `GITHUB_CLIENT_ID` / `_SECRET`、`GOOGLE_CLIENT_ID` / `_SECRET` | app | 可选的登录方式 |
 | `OIDC_DISCOVERY_URL`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`、`OIDC_DISPLAY_NAME` | app | 可选的公司单点登录 |
 
-除了变量，还需要这些绑定：app 需要 `DB`（D1）、`FILES`（R2）、`UNLOCK_RATE_LIMITER`（公开链接密码的频率限制），`MAILER=cloudflare` 时还需要 `EMAIL`（`send_email`，Cloudflare Email Service）；usercontent 需要指向 app 的 `ARTIFACT_FILES` 服务绑定；MCP 需要指向 app 的 `APP` 服务绑定。
+除了变量，还需要这些绑定：app 需要 `DB`（D1）、`FILES`（R2）、`UNLOCK_RATE_LIMITER`（公开链接密码的频率限制）、`SIGN_IN_EMAIL_RATE_LIMITER` 和 `SIGN_IN_ADDRESS_RATE_LIMITER`（每个收件地址、每个发起方请求登录链接的频率限制），`MAILER=cloudflare` 时还需要 `EMAIL`（`send_email`，Cloudflare Email Service）；usercontent 需要指向 app 的 `ARTIFACT_FILES` 服务绑定；MCP 需要指向 app 的 `APP` 服务绑定。
 
 usercontent Worker 必须和 app 放在不同的站点上（生产环境要用另一个域名，只换端口不够），这样 artifact 页面永远读不到 app 的 cookie。
 

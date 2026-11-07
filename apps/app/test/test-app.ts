@@ -48,11 +48,17 @@ export class TestApp {
   readonly repositories = cloudflareRepositories(env.DB, env.FILES)
   readonly routes: AppRoutes
 
-  constructor(options: { allowedEmailDomains?: string } = { allowedEmailDomains: 'example.com' }) {
+  /**
+   * Tests sign the same people in many times a minute, so sign-in links are limited loosely unless
+   * `productionSignInLimits` asks for the limits the app is deployed with.
+   */
+  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean } = { allowedEmailDomains: 'example.com' }) {
     const appEnv: AppEnv = {
       DB: env.DB,
       FILES: env.FILES,
       UNLOCK_RATE_LIMITER: env.UNLOCK_RATE_LIMITER,
+      SIGN_IN_EMAIL_RATE_LIMITER: options.productionSignInLimits ? env.SIGN_IN_EMAIL_RATE_LIMITER : env.LOOSE_SIGN_IN_RATE_LIMITER,
+      SIGN_IN_ADDRESS_RATE_LIMITER: options.productionSignInLimits ? env.SIGN_IN_ADDRESS_RATE_LIMITER : env.LOOSE_SIGN_IN_RATE_LIMITER,
       ...(options.allowedEmailDomains === undefined ? {} : { ALLOWED_EMAIL_DOMAINS: options.allowedEmailDomains }),
       USERCONTENT_ORIGIN,
       MCP_ORIGIN: 'http://mcp.test',
