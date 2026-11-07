@@ -7,12 +7,9 @@ import { INVITE_LIFETIME_DAYS } from '../api/invite-api.ts'
 import { People } from '../people.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
 import { html, SafeHtml } from './html.ts'
-import { type IconName, PageShell } from './page-shell.ts'
+import { PageShell } from './page-shell.ts'
+import { SETTINGS_SECTION_ICONS, SETTINGS_SECTION_LABELS, type SettingsSection } from './settings-sections.ts'
 
-export const SETTINGS_SECTIONS = ['agents', 'profile', 'members', 'workspace'] as const
-export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
-
-const SECTION_LABELS: Record<SettingsSection, string> = { agents: 'Agent 接入', profile: '个人资料', members: '成员', workspace: 'workspace 设置' }
 
 /** What only an admin sees: every artifact of the workspace as metadata, and the latest audit events. */
 export interface WorkspaceAdministration {
@@ -34,7 +31,6 @@ export interface SettingsModel {
   now: number
 }
 
-const SECTION_ICONS: Record<SettingsSection, IconName> = { agents: 'Bot', profile: 'UserRound', members: 'Users', workspace: 'Settings' }
 
 export class SettingsPage {
   static render(model: SettingsModel): Response {
@@ -42,12 +38,12 @@ export class SettingsPage {
 ${PageShell.topBar(model.identity, html`<span class="xxd-text app-topbar__context" data-variant="secondary">/ 设置</span>`)}
 ${PageShell.withSidebar(SettingsPage.#sidebar(model), html`<div class="xxd-read">${SettingsPage.#section(model)}</div>`)}
 ${PageShell.jsonData('settings-config', { userId: model.identity.userId, accessTokens: model.accessTokens })}`
-    return PageShell.render({ title: `${SECTION_LABELS[model.section]} · Open Artifact`, body, scripts: ['common.js', 'settings.js'] })
+    return PageShell.render({ title: `${SETTINGS_SECTION_LABELS[model.section]} · Open Artifact`, body, scripts: ['common.js', 'settings.js'] })
   }
 
   static #sidebar(model: SettingsModel): SafeHtml {
     const sectionLink = (section: SettingsSection) =>
-      html`<a class="xxd-sidebar__item" href="/settings/${section}" ${model.section === section ? html`aria-current="page"` : ''}>${PageShell.icon(SECTION_ICONS[section], 18)}<span>${SECTION_LABELS[section]}</span></a>`
+      html`<a class="xxd-sidebar__item" href="/settings/${section}" ${model.section === section ? html`aria-current="page"` : ''}>${PageShell.icon(SETTINGS_SECTION_ICONS[section], 18)}<span>${SETTINGS_SECTION_LABELS[section]}</span></a>`
     return html`<nav class="xxd-sidebar app-sidebar" aria-label="设置分类"><div class="xxd-sidebar__body">
   <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">个人</div>${sectionLink('profile')}${sectionLink('agents')}</div>
   <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">${model.identity.membership.workspace.name}</div>${sectionLink('members')}${sectionLink('workspace')}</div>
@@ -83,14 +79,16 @@ ${AgentConnectSection.render(model)}`
     return html`${SettingsPage.#pageHeader('个人资料')}
 <form class="xxd-stack profile-form" id="profile-form" data-xxd-validate>
   <div class="xxd-field">
-    <label class="xxd-label" for="profile-name">显示名称</label>
-    <input class="xxd-input" id="profile-name" name="name" required maxlength="60" value="${identity.name}" data-error-required="写一个名字，团队成员会在评论和成员列表里看到它">
+    <label class="xxd-label" for="profile-name">名字</label>
+    <input class="xxd-input" id="profile-name" name="name" required maxlength="60" value="${identity.hasChosenName ? identity.name : ''}" placeholder="${identity.name}" autocomplete="name" aria-describedby="profile-name-help" data-error-required="写一个名字，团队成员会在评论和成员列表里看到它">
+    <p class="xxd-help" id="profile-name-help">团队成员在评论、通知和成员列表里看到它。最多 60 个字。</p>
   </div>
   <div class="xxd-field">
-    <label class="xxd-label" for="profile-email">邮箱</label>
-    <input class="xxd-input" id="profile-email" value="${identity.email}" disabled>
+    <span class="xxd-label" id="profile-email-label">邮箱</span>
+    <p class="xxd-text profile-email" aria-labelledby="profile-email-label">${identity.email}</p>
+    <p class="xxd-help">邮箱用来登录，不能修改。</p>
   </div>
-  <div><button type="submit" class="xxd-btn" data-variant="primary">保存</button></div>
+  <div><button type="submit" class="xxd-btn" data-variant="primary" disabled>保存</button></div>
 </form>`
   }
 
@@ -100,19 +98,28 @@ ${AgentConnectSection.render(model)}`
     const adminCount = members.filter(member => member.role === 'admin').length
     const memberRow = (member: WorkspaceMember) => {
       const name = People.displayName(member)
+      const isSelf = member.userId === identity.userId
       return html`<tr data-member-row="${member.userId}">
-    <td><span class="xxd-cluster"><span class="xxd-avatar" data-size="sm" aria-hidden="true">${PageShell.initialOf(name)}</span>${name}</span></td>
+    <td><span class="xxd-cluster"><span class="xxd-avatar" data-size="sm" aria-hidden="true">${PageShell.initialOf(name)}</span><span>${name}${isSelf ? html`<span class="xxd-text" data-variant="secondary">（你）</span>` : ''}</span></span></td>
     <td><span class="xxd-text" data-variant="secondary">${member.email}</span></td>
-    ${isAdmin ? SettingsPage.#memberControls(member, name, identity.userId, adminCount) : html`<td>${member.role === 'admin' ? html`<span class="xxd-badge">管理员</span>` : '成员'}</td>`}
+    ${isAdmin ? SettingsPage.#memberControls(member, name, identity.userId, adminCount) : html`<td>${ArtifactLabels.role(member.role)}</td>`}
   </tr>`
     }
     const joiningHint = isAdmin ? '' : '要请同事加入，请管理员邀请。'
     return html`${SettingsPage.#pageHeader('成员', `${members.length} 人。${joiningHint}`)}
 ${isAdmin ? SettingsPage.#inviteSection() : ''}
-<div class="xxd-table-wrap"><table class="xxd-table">
-  <thead><tr><th>名称</th><th>邮箱</th><th>角色</th>${isAdmin ? html`<th class="xxd-table__actions"><span class="xxd-sr-only">操作</span></th>` : ''}</tr></thead>
-  <tbody>${members.map(memberRow)}</tbody>
-</table></div>`
+<section class="xxd-stack member-list" aria-labelledby="member-list-title">
+  ${isAdmin ? html`<h2 class="xxd-text" data-variant="heading3" id="member-list-title">全部成员</h2>` : html`<h2 class="xxd-sr-only" id="member-list-title">全部成员</h2>`}
+  <div class="xxd-table-wrap"><table class="xxd-table">
+    <thead><tr><th>名字</th><th>邮箱</th><th>角色</th>${isAdmin ? html`<th class="xxd-table__actions"><span class="xxd-sr-only">操作</span></th>` : ''}</tr></thead>
+    <tbody>${SettingsPage.#adminsFirst(members).map(memberRow)}</tbody>
+  </table></div>
+</section>`
+  }
+
+  static #adminsFirst(members: WorkspaceMember[]): WorkspaceMember[] {
+    const roleOrder = (member: WorkspaceMember) => (member.role === 'admin' ? 0 : 1)
+    return [...members].sort((left, right) => roleOrder(left) - roleOrder(right) || People.displayName(left).localeCompare(People.displayName(right), 'zh-CN'))
   }
 
   // The pending list is drawn by settings.js from /api/workspace/invites, the same JSON every later change returns.
@@ -155,7 +162,7 @@ ${isAdmin ? SettingsPage.#inviteSection() : ''}
 
   static #workspaceSection(model: SettingsModel): SafeHtml {
     const { identity, administration } = model
-    return html`${SettingsPage.#pageHeader(SECTION_LABELS.workspace)}
+    return html`${SettingsPage.#pageHeader(SETTINGS_SECTION_LABELS.workspace)}
 ${administration ? SettingsPage.#workspaceNameForm(identity) : ''}
 <section class="xxd-group" aria-labelledby="public-links-title">
   <h2 class="xxd-group__title" id="public-links-title">公开链接</h2>

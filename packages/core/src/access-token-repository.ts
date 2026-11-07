@@ -33,6 +33,8 @@ export interface AccessTokenRepository {
   listForUser(userId: string): Promise<AccessToken[]>
   /** Revokes only a token that belongs to `userId`; returns whether one was revoked. */
   revoke(tokenId: string, userId: string): Promise<boolean>
+  /** Deletes a token of `userId` that is already revoked or expired at `now`; returns whether one was deleted. */
+  deleteInactive(tokenId: string, userId: string, now: number): Promise<boolean>
   /** Records the use of a token that is neither revoked nor expired at `now`; otherwise says why it was refused. */
   useToken(tokenHash: string, now: number): Promise<TokenUse>
 }

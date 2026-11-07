@@ -124,6 +124,24 @@ describe('personal API tokens', () => {
     expect(answers[0]?.body.error).toContain('revoked')
   })
 
+  it('deletes a token from the list once it no longer works, and never deletes a working one in one step', async () => {
+    const cookie = await app.signIn('lin@example.com')
+    const created = await app.json<{ tokenId: string }>('/api/tokens', { method: 'POST', cookie, body: { name: 'to forget', expiresInDays: 30 } })
+    const tokenPath = `/api/tokens/${created.body.tokenId}`
+
+    const firstDelete = await app.request(tokenPath, { method: 'DELETE', cookie })
+    const stillListed = (await app.json<{ tokens: { tokenId: string; revokedAt: number | null }[] }>('/api/tokens', { cookie })).body.tokens.find(token => token.tokenId === created.body.tokenId)
+    const secondDelete = await app.request(tokenPath, { method: 'DELETE', cookie })
+    const listedAfter = (await app.json<{ tokens: { tokenId: string }[] }>('/api/tokens', { cookie })).body.tokens.map(token => token.tokenId)
+    const thirdDelete = await app.json<{ code: string }>(tokenPath, { method: 'DELETE', cookie })
+
+    expect(firstDelete.status).toBe(204)
+    expect(stillListed?.revokedAt).not.toBeNull()
+    expect(secondDelete.status).toBe(204)
+    expect(listedAfter).not.toContain(created.body.tokenId)
+    expect(thirdDelete).toMatchObject({ status: 404, body: { code: 'not_found' } })
+  })
+
   it('refuses a revoked token even where anyone may read, instead of treating it as anonymous', async () => {
     const cookie = await app.signIn('lin@example.com')
     const created = await app.json<{ tokenId: string; token: string }>('/api/tokens', { method: 'POST', cookie, body: { name: 'gone', expiresInDays: 30 } })

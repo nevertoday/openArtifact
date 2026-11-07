@@ -112,6 +112,9 @@
   .token-table td.xxd-table__actions > * { grid-column: 1 / -1; justify-self: start; margin-top: var(--space-1); }
 }
 .profile-form { max-width: 400px; }
+.invite-section + .member-list { margin-top: var(--space-6); }
+.profile-email { margin: 0; }
+.home-name-nudge { margin-top: var(--space-5); }
 .member-reason { margin: var(--space-1) 0 0; }
 .invite-form { display: grid; gap: var(--gap-items); }
 .invite-section .xxd-list__item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }

@@ -318,6 +318,40 @@ describe('settings', () => {
     expect(reviewerWorkspaceMarkup).toContain('只有管理员可以修改')
   })
 
+  it('lists admins first, marks the reader with （你）, and shows every role the same way', async () => {
+    const membersMarkup = await pageText('/settings/members', reviewerCookie)
+    const rowOrder = [...membersMarkup.matchAll(/data-member-row="[^"]+">\s*<td>.*?<span>([^<（]+)/gs)].map(match => match[1])
+
+    expect(rowOrder[0]).toBe('lin')
+    expect(membersMarkup).toMatch(/周晓<span class="xxd-text" data-variant="secondary">（你）<\/span>/)
+    expect(membersMarkup).not.toContain('<span class="xxd-badge">管理员</span>')
+    expect(membersMarkup).toContain('<th>名字</th>')
+  })
+
+  it('nudges a person who has not set a name, until they do', async () => {
+    const newcomerCookie = await app.signIn('newcomer@example.com')
+
+    const before = await pageText('/', newcomerCookie)
+    await app.request('/api/me', { method: 'PATCH', cookie: newcomerCookie, body: { name: '新同事' } })
+    const after = await pageText('/', newcomerCookie)
+    const profile = await pageText('/settings/profile', newcomerCookie)
+
+    expect(before).toContain('设置你的名字')
+    expect(before).toContain('看到的是「newcomer」')
+    expect(after).not.toContain('设置你的名字')
+    expect(profile).toContain('value="新同事"')
+    expect(profile).toContain('邮箱用来登录，不能修改。')
+  })
+
+  it('lists the settings sections in the same order in the account menu and the side navigation', async () => {
+    const settingsMarkup = await pageText('/settings/profile', authorCookie)
+    const menuOrder = [...settingsMarkup.matchAll(/class="xxd-menu__item" role="menuitem" href="\/settings\/(\w+)"/g)].map(match => match[1])
+    const sidebarOrder = [...settingsMarkup.matchAll(/class="xxd-sidebar__item" href="\/settings\/(\w+)"/g)].map(match => match[1])
+
+    expect(menuOrder).toEqual(['profile', 'agents', 'members', 'workspace'])
+    expect(sidebarOrder).toEqual(menuOrder)
+  })
+
   it('serves the agent guide as llms.txt, with this instance in it', async () => {
     const llmsTxt = await pageText('/llms.txt')
 

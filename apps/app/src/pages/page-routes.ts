@@ -8,7 +8,8 @@ import { HttpCookies } from '../http-cookies.ts'
 import { HOME_FILTERS, HomeListing, HomePage, type HomeFilter } from './home-page.ts'
 import { LoginPage } from './login-page.ts'
 import { MessagePages, type PasswordPrompt } from './message-pages.ts'
-import { SETTINGS_SECTIONS, SettingsPage, type SettingsSection, type WorkspaceAdministration } from './settings-page.ts'
+import { SettingsPage, type WorkspaceAdministration } from './settings-page.ts'
+import { SETTINGS_SECTIONS, type SettingsSection } from './settings-sections.ts'
 import { ViewerPage, type OlderVersion, type ViewerModel } from './viewer-page.ts'
 
 const SIGNED_URL_LIFETIME_MS = 6 * 60 * 60 * 1000

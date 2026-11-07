@@ -161,7 +161,7 @@ ${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(mod
   }
 
   static #artifactsSection(shownArtifacts: OpenedArtifact[], model: HomeModel): SafeHtml {
-    return html`<header class="xxd-page-header">
+    return html`${model.identity.hasChosenName ? '' : HomePage.#nameNudge(model.identity)}<header class="xxd-page-header">
   <div class="xxd-page-header__row">
     <h1 class="xxd-page-header__title">${HomePage.#heading(model.query)}</h1>
     <div class="xxd-page-header__actions"><a class="xxd-btn" data-variant="primary" href="/settings/agents">让 agent 发布</a></div>
@@ -170,6 +170,13 @@ ${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(mod
 </header>
 ${HomePage.#resultLine(shownArtifacts.length, model.query)}
 ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#emptyState(HomePage.#emptyStateOf(model.query))}`
+  }
+
+  static #nameNudge(identity: Identity): SafeHtml {
+    return html`<div class="xxd-banner home-name-nudge" role="status">${PageShell.icon('UserRound')}<div>
+  <p class="xxd-banner__title">设置你的名字</p>
+  <p class="xxd-banner__text">现在团队成员在评论和通知里看到的是「${identity.name}」。设一个大家认得出的名字。</p>
+</div><div class="xxd-banner__actions"><a class="xxd-btn" data-size="sm" href="/settings/profile">去设置</a></div></div>`
   }
 
   // The heading names what the list shows, so it never runs the workspace name into a sentence.

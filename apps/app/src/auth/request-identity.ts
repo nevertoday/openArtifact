@@ -24,6 +24,8 @@ const TOKEN_REFUSAL_MESSAGES: Record<TokenRefusal, string> = {
 export interface Identity {
   userId: string
   name: string
+  /** Whether `name` is one the person chose, rather than their email's local part. */
+  hasChosenName: boolean
   email: string
   /** The workspace this request acts in: the token's workspace, or the one chosen in the browser. */
   membership: Membership
@@ -93,7 +95,7 @@ export class RequestIdentity {
     const tokenMembership = memberships.find(membership => membership.workspace.workspaceId === accessToken.workspaceId)
     if (!profile || !tokenMembership) return this.#refuseToken('token_invalid')
     // A token acts only in the workspace it was created for, even when its owner belongs to others.
-    return { userId: profile.userId, name: People.displayName(profile), email: profile.email, membership: tokenMembership, memberships: [tokenMembership], agentClient: this.#agentClient(), tokenScope: accessToken.scope }
+    return { userId: profile.userId, name: People.displayName(profile), hasChosenName: People.hasChosenName(profile), email: profile.email, membership: tokenMembership, memberships: [tokenMembership], agentClient: this.#agentClient(), tokenScope: accessToken.scope }
   }
 
   #refuseToken(refusal: TokenRefusal): null {
@@ -108,7 +110,7 @@ export class RequestIdentity {
     const chosenWorkspaceId = HttpCookies.read(this.#request, WORKSPACE_COOKIE)
     const membership = memberships.find(candidate => candidate.workspace.workspaceId === chosenWorkspaceId) ?? memberships[0]
     if (!membership) throw new Error(`User ${signedInUser.userId} has no workspace`)
-    return { userId: signedInUser.userId, name: People.displayName(signedInUser), email: signedInUser.email, membership, memberships, agentClient: null, tokenScope: null }
+    return { userId: signedInUser.userId, name: People.displayName(signedInUser), hasChosenName: People.hasChosenName(signedInUser), email: signedInUser.email, membership, memberships, agentClient: null, tokenScope: null }
   }
 
   // A person joins a workspace on the first visit after sign-in, through the invite link this browser opened if any.

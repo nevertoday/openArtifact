@@ -49,6 +49,14 @@ export class CloudflareAccessTokenRepository implements AccessTokenRepository {
     return revocation.meta.changes === 1
   }
 
+  async deleteInactive(tokenId: string, userId: string, now: number): Promise<boolean> {
+    const deletion = await this.#db
+      .prepare('DELETE FROM personal_access_tokens WHERE id = ? AND user_id = ? AND (revoked_at IS NOT NULL OR expires_at <= ?)')
+      .bind(tokenId, userId, now)
+      .run()
+    return deletion.meta.changes === 1
+  }
+
   async useToken(tokenHash: string, now: number): Promise<TokenUse> {
     const activeRow = await this.#db
       .prepare(

@@ -1,6 +1,7 @@
 import type { Identity } from '../auth/request-identity.ts'
 import { fullTimeText, relativeTimeText } from '../../public/static/time-text.js'
 import { html, SafeHtml } from './html.ts'
+import { SETTINGS_SECTION_ICONS, SETTINGS_SECTION_LABELS, SETTINGS_SECTIONS } from './settings-sections.ts'
 
 /** Kit icon names the pages use; the union keeps a misspelt name from reaching the browser. */
 export type IconName =
@@ -159,15 +160,13 @@ ${options.description ? html`<meta name="description" content="${options.descrip
   }
 
   static #accountMenu(identity: Identity): SafeHtml {
-    const menuLink = (href: string, icon: IconName, label: string) =>
-      html`<a class="xxd-menu__item" role="menuitem" href="${href}">${PageShell.icon(icon, 14)}${label}</a>`
-    return html`<button type="button" class="xxd-btn app-account-button" data-variant="ghost" data-icon-only data-xxd-menu="account-menu" aria-label="账户菜单：${identity.name}"><span class="xxd-avatar">${PageShell.initialOf(identity.name)}</span></button>
+    const menuLink = (section: (typeof SETTINGS_SECTIONS)[number]) =>
+      html`<a class="xxd-menu__item" role="menuitem" href="/settings/${section}">${PageShell.icon(SETTINGS_SECTION_ICONS[section], 14)}${SETTINGS_SECTION_LABELS[section]}</a>`
+    return html`<button type="button" class="xxd-btn app-account-button" data-variant="ghost" data-icon-only data-xxd-menu="account-menu" aria-label="账户菜单：${identity.name}" data-account-button><span class="xxd-avatar" data-account-initial>${PageShell.initialOf(identity.name)}</span></button>
 <div class="xxd-menu" id="account-menu" role="menu" popover>
-  <div class="xxd-menu__label xxd-text-pair app-account-head"><span class="xxd-text">${identity.name}</span><span class="xxd-text" data-variant="caption">${identity.email}</span></div>
+  <div class="xxd-menu__label xxd-text-pair app-account-head"><span class="xxd-text" data-account-name>${identity.name}</span><span class="xxd-text" data-variant="caption">${identity.email}</span></div>
   <div class="xxd-menu__sep" role="separator"></div>
-  ${menuLink('/settings/agents', 'Bot', 'Agent 接入')}
-  ${menuLink('/settings/profile', 'UserRound', '个人资料')}
-  ${menuLink('/settings/members', 'Users', '成员')}
+  ${SETTINGS_SECTIONS.map(menuLink)}
   <div class="xxd-menu__sep" role="separator"></div>
   <button type="button" class="xxd-menu__item" role="menuitem" data-sign-out>${PageShell.icon('LogOut', 14)}退出登录</button>
 </div>`

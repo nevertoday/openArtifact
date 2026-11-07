@@ -13,6 +13,11 @@ export class People {
     this.#users = users
   }
 
+  /** False until the person sets a name; until then others see the part of their email before the @. */
+  static hasChosenName(profile: { name: string }): boolean {
+    return profile.name.trim().length > 0
+  }
+
   static displayName(profile: { name: string; email: string }): string {
     const chosenName = profile.name.trim()
     return chosenName.length > 0 ? chosenName : (profile.email.split('@')[0] ?? profile.email)

@@ -39,11 +39,14 @@ export class TokenApi {
     return Response.json({ token: plaintextToken, ...TokenApi.#tokenJson(accessToken) }, { status: 201 })
   }
 
+  /** A working token is revoked; one that is already revoked or expired is deleted from the person's list. */
   async revoke(tokenId: string): Promise<Response> {
     const identity = await this.#context.requireBrowserSession()
-    const revoked = await this.#context.repositories.accessTokens.revoke(tokenId, identity.userId)
-    if (!revoked) throw HttpError.notFound(`active token ${tokenId}`)
-    return new Response(null, { status: 204 })
+    const accessTokens = this.#context.repositories.accessTokens
+    const done = new Response(null, { status: 204 })
+    if (await accessTokens.revoke(tokenId, identity.userId)) return done
+    if (await accessTokens.deleteInactive(tokenId, identity.userId, Date.now())) return done
+    throw HttpError.notFound(`token ${tokenId}`)
   }
 
   /** null means the token never expires. */

@@ -1,4 +1,4 @@
-import { api, confirmArtifactRemoval, element, readJsonData, removalWord, removeArtifact, restoreArtifact, dateText, timeElement, userMessageOf } from './common.js'
+import { api, confirmArtifactRemoval, element, initialOf, readJsonData, removalWord, removeArtifact, restoreArtifact, dateText, timeElement, userMessageOf } from './common.js'
 
 const settingsConfig = readJsonData('settings-config')
 const TOKEN_SCOPE_LABELS = { publish: '仅发布', full: '完全权限' }
@@ -18,7 +18,7 @@ function tokenStateOf(accessToken) {
 
 // One entry per column, so a new column is one line here; the label also heads the cell on a phone.
 const TOKEN_COLUMNS = [
-  { label: '名称', cell: accessToken => accessToken.name },
+  { label: '名字', cell: accessToken => accessToken.name },
   { label: '权限', cell: accessToken => secondaryText(TOKEN_SCOPE_LABELS[accessToken.scope]) },
   { label: '最近使用', cell: accessToken => secondaryText(accessToken.lastUsedAt ? timeElement(accessToken.lastUsedAt) : '还没用过') },
   { label: '到期', cell: accessToken => secondaryText(accessToken.expiresAt ? dateText(accessToken.expiresAt) : '永不过期') },
@@ -26,12 +26,15 @@ const TOKEN_COLUMNS = [
     label: '状态',
     cell: accessToken => {
       const state = tokenStateOf(accessToken)
-      return element('span', { className: 'xxd-badge', 'data-appearance': 'dot', 'data-tone': state.tone }, state.label)
+      return element('span', { className: 'xxd-badge', 'data-appearance': 'dot', 'data-tone': state.tone, 'data-token-state': accessToken.tokenId, tabindex: '-1' }, state.label)
     },
   },
 ]
 
-/** The person's tokens: working ones in a table, revoked and expired ones folded away below it. */
+/**
+ * The person's tokens: working ones in a table, revoked and expired ones folded away below it, each deletable.
+ * After a revoke the fold opens and focus lands on that token's new state, so keyboard users see what happened.
+ */
 class TokenTable {
   #onRevoked
 
@@ -40,24 +43,25 @@ class TokenTable {
     this.#onRevoked = onRevoked
   }
 
-  render(accessTokens, justCreatedTokenId = null) {
+  render(accessTokens, { justCreatedTokenId = null, showInactive = false } = {}) {
     if (accessTokens.length === 0) {
       this.container.replaceChildren(secondaryText('还没有 token。'))
       return
     }
     const activeTokens = accessTokens.filter(accessToken => tokenStateOf(accessToken).isActive)
     const inactiveTokens = accessTokens.filter(accessToken => !tokenStateOf(accessToken).isActive)
-    const inactiveFold = element('details', { className: 'xxd-collapse' }, element('summary', {}, `显示已失效的 token（${inactiveTokens.length}）`), this.#table(inactiveTokens, null))
+    const inactiveFold = element('details', { className: 'xxd-collapse token-fold', open: showInactive },
+      element('summary', {}, `显示已失效的 token（${inactiveTokens.length}）`), this.#table(inactiveTokens, null))
     this.container.replaceChildren(
       activeTokens.length > 0 ? this.#table(activeTokens, justCreatedTokenId) : secondaryText('没有有效的 token。'),
       inactiveTokens.length > 0 ? inactiveFold : null,
     )
   }
 
-  async refresh(justCreatedTokenId = null) {
+  async refresh(changes = {}) {
     const { tokens } = await api('/api/tokens')
-    this.render(tokens, justCreatedTokenId)
-    if (justCreatedTokenId !== null) setTimeout(() => this.container.querySelector('[data-just-created]')?.removeAttribute('data-just-created'), JUST_CREATED_HIGHLIGHT_MS)
+    this.render(tokens, changes)
+    if (changes.justCreatedTokenId) setTimeout(() => this.container.querySelector('[data-just-created]')?.removeAttribute('data-just-created'), JUST_CREATED_HIGHLIGHT_MS)
   }
 
   #table(accessTokens, justCreatedTokenId) {
@@ -69,10 +73,13 @@ class TokenTable {
   }
 
   #row(accessToken, justCreated) {
-    const revokeButton = element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'xs', onClick: () => this.#revoke(accessToken) }, '撤销')
+    const isActive = tokenStateOf(accessToken).isActive
+    const action = isActive
+      ? element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'xs', onClick: () => this.#revoke(accessToken) }, '撤销')
+      : element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'ghost', 'data-size': 'xs', 'aria-label': `删除「${accessToken.name}」`, onClick: event => this.#delete(accessToken, event.currentTarget) }, '删除')
     return element('tr', { 'data-just-created': justCreated },
       TOKEN_COLUMNS.map(column => element('td', { 'data-label': column.label }, column.cell(accessToken))),
-      element('td', { className: 'xxd-table__actions' }, tokenStateOf(accessToken).isActive ? revokeButton : null),
+      element('td', { className: 'xxd-table__actions' }, action),
     )
   }
 
@@ -90,10 +97,22 @@ class TokenTable {
       await api(`/api/tokens/${encodeURIComponent(accessToken.tokenId)}`, { method: 'DELETE' })
       Xxd.toast(`已撤销「${accessToken.name}」`, { tone: 'success' })
       this.#onRevoked(accessToken.tokenId)
-      await this.refresh()
+      await this.refresh({ showInactive: true })
+      this.container.querySelector(`[data-token-state="${CSS.escape(accessToken.tokenId)}"]`)?.focus()
+    } catch (error) {
+      Xxd.toast(`撤销失败：${userMessageOf(error)}`, { tone: 'danger' })
+    }
+  }
+
+  // A revoked or expired token no longer works, so deleting it from the list needs no confirmation.
+  async #delete(accessToken, deleteButton) {
+    try {
+      await Xxd.runBusy(deleteButton, () => api(`/api/tokens/${encodeURIComponent(accessToken.tokenId)}`, { method: 'DELETE' }))
+      Xxd.toast(`已删除「${accessToken.name}」`, { tone: 'success' })
+      await this.refresh({ showInactive: true })
       this.container.focus()
     } catch (error) {
-      Xxd.toast(userMessageOf(error), { tone: 'danger' })
+      Xxd.toast(`删除失败：${userMessageOf(error)}`, { tone: 'danger' })
     }
   }
 }
@@ -218,7 +237,7 @@ function wireAgentConnection() {
       const createdToken = await Xxd.runBusy(createButton, () => api('/api/tokens', { method: 'POST', body: newToken }))
       createForm.reset()
       agentConnection.show(createdToken)
-      await tokenTable.refresh(createdToken.tokenId)
+      await tokenTable.refresh({ justCreatedTokenId: createdToken.tokenId })
     } catch (error) {
       Xxd.toast(`新建失败：${userMessageOf(error)}`, { tone: 'danger' })
     } finally {
@@ -227,21 +246,42 @@ function wireAgentConnection() {
   })
 }
 
+/** Shows a failed save under the field it concerns, in Chinese. */
+function showFieldError(input, error) {
+  Xxd.setFieldError(input, userMessageOf(error))
+  input.focus()
+}
+
+// 保存 stays off until the name differs from the saved one; after saving, the top bar shows the new name at once.
 function wireProfileForm() {
   const profileForm = document.getElementById('profile-form')
-  profileForm?.addEventListener('submit', async event => {
+  if (!profileForm) return
+  const nameInput = document.getElementById('profile-name')
+  const saveButton = profileForm.querySelector('[type="submit"]')
+  let savedName = nameInput.value.trim()
+  nameInput.addEventListener('input', () => { saveButton.disabled = nameInput.value.trim() === savedName })
+  profileForm.addEventListener('submit', async event => {
     event.preventDefault()
-    const saveButton = event.submitter
-    saveButton.setAttribute('aria-busy', 'true')
+    const name = nameInput.value.trim()
+    nameInput.value = name
+    if (name === '') return Xxd.setFieldError(nameInput, nameInput.dataset.errorRequired)
+    saveButton.disabled = true
     try {
-      await api('/api/me', { method: 'PATCH', body: { name: new FormData(profileForm).get('name') } })
+      await Xxd.runBusy(saveButton, () => api('/api/me', { method: 'PATCH', body: { name } }))
+      savedName = name
+      showAccountName(name)
       Xxd.toast('已保存', { tone: 'success' })
     } catch (error) {
-      Xxd.toast(`保存失败：${userMessageOf(error)}`, { tone: 'danger' })
-    } finally {
-      saveButton.removeAttribute('aria-busy')
+      saveButton.disabled = false
+      showFieldError(nameInput, error)
     }
   })
+}
+
+function showAccountName(name) {
+  for (const accountName of document.querySelectorAll('[data-account-name]')) accountName.textContent = name
+  for (const accountInitial of document.querySelectorAll('[data-account-initial]')) accountInitial.textContent = initialOf(name)
+  document.querySelector('[data-account-button]')?.setAttribute('aria-label', `账户菜单：${name}`)
 }
 
 function wireWorkspaceNameForm() {
@@ -255,7 +295,7 @@ function wireWorkspaceNameForm() {
       await api('/api/workspace', { method: 'PATCH', body: { name: new FormData(workspaceNameForm).get('name') } })
       location.reload()
     } catch (error) {
-      Xxd.setFieldError(document.getElementById('workspace-name'), userMessageOf(error))
+      showFieldError(document.getElementById('workspace-name'), error)
       saveButton.disabled = false
       saveButton.removeAttribute('aria-busy')
     }
