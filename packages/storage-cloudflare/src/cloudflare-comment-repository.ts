@@ -64,6 +64,11 @@ export class CloudflareCommentRepository implements CommentRepository {
     await this.#db.prepare('UPDATE comments SET resolved_at = ?, resolved_by = ? WHERE id = ?').bind(resolvedAt, resolvedBy, commentId).run()
   }
 
+  // Notifications about these comments go with them, through their foreign key.
+  async remove(commentId: string): Promise<void> {
+    await this.#db.prepare('DELETE FROM comments WHERE id = ?1 OR parent_id = ?1').bind(commentId).run()
+  }
+
   async listInOpenThreads(workspaceId: string): Promise<ArtifactComment[]> {
     const { results: commentRows } = await this.#db
       .prepare(

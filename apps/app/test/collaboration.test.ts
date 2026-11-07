@@ -30,6 +30,7 @@ interface CommentJson {
   resolvedAt: number | null
   resolvedBy: { name: string } | null
   author: { name: string }
+  canDelete: boolean
 }
 
 describe('publishing and updating', () => {
@@ -191,6 +192,33 @@ describe('the comment loop with an agent', () => {
     expect(everything.body.comments[0]?.resolvedAt).toBeGreaterThan(0)
     expect(app.mailer.lastTo('lin@example.com')?.subject).toBe('zhou 在「Design doc」发表了评论')
     expect(app.mailer.sent.filter(email => email.to === 'zhou@example.com').map(email => email.subject)).toContain('Claude Code（代 lin）在「Design doc」回复了评论')
+  })
+
+  it('lets people delete their own comments, and the author clear any comment with its replies and notices', async () => {
+    const published = await app.publish({ token: agentToken }, 'Pricing page')
+    const commentsPath = `/api/artifacts/${published.artifactId}/comments`
+    const question = await app.json<{ comment: CommentJson }>(commentsPath, { method: 'POST', cookie: reviewerCookie, body: { body: '价格对吗？' } })
+    const questionId = question.body.comment.commentId
+    const answer = await app.json<{ comment: CommentJson }>(commentsPath, { method: 'POST', cookie: authorCookie, body: { body: '对的', parentId: questionId } })
+    const asSeenByReviewer = await app.json<{ comments: CommentJson[] }>(commentsPath, { cookie: reviewerCookie })
+    const asSeenByAuthor = await app.json<{ comments: CommentJson[] }>(commentsPath, { cookie: authorCookie })
+    const noticesBefore = await app.json<{ notifications: { artifactId: string }[] }>('/api/notifications', { cookie: authorCookie })
+
+    const reviewerDeletesAuthorsReply = await app.request(`/api/comments/${answer.body.comment.commentId}`, { method: 'DELETE', cookie: reviewerCookie })
+    const authorDeletesQuestion = await app.request(`/api/comments/${questionId}`, { method: 'DELETE', cookie: authorCookie })
+    const afterDelete = await app.json<{ comments: CommentJson[] }>(commentsPath, { cookie: authorCookie })
+    const noticesAfter = await app.json<{ notifications: { artifactId: string }[] }>('/api/notifications', { cookie: authorCookie })
+    const deletedAgain = await app.request(`/api/comments/${questionId}`, { method: 'DELETE', cookie: authorCookie })
+
+    expect(question.body.comment.canDelete).toBe(true)
+    expect(asSeenByReviewer.body.comments.map(comment => [comment.body, comment.canDelete])).toEqual([['价格对吗？', true], ['对的', false]])
+    expect(asSeenByAuthor.body.comments.map(comment => comment.canDelete)).toEqual([true, true])
+    expect(noticesBefore.body.notifications.some(notice => notice.artifactId === published.artifactId)).toBe(true)
+    expect(reviewerDeletesAuthorsReply.status).toBe(403)
+    expect(authorDeletesQuestion.status).toBe(204)
+    expect(afterDelete.body.comments).toEqual([])
+    expect(noticesAfter.body.notifications.some(notice => notice.artifactId === published.artifactId)).toBe(false)
+    expect(deletedAgain.status).toBe(404)
   })
 
   it('keeps the comment loop working when notification mail cannot be sent', async () => {

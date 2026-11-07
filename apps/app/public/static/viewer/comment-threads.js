@@ -153,6 +153,14 @@ export class CommentThreads extends EventTarget {
     this.#changed()
   }
 
+  /** Deletes a comment for good; deleting a thread's first comment deletes the whole thread. */
+  async remove(commentId) {
+    this.#writes++
+    await api(`/api/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' })
+    this.#comments = this.#comments.filter(comment => comment.commentId !== commentId && comment.parentId !== commentId)
+    this.#changed()
+  }
+
   /**
    * Fetches the comments again. Resolves to what others wrote since the last look, and the reader's own comments
    * to an agent that an agent has just answered and resolved; null when the fetch failed, keeping what is shown.

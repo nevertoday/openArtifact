@@ -87,6 +87,7 @@ const API_ROUTES: ApiRoute[] = [
   route('POST', '/api/notifications/:notificationId/read', (apis, _request, params) => apis.notifications.markRead(param(params, 'notificationId'))),
   route('GET', '/api/comments', (apis, request) => apis.comments.listWaitingForMyAgent(request)),
   route('PATCH', '/api/comments/:commentId', (apis, request, params) => apis.comments.setResolved(request, param(params, 'commentId'))),
+  route('DELETE', '/api/comments/:commentId', (apis, request, params) => apis.comments.remove(request, param(params, 'commentId'))),
   route('GET', '/api/artifacts/:artifactId/sharing', (apis, request, params) => apis.sharing.read(request, param(params, 'artifactId'))),
   route('PUT', '/api/artifacts/:artifactId/sharing', (apis, request, params) => apis.sharing.update(request, param(params, 'artifactId'))),
   route('POST', '/api/artifacts/:artifactId/access-requests', (apis, request, params) => apis.sharing.requestAccess(request, param(params, 'artifactId'))),

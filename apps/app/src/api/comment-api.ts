@@ -22,12 +22,14 @@ export class CommentApi {
   }
 
   async list(request: Request, artifactId: string): Promise<Response> {
-    await this.#context.gate.require(artifactId, await this.#context.identity(), request, 'canReadComments', 'read the comments on this artifact')
+    const identity = await this.#context.identity()
+    const openedArtifact = await this.#context.gate.require(artifactId, identity, request, 'canReadComments', 'read the comments on this artifact')
     const filter = CommentApi.#filterOf(request)
     const allComments = await this.#context.repositories.comments.listForArtifact(artifactId)
     const shownComments = CommentApi.#threadsMatching(allComments, filter)
     const names = await this.#context.people.namesOf(shownComments.flatMap(comment => [comment.authorId, comment.resolvedBy]))
-    return Response.json({ comments: shownComments.map(comment => CommentApi.#commentJson(comment, names)) })
+    const deletable = (comment: ArtifactComment) => identity !== null && CommentApi.#mayRemove(comment, identity.userId, openedArtifact)
+    return Response.json({ comments: shownComments.map(comment => CommentApi.#commentJson(comment, names, deletable(comment))) })
   }
 
   /** The agent's inbox: open comments addressed to an agent on every artifact the caller may publish to. */
@@ -67,7 +69,7 @@ export class CommentApi {
     if (resolvesThread && threadRoot) await this.#context.repositories.comments.setResolved(threadRoot.commentId, identity.userId)
     await this.#context.notifier.notify(identity, openedArtifact.summary, { kind: 'comment_added', comment: addedComment, resolvesThread })
     const names = await this.#context.people.namesOf([identity.userId])
-    return Response.json({ comment: CommentApi.#commentJson(addedComment, names) }, { status: 201 })
+    return Response.json({ comment: CommentApi.#commentJson(addedComment, names, true) }, { status: 201 })
   }
 
   async setResolved(request: Request, commentId: string): Promise<Response> {
@@ -81,6 +83,21 @@ export class CommentApi {
     const resolvesOpenThread = resolved && comment.parentId === null && comment.resolvedAt === null
     if (resolvesOpenThread) await this.#context.notifier.notify(identity, openedArtifact.summary, { kind: 'thread_resolved', threadRoot: comment })
     return Response.json({ commentId, resolved })
+  }
+
+  async remove(request: Request, commentId: string): Promise<Response> {
+    const identity = await this.#context.requireIdentity()
+    const comment = await this.#context.repositories.comments.find(commentId)
+    if (!comment) throw HttpError.notFound(`comment ${commentId}`)
+    const openedArtifact = await this.#context.gate.require(comment.artifactId, identity, request, 'canReadComments', 'delete comments on this artifact')
+    if (!CommentApi.#mayRemove(comment, identity.userId, openedArtifact)) throw HttpError.forbidden('delete a comment someone else wrote')
+    await this.#context.repositories.comments.remove(commentId)
+    return new Response(null, { status: 204 })
+  }
+
+  // People take back their own words; whoever manages the artifact may also clear what others left on it.
+  static #mayRemove(comment: ArtifactComment, userId: string, openedArtifact: OpenedArtifact): boolean {
+    return comment.authorId === userId || openedArtifact.permissions.canManageSharing
   }
 
   // Threads are one level deep: a reply to a reply joins the thread of the comment it answers.
@@ -192,7 +209,7 @@ export class CommentApi {
     return allComments.filter(comment => shownThreadIds.has(comment.parentId ?? comment.commentId))
   }
 
-  static #commentJson(comment: ArtifactComment, names: Map<string, string>) {
+  static #commentJson(comment: ArtifactComment, names: Map<string, string>, canDelete: boolean) {
     return {
       commentId: comment.commentId,
       parentId: comment.parentId,
@@ -205,6 +222,7 @@ export class CommentApi {
       resolvedAt: comment.resolvedAt,
       resolvedBy: comment.resolvedBy === null ? null : { userId: comment.resolvedBy, name: names.get(comment.resolvedBy) },
       createdAt: comment.createdAt,
+      canDelete,
     }
   }
 }

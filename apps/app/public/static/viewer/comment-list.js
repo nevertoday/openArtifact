@@ -5,7 +5,7 @@ import { COMMENT_FILTERS } from './comment-threads.js'
 const COPIED_LABEL_MS = 2000
 const FILTER_LABELS = { open: '待处理', agent: '给 agent', all: '全部' }
 const COMMENT_LINK_PREFIX = '#comment-'
-const THREAD_CONTROLS = ['.comment-pin', '.comment-thread__resolve', '.comment-thread__reply-toggle']
+const THREAD_CONTROLS = ['.comment-pin', '.comment-thread__resolve', '.comment-thread__reply-toggle', '.comment-thread__delete']
 const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)')
 
 /**
@@ -241,7 +241,7 @@ export class CommentList extends EventTarget {
       this.#metaOf(thread),
       this.#excerptOf(thread),
       element('p', { className: 'comment-thread__body' }, thread.root.body),
-      thread.replies.length > 0 ? element('ol', { className: 'comment-replies' }, thread.replies.map(reply => CommentList.#replyElement(reply))) : null,
+      thread.replies.length > 0 ? element('ol', { className: 'comment-replies' }, thread.replies.map(reply => this.#replyElement(thread, reply))) : null,
       isResolved ? CommentList.#resolutionOf(thread.root) : null,
       this.#canComment ? this.#actionsOrReplyForm(thread) : null,
     )
@@ -298,7 +298,46 @@ export class CommentList extends EventTarget {
       isResolved
         ? action('重新打开', () => this.#reopen(thread), { className: 'xxd-link comment-thread__resolve', 'aria-label': `重新打开评论 ${thread.number}` })
         : action('解决', () => this.#resolve(thread), { className: 'xxd-link comment-thread__resolve', 'aria-label': `解决评论 ${thread.number}` }),
+      thread.root.canDelete ? CommentList.#deleteButton(() => this.#deleteThread(thread), `删除评论 ${thread.number}`) : null,
     )
+  }
+
+  // Set apart at the row's end and quiet until pointed at, so it is never pressed on the way to 解决.
+  static #deleteButton(onClick, label) {
+    return element('button', { type: 'button', className: 'xxd-link comment-thread__delete', 'aria-label': label, onClick }, '删除')
+  }
+
+  // Deleting cannot be undone, so it always asks; the kit puts 取消 first and the danger action last.
+  static #confirmDeletion(title, whatElseGoes) {
+    return Xxd.confirmDialog({ title, message: `${whatElseGoes}删除后不能恢复。`, confirmLabel: '删除', cancelLabel: '取消', closeLabel: '关闭', tone: 'danger' })
+  }
+
+  async #deleteThread(thread) {
+    const replyCount = thread.replies.length
+    const confirmed = await CommentList.#confirmDeletion(`删除评论 ${thread.number}？`, replyCount > 0 ? `它的 ${replyCount} 条回复会一起删除。` : '')
+    if (!confirmed) return
+    const neighbourId = this.#neighbourOf(thread.id)
+    try {
+      await this.#threads.remove(thread.id)
+      this.#announce(`已删除评论 ${thread.number}`)
+      Xxd.toast(`已删除评论 ${thread.number}`, { within: this.#toastRegion })
+      this.#focusThreadOrList(neighbourId)
+    } catch (error) {
+      Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#toastRegion })
+    }
+  }
+
+  async #deleteReply(thread, reply) {
+    const confirmed = await CommentList.#confirmDeletion('删除这条回复？', '')
+    if (!confirmed) return
+    try {
+      await this.#threads.remove(reply.commentId)
+      this.#announce(`已删除评论 ${thread.number} 的一条回复`)
+      Xxd.toast('已删除回复', { within: this.#toastRegion })
+      this.#threadElementOf(thread.id)?.querySelector('.comment-thread__reply-toggle')?.focus()
+    } catch (error) {
+      Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#toastRegion })
+    }
   }
 
   // The control itself says 已复制 for a moment, in words, so it never reads as another control's symbol.
@@ -323,16 +362,25 @@ export class CommentList extends EventTarget {
     }, COPIED_LABEL_MS)
   }
 
-  // Focus goes to the thread after the resolved one, so the keyboard keeps its place in the list.
-  async #resolve(thread) {
+  // The thread after this one in the list, or the one before when it is the last: where the keyboard goes once it leaves.
+  #neighbourOf(threadId) {
     const shownIds = this.#threads.all.filter(candidate => candidate.matches(this.#filter)).map(candidate => candidate.id)
-    const nextId = shownIds[shownIds.indexOf(thread.id) + 1] ?? null
+    const index = shownIds.indexOf(threadId)
+    return shownIds[index + 1] ?? shownIds[index - 1] ?? null
+  }
+
+  #focusThreadOrList(threadId) {
+    const focusTarget = (threadId && this.#threadElementOf(threadId)?.querySelector('.comment-pin')) ?? this.#element.querySelector('[data-comment-threads]')
+    focusTarget.focus()
+  }
+
+  async #resolve(thread) {
+    const neighbourId = this.#neighbourOf(thread.id)
     try {
       await this.#threads.setResolved(thread.id, true)
       this.#announce(`已解决评论 ${thread.number}`)
       Xxd.toast(`已解决评论 ${thread.number}`, { within: this.#toastRegion, action: { label: '撤销', onClick: () => this.#reopen(thread) } })
-      const focusTarget = nextId ? this.#threadElementOf(nextId)?.querySelector('.comment-pin') : this.#element.querySelector('[data-comment-threads]')
-      focusTarget?.focus()
+      this.#focusThreadOrList(neighbourId)
     } catch (error) {
       Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#toastRegion })
     }
@@ -397,12 +445,13 @@ export class CommentList extends EventTarget {
     return comment.postedVia ? `${comment.postedVia}（代 ${comment.author.name}）` : comment.author.name
   }
 
-  static #replyElement(reply) {
+  #replyElement(thread, reply) {
     const byAgent = reply.postedVia !== null
     const who = byAgent
       ? [element('span', { className: 'comment-agent-mark', 'aria-hidden': 'true' }, icon('SquareTerminal', 14)), element('b', { className: 'comment-thread__author' }, reply.postedVia), element('span', { className: 'xxd-badge' }, `代 ${reply.author.name}`)]
       : [element('span', { className: 'xxd-avatar', 'data-size': 'sm', 'aria-hidden': 'true' }, initialOf(reply.author.name)), element('b', { className: 'comment-thread__author' }, reply.author.name)]
-    return element('li', { className: 'comment-reply', 'data-agent': byAgent }, element('div', { className: 'comment-thread__meta' }, who, timeElement(reply.createdAt)), element('p', {}, reply.body))
+    const deleteReply = this.#canComment && reply.canDelete ? CommentList.#deleteButton(() => this.#deleteReply(thread, reply), `删除 ${reply.postedVia ?? reply.author.name} 的回复`) : null
+    return element('li', { className: 'comment-reply', 'data-agent': byAgent }, element('div', { className: 'comment-thread__meta' }, who, timeElement(reply.createdAt), deleteReply), element('p', {}, reply.body))
   }
 
   static #resolutionOf(root) {

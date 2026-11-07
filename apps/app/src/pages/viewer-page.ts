@@ -237,7 +237,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     const commentsView = html`<div class="viewer-drawer__view" data-drawer-view="comments">
     <div class="viewer-drawer__filters" data-comment-filters></div>
     <div class="viewer-drawer__cue" data-new-comments></div>
-    <div class="viewer-drawer__threads" data-comment-threads><p class="viewer-drawer__status"><span class="xxd-spinner" aria-hidden="true"></span>正在加载评论…</p></div>
+    <div class="viewer-drawer__threads" data-comment-threads tabindex="-1"><p class="viewer-drawer__status"><span class="xxd-spinner" aria-hidden="true"></span>正在加载评论…</p></div>
     <p class="viewer-drawer__foot" data-drawer-foot hidden></p>
     <div class="xxd-sr-only" role="status" data-comment-status></div>
   </div>`

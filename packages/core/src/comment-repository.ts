@@ -53,6 +53,8 @@ export interface CommentRepository {
   listForArtifact(artifactId: string): Promise<ArtifactComment[]>
   /** `resolvedBy` null reopens the comment. */
   setResolved(commentId: string, resolvedBy: string | null): Promise<void>
+  /** Removes the comment for good; removing a thread's first comment removes its replies with it. */
+  remove(commentId: string): Promise<void>
   /** Every comment of the workspace's unresolved threads, oldest first. */
   listInOpenThreads(workspaceId: string): Promise<ArtifactComment[]>
 }
