@@ -1,9 +1,8 @@
-import { element, icon, initialOf, submitOnce, timeElement, userMessageOf } from '../common.js'
+import { element, icon, initialOf, m, submitOnce, timeElement, userMessageOf } from '../common.js'
 import { MODIFIER_KEY } from './comment-mode.js'
 import { COMMENT_FILTERS } from './comment-threads.js'
 
 const COPIED_LABEL_MS = 2000
-const FILTER_LABELS = { open: '待处理', agent: '给 agent', all: '全部' }
 const COMMENT_LINK_PREFIX = '#comment-'
 const THREAD_CONTROLS = ['.comment-pin', '.comment-thread__resolve', '.comment-thread__reply-toggle', '.comment-thread__delete']
 const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)')
@@ -83,14 +82,14 @@ export class CommentList extends EventTarget {
   /** J and K: the next or previous open thread in the order its pins appear on the page. */
   step(direction, threadsInPageOrder) {
     const open = threadsInPageOrder.filter(thread => thread.isOpen)
-    if (open.length === 0) return Xxd.toast('没有待处理的评论', { within: this.#toastRegion })
+    if (open.length === 0) return Xxd.toast(m.viewerClient.comments.noneOpen, { within: this.#toastRegion })
     const index = open.findIndex(thread => thread.id === this.#activeId)
     const firstStep = direction > 0 ? open[0] : open.at(-1)
     const next = index < 0 ? firstStep : open[(index + direction + open.length) % open.length]
     this.select(next.id, { reveal: true, focus: true })
   }
 
-  /** Threads whose element is gone from the version on screen read 位置已失效 instead of pointing nowhere. */
+  /** Threads whose element is gone from the version on screen say their spot is lost instead of pointing nowhere. */
   showOrphaned(threadIds) {
     const unchanged = threadIds.length === this.#orphanedIds.size && threadIds.every(threadId => this.#orphanedIds.has(threadId))
     if (unchanged) return
@@ -173,8 +172,8 @@ export class CommentList extends EventTarget {
     const foot = this.#element.querySelector('[data-drawer-foot]')
     foot.hidden = !this.#canComment
     if (!this.#canComment) return
-    if (this.#byTouch) foot.replaceChildren('长按页面上的内容写评论。')
-    else foot.replaceChildren('按 ', element('kbd', { className: 'xxd-kbd' }, 'C'), ' 再点页面写评论，', element('kbd', { className: 'xxd-kbd' }, 'J'), ' ', element('kbd', { className: 'xxd-kbd' }, 'K'), ' 切换评论。')
+    if (this.#byTouch) foot.replaceChildren(m.viewerClient.comments.footTouch)
+    else foot.replaceChildren(...m.viewerClient.comments.footKeys(element('kbd', { className: 'xxd-kbd' }, 'C'), element('kbd', { className: 'xxd-kbd' }, 'J'), element('kbd', { className: 'xxd-kbd' }, 'K')))
   }
 
   #isFilterShown(filter) {
@@ -198,8 +197,8 @@ export class CommentList extends EventTarget {
     slot.hidden = shownFilters.length < 2
     if (slot.hidden) return slot.replaceChildren()
     const option = filter => element('button', { type: 'button', role: 'radio', 'aria-checked': String(filter === this.#filter), tabindex: filter === this.#filter ? '0' : '-1', 'data-value': filter },
-      FILTER_LABELS[filter], element('span', { className: 'comment-filter__count' }, String(this.#threads.count(filter))))
-    const group = element('div', { className: 'xxd-segmented', 'data-xxd-segmented': true, 'data-size': 'sm', role: 'radiogroup', 'aria-label': '筛选评论' }, shownFilters.map(option))
+      m.viewerClient.comments.filters[filter], element('span', { className: 'comment-filter__count' }, String(this.#threads.count(filter))))
+    const group = element('div', { className: 'xxd-segmented', 'data-xxd-segmented': true, 'data-size': 'sm', role: 'radiogroup', 'aria-label': m.viewerClient.comments.filterLabel }, shownFilters.map(option))
     group.addEventListener('xxd:change', event => {
       this.#filter = event.detail.value
       this.render()
@@ -213,15 +212,15 @@ export class CommentList extends EventTarget {
     const arrivedCount = this.#arrivedIds.size
     if (arrivedCount === 0) return slot.replaceChildren()
     const [firstArrived] = this.#arrivedIds
-    slot.replaceChildren(element('button', { type: 'button', className: 'xxd-btn', 'data-size': 'xs', onClick: () => this.select(firstArrived, { focus: true }) }, `有 ${arrivedCount} 条新评论`))
+    slot.replaceChildren(element('button', { type: 'button', className: 'xxd-btn', 'data-size': 'xs', onClick: () => this.select(firstArrived, { focus: true }) }, m.viewerClient.comments.arrived(arrivedCount)))
   }
 
   #emptyState() {
-    const noCommentsYet = this.#canComment ? `还没有评论。${this.#byTouch ? '长按页面上的内容' : '按 C，点页面上的内容'}写第一条。` : '还没有评论。'
+    const noCommentsYet = this.#canComment ? (this.#byTouch ? m.viewerClient.comments.writeFirstTouch : m.viewerClient.comments.writeFirstPointer) : m.viewerClient.comments.noCommentsYet
     const hasComments = this.#threads.count('all') > 0
     const emptyText = {
-      open: hasComments ? '没有待处理的评论。' : noCommentsYet,
-      agent: '没有给 agent 的评论。勾上「给 agent」，agent 会按评论修改页面。',
+      open: hasComments ? m.viewerClient.comments.emptyOpen : noCommentsYet,
+      agent: m.viewerClient.comments.emptyAgent,
       all: noCommentsYet,
     }[this.#filter]
     return element('div', { className: 'xxd-empty comment-threads__empty', 'data-size': 'sm' }, element('p', { className: 'xxd-empty__text' }, emptyText))
@@ -236,7 +235,7 @@ export class CommentList extends EventTarget {
       'data-active': thread.id === this.#activeId,
       'data-arrived': this.#arrivedIds.has(thread.id) || thread.id === this.#freshId,
       tabindex: '-1',
-      'aria-label': `评论 ${thread.number}，${CommentList.#authorOf(thread.root)}${isResolved ? '，已解决' : ''}`,
+      'aria-label': m.viewerClient.comments.threadLabel({ number: thread.number, author: CommentList.#authorOf(thread.root), resolved: isResolved }),
     },
       this.#metaOf(thread),
       this.#excerptOf(thread),
@@ -255,11 +254,11 @@ export class CommentList extends EventTarget {
   #metaOf(thread) {
     const pinContent = thread.pinState === 'resolved' ? icon('Check', 14) : String(thread.number)
     return element('div', { className: 'comment-thread__meta' },
-      element('button', { type: 'button', className: 'comment-pin', 'data-state': thread.pinState, 'aria-label': `在页面上显示评论 ${thread.number}`, onClick: () => this.select(thread.id) }, pinContent),
+      element('button', { type: 'button', className: 'comment-pin', 'data-state': thread.pinState, 'aria-label': m.viewerClient.comments.showPin(thread.number), onClick: () => this.select(thread.id) }, pinContent),
       element('span', { className: 'xxd-avatar', 'data-size': 'sm', 'aria-hidden': 'true' }, initialOf(thread.root.author.name)),
       element('b', { className: 'comment-thread__author' }, CommentList.#authorOf(thread.root)),
       timeElement(thread.root.createdAt),
-      thread.forAgent ? element('span', { className: 'xxd-badge', 'data-tone': 'warning' }, '给 agent') : null,
+      thread.forAgent ? element('span', { className: 'xxd-badge', 'data-tone': 'warning' }, m.viewerClient.comments.forAgent) : null,
     )
   }
 
@@ -268,22 +267,21 @@ export class CommentList extends EventTarget {
     const showsWork = this.#filter === 'open' || this.#filter === 'agent'
     const waiting = this.#threads.all.filter(thread => thread.isCountedIn(this.#filter))
     if (!this.#handoff || !showsWork || waiting.length === 0) return null
-    const what = this.#filter === 'agent' ? '给 agent 的评论' : '待处理的评论'
     const copyAll = element('button', {
       type: 'button',
       className: 'xxd-btn agent-handoff__copy',
       'data-variant': 'primary',
       'data-size': 'sm',
-      onClick: event => this.#copyToAgent(event.currentTarget, waiting, `已复制 ${waiting.length} 条评论，粘贴给你的 agent`),
-    }, icon('Copy', 14), element('span', { 'data-copy-label': '' }, '全部复制给 agent'))
-    return element('section', { className: 'agent-handoff', 'aria-label': '交给 agent' },
-      element('p', { className: 'agent-handoff__title' }, `${waiting.length} 条${what}`),
+      onClick: event => this.#copyToAgent(event.currentTarget, waiting, m.viewerClient.handoff.copiedAll(waiting.length)),
+    }, icon('Copy', 14), element('span', { 'data-copy-label': '' }, m.viewerClient.handoff.copyAll))
+    return element('section', { className: 'agent-handoff', 'aria-label': m.viewerClient.handoff.region },
+      element('p', { className: 'agent-handoff__title' }, this.#filter === 'agent' ? m.viewerClient.handoff.waitingAgent(waiting.length) : m.viewerClient.handoff.waitingOpen(waiting.length)),
       copyAll,
-      element('p', { className: 'agent-handoff__hint' }, '粘贴给任何 agent 都能照着改。已接入的 agent，直接说「处理 Open Artifact 上的评论」。', element('a', { className: 'xxd-link', href: '/settings/agents' }, '去 Agent 接入')))
+      element('p', { className: 'agent-handoff__hint' }, m.viewerClient.handoff.hint, element('a', { className: 'xxd-link', href: '/settings/agents' }, m.viewerClient.handoff.setUp)))
   }
 
   #excerptOf(thread) {
-    const lostSpot = this.#orphanedIds.has(thread.id) ? element('span', { className: 'comment-thread__lost' }, '位置已失效') : null
+    const lostSpot = this.#orphanedIds.has(thread.id) ? element('span', { className: 'comment-thread__lost' }, m.viewerClient.comments.lostSpot) : null
     if (!thread.excerpt && !lostSpot) return null
     return element('p', { className: 'comment-thread__quote' }, lostSpot, thread.excerpt)
   }
@@ -294,34 +292,34 @@ export class CommentList extends EventTarget {
     const isResolved = !thread.isOpen
     const action = (label, onClick, extra = {}) => element('button', { type: 'button', className: 'xxd-btn comment-action', 'data-variant': 'ghost', 'data-size': 'xs', onClick, ...extra }, label)
     return element('div', { className: 'comment-thread__actions' },
-      action('回复', () => this.#openReply(thread.id), { className: 'xxd-btn comment-action comment-thread__reply-toggle', 'aria-label': `回复评论 ${thread.number}` }),
-      this.#handoff && !isResolved ? action('复制给 agent', event => this.#copyToAgent(event.currentTarget, [thread], `已复制评论 ${thread.number}，粘贴给你的 agent`), { 'aria-label': `复制评论 ${thread.number} 给 agent` }) : null,
+      action(m.viewerClient.comments.reply, () => this.#openReply(thread.id), { className: 'xxd-btn comment-action comment-thread__reply-toggle', 'aria-label': m.viewerClient.comments.replyTo(thread.number) }),
+      this.#handoff && !isResolved ? action(m.viewerClient.handoff.copyOne, event => this.#copyToAgent(event.currentTarget, [thread], m.viewerClient.handoff.copiedOne(thread.number)), { 'aria-label': m.viewerClient.handoff.copyOneLabel(thread.number) }) : null,
       isResolved
-        ? action('重新打开', () => this.#reopen(thread), { className: 'xxd-btn comment-action comment-thread__resolve', 'aria-label': `重新打开评论 ${thread.number}` })
-        : action('解决', () => this.#resolve(thread), { className: 'xxd-btn comment-action comment-thread__resolve', 'aria-label': `解决评论 ${thread.number}` }),
-      thread.root.canDelete ? CommentList.#deleteButton(() => this.#deleteThread(thread), `删除评论 ${thread.number}`) : null,
+        ? action(m.viewerClient.comments.reopen, () => this.#reopen(thread), { className: 'xxd-btn comment-action comment-thread__resolve', 'aria-label': m.viewerClient.comments.reopenLabel(thread.number) })
+        : action(m.viewerClient.comments.resolve, () => this.#resolve(thread), { className: 'xxd-btn comment-action comment-thread__resolve', 'aria-label': m.viewerClient.comments.resolveLabel(thread.number) }),
+      thread.root.canDelete ? CommentList.#deleteButton(() => this.#deleteThread(thread), m.viewerClient.comments.deleteLabel(thread.number)) : null,
     )
   }
 
-  // Set apart at the row's end and quiet until pointed at, so it is never pressed on the way to 解决.
+  // Set apart at the row's end and quiet until pointed at, so it is never pressed on the way to resolving.
   static #deleteButton(onClick, label) {
-    return element('button', { type: 'button', className: 'xxd-btn comment-action comment-thread__delete', 'data-variant': 'ghost', 'data-size': 'xs', 'aria-label': label, onClick }, '删除')
+    return element('button', { type: 'button', className: 'xxd-btn comment-action comment-thread__delete', 'data-variant': 'ghost', 'data-size': 'xs', 'aria-label': label, onClick }, m.viewerClient.comments.delete)
   }
 
-  // Deleting cannot be undone, so it always asks; the kit puts 取消 first and the danger action last.
-  static #confirmDeletion(title, whatElseGoes) {
-    return Xxd.confirmDialog({ title, message: `${whatElseGoes}删除后不能恢复。`, confirmLabel: '删除', cancelLabel: '取消', closeLabel: '关闭', tone: 'danger' })
+  // Deleting cannot be undone, so it always asks; the kit puts cancel first and the danger action last.
+  static #confirmDeletion(title, message) {
+    return Xxd.confirmDialog({ title, message, confirmLabel: m.viewerClient.comments.delete, cancelLabel: m.viewerClient.actions.cancel, closeLabel: m.viewerClient.actions.close, tone: 'danger' })
   }
 
   async #deleteThread(thread) {
     const replyCount = thread.replies.length
-    const confirmed = await CommentList.#confirmDeletion(`删除评论 ${thread.number}？`, replyCount > 0 ? `它的 ${replyCount} 条回复会一起删除。` : '')
+    const confirmed = await CommentList.#confirmDeletion(m.viewerClient.comments.deleteTitle(thread.number), m.viewerClient.comments.deleteMessage(replyCount))
     if (!confirmed) return
     const neighbourId = this.#neighbourOf(thread.id)
     try {
       await this.#threads.remove(thread.id)
-      this.#announce(`已删除评论 ${thread.number}`)
-      Xxd.toast(`已删除评论 ${thread.number}`, { within: this.#toastRegion })
+      this.#announce(m.viewerClient.comments.deleted(thread.number))
+      Xxd.toast(m.viewerClient.comments.deleted(thread.number), { within: this.#toastRegion })
       this.#focusThreadOrList(neighbourId)
     } catch (error) {
       Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#toastRegion })
@@ -329,31 +327,31 @@ export class CommentList extends EventTarget {
   }
 
   async #deleteReply(thread, reply) {
-    const confirmed = await CommentList.#confirmDeletion('删除这条回复？', '')
+    const confirmed = await CommentList.#confirmDeletion(m.viewerClient.comments.deleteReplyTitle, m.viewerClient.comments.deleteReplyMessage)
     if (!confirmed) return
     try {
       await this.#threads.remove(reply.commentId)
-      this.#announce(`已删除评论 ${thread.number} 的一条回复`)
-      Xxd.toast('已删除回复', { within: this.#toastRegion })
+      this.#announce(m.viewerClient.comments.replyDeletedFrom(thread.number))
+      Xxd.toast(m.viewerClient.comments.replyDeleted, { within: this.#toastRegion })
       this.#threadElementOf(thread.id)?.querySelector('.comment-thread__reply-toggle')?.focus()
     } catch (error) {
       Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#toastRegion })
     }
   }
 
-  // The control itself says 已复制 for a moment, in words, so it never reads as another control's symbol.
+  // The control itself says it copied for a moment, in words, so it never reads as another control's symbol.
   async #copyToAgent(control, threads, doneMessage) {
     // The kit falls back to a hidden selection when the clipboard API is refused; it answers false only when both fail.
     const copied = await Xxd.copyText(this.#handoff.promptFor(threads))
     if (!copied) {
-      Xxd.toast('没有复制成功，请再试一次', { tone: 'danger', within: this.#toastRegion })
+      Xxd.toast(m.viewerClient.handoff.copyFailed, { tone: 'danger', within: this.#toastRegion })
       return
     }
     const label = control.querySelector('[data-copy-label]') ?? control
     const restingLabel = label.textContent
     // Held at its resting width, so the shorter word does not pull the controls beside it.
     control.style.minWidth = `${control.offsetWidth}px`
-    label.textContent = '已复制'
+    label.textContent = m.viewerClient.handoff.copied
     control.setAttribute('data-copied', '')
     Xxd.toast(doneMessage, { tone: 'success', within: this.#toastRegion })
     setTimeout(() => {
@@ -379,8 +377,8 @@ export class CommentList extends EventTarget {
     const neighbourId = this.#neighbourOf(thread.id)
     try {
       await this.#threads.setResolved(thread.id, true)
-      this.#announce(`已解决评论 ${thread.number}`)
-      Xxd.toast(`已解决评论 ${thread.number}`, { within: this.#toastRegion, action: { label: '撤销', onClick: () => this.#reopen(thread) } })
+      this.#announce(m.viewerClient.comments.resolved(thread.number))
+      Xxd.toast(m.viewerClient.comments.resolved(thread.number), { within: this.#toastRegion, action: { label: m.viewerClient.actions.undo, onClick: () => this.#reopen(thread) } })
       this.#focusThreadOrList(neighbourId)
     } catch (error) {
       Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#toastRegion })
@@ -390,7 +388,7 @@ export class CommentList extends EventTarget {
   async #reopen(thread) {
     try {
       await this.#threads.setResolved(thread.id, false)
-      this.#announce(`已重新打开评论 ${thread.number}`)
+      this.#announce(m.viewerClient.comments.reopened(thread.number))
       this.#threadElementOf(thread.id)?.querySelector('.comment-thread__resolve')?.focus()
     } catch (error) {
       Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#toastRegion })
@@ -398,13 +396,13 @@ export class CommentList extends EventTarget {
   }
 
   #replyForm(thread) {
-    const replyBody = element('textarea', { className: 'xxd-textarea', rows: '2', required: true, placeholder: '回复…', 'aria-label': `回复评论 ${thread.number}`, onInput: event => this.#replyDrafts.set(thread.id, event.target.value) }, this.#replyDrafts.get(thread.id) ?? '')
+    const replyBody = element('textarea', { className: 'xxd-textarea', rows: '2', required: true, placeholder: m.viewerClient.comments.replyPlaceholder, 'aria-label': m.viewerClient.comments.replyTo(thread.number), onInput: event => this.#replyDrafts.set(thread.id, event.target.value) }, this.#replyDrafts.get(thread.id) ?? '')
     const replyForm = element('form', { className: 'comment-reply-form', 'data-reply-form': thread.id },
       replyBody,
       element('div', { className: 'comment-reply-form__row' },
         element('span', { className: 'viewer-shortcut', 'aria-hidden': 'true' }, element('kbd', { className: 'xxd-kbd' }, MODIFIER_KEY), element('kbd', { className: 'xxd-kbd' }, '↵')),
-        element('button', { type: 'button', className: 'xxd-btn ui-dialog-cancel', 'data-size': 'sm', onClick: () => this.cancelReply() }, '取消'),
-        element('button', { type: 'submit', className: 'xxd-btn', 'data-variant': 'primary', 'data-size': 'sm' }, '回复'),
+        element('button', { type: 'button', className: 'xxd-btn ui-dialog-cancel', 'data-size': 'sm', onClick: () => this.cancelReply() }, m.viewerClient.actions.cancel),
+        element('button', { type: 'submit', className: 'xxd-btn', 'data-variant': 'primary', 'data-size': 'sm' }, m.viewerClient.comments.reply),
       ),
     )
     submitOnce(replyForm, () => this.#sendReply(thread, replyBody.value.trim()))
@@ -435,7 +433,7 @@ export class CommentList extends EventTarget {
       this.#replyingTo = null
       document.activeElement?.blur()
       this.render()
-      this.#announce(`已回复评论 ${thread.number}`)
+      this.#announce(m.viewerClient.comments.replied(thread.number))
       this.#threadElementOf(thread.id)?.querySelector('.comment-thread__reply-toggle')?.focus()
     } catch (error) {
       Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#toastRegion })
@@ -443,21 +441,21 @@ export class CommentList extends EventTarget {
   }
 
   static #authorOf(comment) {
-    return comment.postedVia ? `${comment.postedVia}（代 ${comment.author.name}）` : comment.author.name
+    return comment.postedVia ? m.viewerClient.comments.onBehalf({ agent: comment.postedVia, person: comment.author.name }) : comment.author.name
   }
 
   #replyElement(thread, reply) {
     const byAgent = reply.postedVia !== null
     const who = byAgent
-      ? [element('span', { className: 'comment-agent-mark', 'aria-hidden': 'true' }, icon('SquareTerminal', 14)), element('b', { className: 'comment-thread__author' }, reply.postedVia), element('span', { className: 'xxd-badge' }, `代 ${reply.author.name}`)]
+      ? [element('span', { className: 'comment-agent-mark', 'aria-hidden': 'true' }, icon('SquareTerminal', 14)), element('b', { className: 'comment-thread__author' }, reply.postedVia), element('span', { className: 'xxd-badge' }, m.viewerClient.comments.onBehalfBadge(reply.author.name))]
       : [element('span', { className: 'xxd-avatar', 'data-size': 'sm', 'aria-hidden': 'true' }, initialOf(reply.author.name)), element('b', { className: 'comment-thread__author' }, reply.author.name)]
-    const deleteReply = this.#canComment && reply.canDelete ? CommentList.#deleteButton(() => this.#deleteReply(thread, reply), `删除 ${reply.postedVia ?? reply.author.name} 的回复`) : null
+    const deleteReply = this.#canComment && reply.canDelete ? CommentList.#deleteButton(() => this.#deleteReply(thread, reply), m.viewerClient.comments.deleteReplyLabel(reply.postedVia ?? reply.author.name)) : null
     return element('li', { className: 'comment-reply', 'data-agent': byAgent }, element('div', { className: 'comment-thread__meta' }, who, timeElement(reply.createdAt), deleteReply), element('p', {}, reply.body))
   }
 
   static #resolutionOf(root) {
     const resolver = root.resolvedBy?.name
     const when = root.resolvedAt ? [' · ', timeElement(root.resolvedAt)] : []
-    return element('p', { className: 'comment-thread__resolution' }, resolver ? `${resolver} 标记已解决` : '已解决', when)
+    return element('p', { className: 'comment-thread__resolution' }, resolver ? m.viewerClient.comments.resolvedBy(resolver) : m.viewerClient.comments.resolvedPlain, when)
   }
 }

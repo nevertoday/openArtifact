@@ -1,4 +1,4 @@
-import { element, submitOnce, userMessageOf } from '../common.js'
+import { element, m, submitOnce, userMessageOf } from '../common.js'
 
 const COACH_SEEN_KEY = 'open-artifact.coach.comment'
 const COMPOSER_WIDTH = 340
@@ -45,7 +45,7 @@ export class CommentMode extends EventTarget {
     this.#frame.setMode({ commentable: true, commenting: on })
     this.#button.setAttribute('aria-pressed', String(on))
     this.#hint.hidden = !on
-    this.#hint.querySelector('[data-mode-hint-text]').textContent = on ? (writesByTouch() ? '点页面上的内容写评论' : '点页面上任意内容写评论') : ''
+    this.#hint.querySelector('[data-mode-hint-text]').textContent = on ? (writesByTouch() ? m.viewerClient.commentMode.hintTouch : m.viewerClient.commentMode.hintPointer) : ''
     this.dispatchEvent(new Event('change'))
   }
 }
@@ -87,9 +87,9 @@ export class Composer extends EventTarget {
     this.#keepDraft()
     this.#target = picked
     const sameAsDraft = this.#draft.key === Composer.#keyOf(picked.anchor)
-    this.#form.querySelector('[data-composer-label]').textContent = picked.label
+    this.#form.querySelector('[data-composer-label]').textContent = Composer.#wordsOf(picked.label)
     this.#form.querySelector('[data-composer-version]').textContent = `v${this.#shownVersion()}`
-    this.#form.querySelector('[data-composer-quote]').textContent = picked.source === 'selection' ? `「${picked.excerpt}」` : picked.excerpt
+    this.#form.querySelector('[data-composer-quote]').textContent = picked.source === 'selection' ? m.viewerClient.quoted(picked.excerpt) : picked.excerpt
     this.#form.elements.body.value = sameAsDraft ? this.#draft.body : ''
     this.#form.elements.forAgent.checked = sameAsDraft && this.#draft.forAgent
     this.#showAgentNote()
@@ -110,6 +110,11 @@ export class Composer extends EventTarget {
   #keepDraft() {
     if (!this.#target) return
     this.#draft = { key: Composer.#keyOf(this.#target.anchor), body: this.#form.elements.body.value, forAgent: this.#form.elements.forAgent.checked }
+  }
+
+  static #wordsOf({ kind, text }) {
+    const kindName = m.viewerClient.blockKinds[kind]
+    return text ? `${kindName} · ${text}` : kindName
   }
 
   static #keyOf(anchor) {
@@ -175,7 +180,7 @@ export class CoachMark {
     this.#button = button
     coach.querySelector('[data-dismiss-coach]').addEventListener('click', () => this.dismiss())
     window.addEventListener('resize', () => this.#place())
-    // Doing anything else with the page is as good as 知道了.
+    // Doing anything else with the page is as good as dismissing it.
     document.addEventListener('pointerdown', event => { if (!coach.contains(event.target)) this.dismiss() })
   }
 
@@ -186,8 +191,8 @@ export class CoachMark {
   showOnce() {
     if (this.#wasSeen()) return
     const text = this.#element.querySelector('[data-coach-text]')
-    if (writesByTouch()) text.replaceChildren('长按页面任何地方留言')
-    else text.replaceChildren('按 ', element('kbd', { className: 'xxd-kbd' }, 'C'), '，在页面任何地方留言')
+    if (writesByTouch()) text.replaceChildren(m.viewerClient.commentMode.coachTouch)
+    else text.replaceChildren(...m.viewerClient.commentMode.coachKeys(element('kbd', { className: 'xxd-kbd' }, 'C')))
     this.#element.hidden = false
     this.#place()
   }

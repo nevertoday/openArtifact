@@ -44,7 +44,7 @@ describe('the SDK in an artifact page', () => {
 
     expect(page.lastMessageNamed('target-picked')).toMatchObject({
       source: 'click',
-      label: '表格 · 修复进度',
+      label: { kind: 'table', text: '修复进度' },
       excerpt: '问题 · 状态',
       anchor: { selector: 'body > main:nth-of-type(1) > table:nth-of-type(1)', textQuote: '问题 · 状态', quote: null },
     })
@@ -56,7 +56,7 @@ describe('the SDK in an artifact page', () => {
 
     await page.click('.tile')
 
-    expect(page.lastMessageNamed('target-picked')).toMatchObject({ label: '区块 · 4 P0', anchor: { selector: 'body > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)' } })
+    expect(page.lastMessageNamed('target-picked')).toMatchObject({ label: { kind: 'block', text: '4 P0' }, anchor: { selector: 'body > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)' } })
   })
 
   it('picks nothing on the blank margins of the page\'s column', async () => {
@@ -103,6 +103,21 @@ describe('the SDK in an artifact page', () => {
     expect(page.overlay?.querySelector('.pins')?.getAttribute('aria-label')).toBe('评论标注')
   })
 
+  it('words its own pins, marks and buttons in the language the viewer names', async () => {
+    page = await FramedPage.loaded(REVIEW_PAGE)
+    await page.tell('pins', { pins: [{ commentId: 'c1', number: 1, state: 'resolved', active: false, anchor: { x: 0, y: 0, selector: '#intro', textQuote: '发布侧已经顺手', quote: null } }] })
+    await page.tell('compare', { diff: { changed: [{ path: '#intro', before: '旧的一句', after: '' }], added: [], removed: [] } })
+
+    await page.tell('language', { locale: 'en' })
+
+    const overlayText = [page.overlay, page.marksOverlay].map(root => root?.innerHTML ?? '').join('')
+    expect(page.overlay?.querySelector('.pins')?.getAttribute('aria-label')).toBe('Comment pins')
+    expect(page.overlay?.querySelector('.pin')?.getAttribute('aria-label')).toBe('Comment 1, resolved')
+    expect(page.overlay?.querySelector('.select-button')?.textContent).toBe('Comment')
+    expect(page.marksOverlay?.querySelector('.mark')?.getAttribute('title')).toBe('Was: 旧的一句')
+    expect(overlayText.replace('旧的一句', '')).not.toMatch(/[一-鿿]/)
+  })
+
   it('finds a commented paragraph again after the paragraph before it was removed', async () => {
     page = await FramedPage.loaded('<main><p>第一段</p><p>产品有五类使用者。</p><p>第三段</p></main>')
     const scrolledTo: string[] = []
@@ -135,7 +150,7 @@ describe('the SDK in an artifact page', () => {
 
     expect(page.lastMessageNamed('target-picked')).toMatchObject({
       source: 'selection',
-      label: '选中的文字',
+      label: { kind: 'selection', text: '' },
       excerpt: '五类使用者',
       anchor: { selector: 'body > main:nth-of-type(1) > p:nth-of-type(2)', quote: { exact: '五类使用者', prefix: '产品有', suffix: '。前两类是付出时间的人。' } },
     })

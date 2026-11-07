@@ -1,4 +1,4 @@
-import { element, readJsonData, userMessageOf } from '../common.js'
+import { element, m, readJsonData, userMessageOf } from '../common.js'
 import { AgentHandoff } from './agent-handoff.js'
 import { SharedDataProxy } from '../shared-data-proxy.js'
 import { ArtifactFrame } from './artifact-frame.js'
@@ -52,7 +52,7 @@ if (versions) new VersionOverwrite({ config, versions, notice: versionNotice, st
 
 const threads = permissions.canReadComments ? new CommentThreads(config.artifactId, config.viewer) : null
 const handoff = permissions.canEdit
-  ? new AgentHandoff({ artifactId: config.artifactId, title: config.title, version: config.currentVersion, url: `${location.origin}/a/${encodeURIComponent(config.artifactId)}`, guideUrl: `${location.origin}/llms.txt` })
+  ? new AgentHandoff(m.viewerClient.agentPrompt, { artifactId: config.artifactId, title: config.title, version: config.currentVersion, url: `${location.origin}/a/${encodeURIComponent(config.artifactId)}`, guideUrl: `${location.origin}/llms.txt` })
   : null
 const list = threads ? new CommentList({ element: drawerElement.querySelector('[data-drawer-view="comments"]'), threads, drawer, stage, canComment: permissions.canComment, byTouch: writesByTouch(), handoff }) : null
 const pins = threads ? new CommentPins({ frame, threads, list, isShowingLatest: () => versions?.isShowingLatest ?? true }) : null
@@ -65,7 +65,7 @@ if (threads) {
     if (reveal && thread.anchor) frame.scrollToAnchor(thread.anchor)
   })
   threads.load().then(() => list.showLinkedComment(), error => {
-    drawerElement.querySelector('[data-comment-threads]').replaceChildren(element('p', { className: 'viewer-drawer__status' }, `评论没有加载出来：${userMessageOf(error)}`))
+    drawerElement.querySelector('[data-comment-threads]').replaceChildren(element('p', { className: 'viewer-drawer__status' }, m.viewerClient.comments.loadFailed(userMessageOf(error))))
   })
   window.addEventListener('hashchange', () => list.showLinkedComment())
   new LiveUpdates({ threads, versions, frame, list, drawer, stage }).start()
@@ -89,7 +89,7 @@ if (commentMode) {
   composer.addEventListener('sent', event => {
     const { thread } = event.detail
     if (!drawer.isSheet) return list.select(thread.id, { reveal: false, fresh: true })
-    Xxd.toast(`评论 ${thread.number} 已发送`, { tone: 'success', within: stage, action: { label: '查看', onClick: () => list.select(thread.id, { reveal: false, focus: true }) } })
+    Xxd.toast(m.viewerClient.comments.sent(thread.number), { tone: 'success', within: stage, action: { label: m.viewerClient.actions.view, onClick: () => list.select(thread.id, { reveal: false, focus: true }) } })
   })
   versions?.addEventListener('shown', () => composer.close())
   setTimeout(() => coach.showOnce(), COACH_DELAY_MS)

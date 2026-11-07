@@ -1,8 +1,9 @@
+import { m } from '../common.js'
+
 const SHEET_LAYOUT = matchMedia('(max-width: 640px)')
 const CLOSING_PULL_PX = 80
 const OPENING_PULL_PX = 60
 const TAP_PX = 4
-const VIEW_TITLES = { comments: '评论', data: '数据' }
 
 /**
  * The panel beside the artifact: comments by default, the page's data when asked for. On a wide screen it pushes
@@ -42,8 +43,8 @@ export class ViewerDrawer {
     const wasOpen = this.isOpen
     this.#view = view
     for (const viewElement of this.#element.querySelectorAll('[data-drawer-view]')) viewElement.hidden = viewElement.dataset.drawerView !== view
-    this.#element.querySelector('[data-drawer-title]').textContent = VIEW_TITLES[view]
-    this.#element.querySelector('[data-close-drawer]').setAttribute('aria-label', `关闭${VIEW_TITLES[view]}`)
+    this.#element.querySelector('[data-drawer-title]').textContent = m.viewerClient.drawer.titles[view]
+    this.#element.querySelector('[data-close-drawer]').setAttribute('aria-label', m.viewerClient.drawer.closeLabels[view])
     if (!wasOpen) {
       this.#returnFocusTo = document.activeElement
       this.#element.hidden = false

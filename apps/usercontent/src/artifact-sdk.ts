@@ -1,3 +1,6 @@
+import { DEFAULT_LOCALE } from '@open-artifact/core'
+import { SDK_MESSAGES } from './i18n/sdk-messages.ts'
+
 export const SDK_PATH = '/_sdk/open-artifact.js'
 
 /*
@@ -13,6 +16,7 @@ export const SDK_PATH = '/_sdk/open-artifact.js'
  * Parent to frame:
  *   response        { requestId, ok, result?, error?, status? }  answer to a shared-data request from the page
  *   sync            the viewer has started listening; a page that has already loaded says ready again
+ *   language        { locale }  the viewer's language, for the few words the frame shows itself
  *   theme           { theme, tokens, reducedMotion }  the viewer's colours, as CSS custom property values
  *   mode            { commentable, commenting }  whether the viewer may comment, and comment mode
  *   pins            { pins: [{ commentId, number, anchor, state: 'open' | 'agent' | 'resolved', active }] }
@@ -26,7 +30,9 @@ export const SDK_PATH = '/_sdk/open-artifact.js'
  * Frame to parent:
  *   request         { requestId, operation, ... }  shared data and viewer calls from the page
  *   ready           { blocks }  the page has loaded
- *   target-picked   { source: 'click' | 'long-press' | 'selection', anchor, rect, label, excerpt }
+ *   target-picked   { source: 'click' | 'long-press' | 'selection', anchor, rect, label: { kind, text }, excerpt }
+ *                   the viewer words the label; kind is heading, table, figure, image, video, code, quote,
+ *                   listItem, paragraph, term, definition, block or selection, and text is '' or a clipped name
  *   viewport        { top: { path, text, offset } | null, focused: rect | null }  at most once a frame
  *   pins-placed     { placed, orphaned, tops }  after every layout of the pins
  *   pin-selected    { commentId }
@@ -51,6 +57,8 @@ export class ArtifactSdk {
   const PREVIEW_ANSWERS = { viewer: null, list: [] }
   const pendingRequests = new Map()
   const viewerMessages = new Map()
+  const MESSAGES = ${JSON.stringify(SDK_MESSAGES)}
+  let words = MESSAGES[${JSON.stringify(DEFAULT_LOCALE)}]
   let requestCount = 0
 
   function tellViewer(name, fields) {
@@ -116,7 +124,7 @@ export class ArtifactSdk {
   const SEMANTIC_TARGETS = 'table, figure, pre, blockquote, img, svg, canvas, video, li, h1, h2, h3, h4, h5, h6, p, dt, dd'
   const OBSTACLES = 'img, svg, canvas, video, iframe, button, input, select, textarea'
   const BLOCK_DISPLAY = /^(block|list-item|table|table-row|table-cell|table-caption|flex|grid|flow-root)$/
-  const TAG_LABELS = new Map([['table', '表格'], ['figure', '图'], ['img', '图片'], ['svg', '图'], ['canvas', '图'], ['video', '视频'], ['pre', '代码'], ['blockquote', '引用'], ['li', '列表项'], ['p', '段落'], ['dt', '术语'], ['dd', '释义']])
+  const TAG_KINDS = new Map([['table', 'table'], ['figure', 'figure'], ['img', 'image'], ['svg', 'figure'], ['canvas', 'figure'], ['video', 'video'], ['pre', 'code'], ['blockquote', 'quote'], ['li', 'listItem'], ['p', 'paragraph'], ['dt', 'term'], ['dd', 'definition']])
   const THEME_TOKENS = ['ink', 'paper', 'muted', 'action', 'success-solid', 'success-on-solid', 'success-tint', 'warning-solid', 'warning-on-solid', 'warning-tint', 'danger-solid', 'danger-on-solid', 'danger-text', 'dim', 'font-body']
   const FORWARDED_KEYS = new Set(['c', 'C', 'j', 'J', 'k', 'K', '?', 'Escape'])
   const EXCERPT_LENGTH = 60
@@ -234,14 +242,18 @@ export class ArtifactSdk {
 
   function labelOf(element) {
     const tag = element.tagName.toLowerCase()
-    if (/^h[1-6]$/.test(tag)) return '标题 · ' + clip(normalize(element.textContent), 12)
+    if (/^h[1-6]$/.test(tag)) return { kind: 'heading', text: clip(normalize(element.textContent), 12) }
     if (tag === 'table') {
       const title = element.querySelector('caption') || precedingHeadingOf(element)
-      return title ? '表格 · ' + clip(normalize(title.textContent), 10) : '表格'
+      return { kind: 'table', text: title ? clip(normalize(title.textContent), 10) : '' }
     }
-    if (TAG_LABELS.has(tag)) return TAG_LABELS.get(tag)
-    const ownText = normalize(ownTextOf(element))
-    return ownText ? '区块 · ' + clip(ownText, 10) : '区块'
+    if (TAG_KINDS.has(tag)) return { kind: TAG_KINDS.get(tag), text: '' }
+    return { kind: 'block', text: clip(normalize(ownTextOf(element)), 10) }
+  }
+
+  function wordsOfLabel(label) {
+    const kind = words.blockKinds[label.kind]
+    return label.text ? kind + ' · ' + label.text : kind
   }
 
   // A table is named by its caption or first row, never by all of its cells run together.
@@ -400,8 +412,8 @@ export class ArtifactSdk {
   const marksHost = overlayHost('marks', 'pointer-events:none;', '<div class="marks"></div><div class="washes"></div>')
   const layerHost = overlayHost('pins', 'z-index:2147483000;',
     '<div class="outline"></div><div class="chip" aria-hidden="true"></div>' +
-    '<div class="pins" role="group" aria-label="评论标注"></div>' +
-    '<button class="select-button" type="button" aria-label="评论选中的文字"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="miter" aria-hidden="true"><path d="M3.5 4.5h17v12h-11l-6 4z"/></svg>评论</button>')
+    '<div class="pins" role="group"></div>' +
+    '<button class="select-button" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="miter" aria-hidden="true"><path d="M3.5 4.5h17v12h-11l-6 4z"/></svg><span></span></button>')
   const overlayHosts = [marksHost, layerHost]
   const shadow = layerHost.shadowRoot
   const outline = shadow.querySelector('.outline')
@@ -410,6 +422,12 @@ export class ArtifactSdk {
   const washLayer = marksHost.shadowRoot.querySelector('.washes')
   const pinLayer = shadow.querySelector('.pins')
   const selectButton = shadow.querySelector('.select-button')
+  function wordOverlay() {
+    pinLayer.setAttribute('aria-label', words.pins)
+    selectButton.setAttribute('aria-label', words.commentSelection)
+    selectButton.querySelector('span').textContent = words.comment
+  }
+  wordOverlay()
   const quoteHighlightStyle = document.createElement('style')
   quoteHighlightStyle.setAttribute('data-open-artifact-ui', '')
 
@@ -501,7 +519,7 @@ export class ArtifactSdk {
     button.querySelector('.number').textContent = String(pin.number)
     button.dataset.state = pin.state
     button.toggleAttribute('data-active', Boolean(pin.active))
-    button.setAttribute('aria-label', '评论 ' + pin.number + (pin.state === 'resolved' ? '，已解决' : ''))
+    button.setAttribute('aria-label', (pin.state === 'resolved' ? words.resolvedPin : words.pin).replace('{number}', pin.number))
   }
 
   function removePin(button) {
@@ -576,8 +594,8 @@ export class ArtifactSdk {
     mark.className = 'mark'
     mark.dataset.kind = kind
     mark.innerHTML = '<b></b>'
-    mark.querySelector('b').textContent = kind === 'changed' ? '改' : '新'
-    if (before) mark.title = '原来：' + before
+    mark.querySelector('b').textContent = words.marks[kind]
+    if (before) mark.title = words.was + before
     const box = documentRectOf(element)
     place(mark, box, element.closest('table') ? 0 : 4)
     mark.style.setProperty('--label-x', labelOffsetOf(element, box) + 'px')
@@ -591,9 +609,10 @@ export class ArtifactSdk {
     const box = container ? documentRectOf(container) : { left: 32, top: 8, width: 600, height: 0 }
     const line = document.createElement('div')
     line.className = 'removed'
-    line.innerHTML = '<b>删</b><span></span>'
+    line.innerHTML = '<b></b><span></span>'
+    line.querySelector('b').textContent = words.marks.removed
     line.querySelector('span').textContent = removal.text
-    line.title = '删掉了：' + removal.text
+    line.title = words.removed + removal.text
     line.style.left = box.left + 'px'
     line.style.top = (row ? row.top + row.height : box.top) + 6 + 'px'
     line.style.width = box.width + 'px'
@@ -687,7 +706,7 @@ export class ArtifactSdk {
     hovered = target
     if (!target) return hideHover()
     showOutline(target, false)
-    chip.textContent = labelOf(target)
+    chip.textContent = wordsOfLabel(labelOf(target))
     const chipLeft = Math.min(event.clientX + 14, innerWidth - chip.offsetWidth - 8)
     const nearBottom = event.clientY + 44 > innerHeight
     chip.style.transform = 'translate(' + Math.max(8, chipLeft) + 'px, ' + (nearBottom ? event.clientY - 30 : event.clientY + 20) + 'px)'
@@ -737,7 +756,7 @@ export class ArtifactSdk {
     longPress.start = null
   }
 
-  // ---------- selected words get a 评论 button ----------
+  // ---------- selected words get a comment button ----------
   function selectedRange() {
     const selection = getSelection()
     if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null
@@ -780,7 +799,7 @@ export class ArtifactSdk {
     selectButton.removeAttribute('data-shown')
     renderQuoteHighlight()
     getSelection().removeAllRanges()
-    tellViewer('target-picked', { source: 'selection', anchor: anchorOf(block, quote), rect: viewportRectOf(range.getBoundingClientRect()), label: '选中的文字', excerpt: clip(quote.exact, EXCERPT_LENGTH) })
+    tellViewer('target-picked', { source: 'selection', anchor: anchorOf(block, quote), rect: viewportRectOf(range.getBoundingClientRect()), label: { kind: 'selection', text: '' }, excerpt: clip(quote.exact, EXCERPT_LENGTH) })
   }
 
   // ---------- keys the viewer owns ----------
@@ -794,6 +813,11 @@ export class ArtifactSdk {
   // ---------- messages from the viewer ----------
   viewerMessages.set('sync', () => {
     if (document.readyState === 'complete') reportReady()
+  })
+  viewerMessages.set('language', message => {
+    words = MESSAGES[Object.hasOwn(MESSAGES, message.locale) ? message.locale : ${JSON.stringify(DEFAULT_LOCALE)}]
+    wordOverlay()
+    layout()
   })
   viewerMessages.set('theme', message => {
     const theme = message.theme === 'dark' ? 'dark' : 'light'

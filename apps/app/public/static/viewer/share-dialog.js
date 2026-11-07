@@ -1,12 +1,12 @@
-import { api, dateText, element, initialOf, submitOnce, userMessageOf } from '../common.js'
+import { api, dateText, element, initialOf, m, submitOnce, userMessageOf } from '../common.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const SHARE_LINK_PREFIX = '#share='
-const GRANT_ROLES = [['viewer', '可查看'], ['commenter', '可评论'], ['editor', '可编辑']]
+const GRANT_ROLES = ['viewer', 'commenter', 'editor']
 
 /**
- * Every change made in the share dialog, kept until 保存 sends them in one request. Only what the dialog shows for
- * the chosen visibility counts: the people where the server says they apply, the link settings for 公开链接.
+ * Every change made in the share dialog, kept until saving sends them in one request. Only what the dialog shows for
+ * the chosen visibility counts: the people where the server says they apply, the link settings for a public link.
  */
 class SharingDraft {
   constructor(saved) {
@@ -162,7 +162,7 @@ export class ShareDialog extends EventTarget {
   /** Opens the dialog; with `askedBy`, the member who asked for access is filled in, one click from being added. */
   async open({ askedBy = null } = {}) {
     this.#draft = null
-    this.#body.replaceChildren(element('p', { className: 'viewer-drawer__status' }, element('span', { className: 'xxd-spinner', 'aria-hidden': 'true' }), '正在加载…'))
+    this.#body.replaceChildren(element('p', { className: 'viewer-drawer__status' }, element('span', { className: 'xxd-spinner', 'aria-hidden': 'true' }), m.viewerClient.share.loading))
     this.#refreshSaveButton()
     Xxd.openDialog(this.#dialog)
     try {
@@ -176,7 +176,7 @@ export class ShareDialog extends EventTarget {
     }
   }
 
-  // Someone who asked for access can only be added where the list of people counts, so 指定的人 is chosen if needed.
+  // Someone who asked for access can only be added where the list of people counts, so specified people is chosen if needed.
   #prepareToAdd(userId) {
     const member = this.#draft.saved.members.find(candidate => candidate.userId === userId)
     const alreadyAdded = this.#draft.grants.has(userId)
@@ -198,11 +198,11 @@ export class ShareDialog extends EventTarget {
     const hasUnsavedChanges = this.#draft?.hasChanges ?? false
     if (hasUnsavedChanges) {
       const discardConfirmed = await Xxd.confirmDialog({
-        title: '放弃未保存的修改？',
-        message: '分享设置有修改还没有保存。关闭后，这些修改不会生效。',
-        confirmLabel: '放弃修改',
-        cancelLabel: '取消',
-        closeLabel: '关闭',
+        title: m.viewerClient.share.discardTitle,
+        message: m.viewerClient.share.discardMessage,
+        confirmLabel: m.viewerClient.share.discardConfirm,
+        cancelLabel: m.viewerClient.actions.cancel,
+        closeLabel: m.viewerClient.actions.close,
         tone: 'danger',
       })
       if (!discardConfirmed) return
@@ -211,7 +211,7 @@ export class ShareDialog extends EventTarget {
   }
 
   #visibilityChoices() {
-    const choice = (visibility, description) => {
+    const choice = visibility => {
       const isDisabled = visibility === 'public_link' && !this.#draft.saved.publicLink.allowedInWorkspace
       const radio = element('input', { type: 'radio', className: 'xxd-radio', name: 'visibility', id: `visibility-${visibility}`, value: visibility, checked: this.#draft.visibility === visibility, disabled: isDisabled })
       radio.addEventListener('change', () => {
@@ -219,54 +219,54 @@ export class ShareDialog extends EventTarget {
         this.#render()
       })
       return element('label', { className: 'xxd-choice', for: `visibility-${visibility}` }, radio,
-        element('span', {}, this.#visibilityLabels[visibility], element('small', {}, isDisabled ? 'workspace 管理员已关闭公开链接' : description)))
+        element('span', {}, this.#visibilityLabels[visibility], element('small', {}, isDisabled ? m.viewerClient.share.publicLinksOff : m.viewerClient.share.visibilityDescriptions[visibility])))
     }
-    return element('fieldset', { className: 'xxd-choices share-section' }, element('legend', { className: 'share-section__title' }, '谁能看到'),
-      choice('private', '只有你自己'),
-      choice('specified', '只有你在下面添加的人'),
-      choice('workspace', '默认。成员可以查看、评论，也能读写页面里的共享数据'),
-      choice('public_link', '拿到链接的人不用登录就能打开，只看到页面本身'),
+    return element('fieldset', { className: 'xxd-choices share-section' }, element('legend', { className: 'share-section__title' }, m.viewerClient.share.whoCanSee),
+      choice('private'),
+      choice('specified'),
+      choice('workspace'),
+      choice('public_link'),
     )
   }
 
   #peopleSection() {
     if (!this.#draft.peopleApply) return null
-    const emailInput = element('input', { className: 'xxd-input', 'data-size': 'sm', id: 'grant-email', type: 'email', required: true, placeholder: '输入成员邮箱', 'aria-label': '成员邮箱', list: 'workspace-members', value: this.#emailToAdd, 'data-error-type': '请输入有效的邮箱，比如 name@example.com' })
+    const emailInput = element('input', { className: 'xxd-input', 'data-size': 'sm', id: 'grant-email', type: 'email', required: true, placeholder: m.viewerClient.share.emailPlaceholder, 'aria-label': m.viewerClient.share.emailLabel, list: 'workspace-members', value: this.#emailToAdd, 'data-error-type': m.viewerClient.share.emailInvalid })
     const roleSelect = ShareDialog.#roleSelect(this.#draft.roleForNewPerson, 'grant-role')
     const addForm = element('form', { className: 'share-grant-form', 'data-xxd-validate': true },
-      element('div', { className: 'xxd-field share-grant-form__email' }, emailInput), ShareDialog.#selectBox(roleSelect), element('button', { type: 'submit', className: 'xxd-btn', 'data-size': 'sm' }, '添加'))
+      element('div', { className: 'xxd-field share-grant-form__email' }, emailInput), ShareDialog.#selectBox(roleSelect), element('button', { type: 'submit', className: 'xxd-btn', 'data-size': 'sm' }, m.viewerClient.share.add))
     submitOnce(addForm, () => this.#addPerson(emailInput, roleSelect.value))
     const memberOptions = element('datalist', { id: 'workspace-members' }, this.#draft.saved.members.map(member => element('option', { value: member.email }, member.name)))
     const grants = [...this.#draft.grants.values()]
     const peopleList = grants.length > 0
       ? element('ul', { className: 'xxd-list' }, grants.map(grant => this.#personRow(grant)))
-      : element('p', { className: 'xxd-text', 'data-variant': 'secondary' }, this.#draft.visibility === 'specified' ? '还没有添加任何人，现在只有你能看到。' : '还没有单独添加任何人。')
+      : element('p', { className: 'xxd-text', 'data-variant': 'secondary' }, this.#draft.visibility === 'specified' ? m.viewerClient.share.nobodyYetSpecified : m.viewerClient.share.nobodyYet)
     return element('section', { className: 'xxd-stack share-section' },
       element('div', { className: 'xxd-text-pair' },
-        element('h3', { className: 'share-section__title' }, '添加的人'),
-        element('p', { className: 'xxd-text', 'data-variant': 'caption' }, this.#draft.visibility === 'specified' ? '保存后，新添加的人会收到邮件。可查看：使用页面；可评论：再加评论；可编辑：还能发布新版本。' : '给某个人比其他人更多的权限，比如可编辑：还能发布新版本。保存后，新添加的人会收到邮件。')),
+        element('h3', { className: 'share-section__title' }, m.viewerClient.share.peopleTitle),
+        element('p', { className: 'xxd-text', 'data-variant': 'caption' }, this.#draft.visibility === 'specified' ? m.viewerClient.share.peopleHintSpecified : m.viewerClient.share.peopleHint)),
       addForm, memberOptions, peopleList,
     )
   }
 
   #personRow(grant) {
     const roleSelect = ShareDialog.#roleSelect(grant.role, `grant-role-${grant.userId}`)
-    roleSelect.setAttribute('aria-label', `${grant.name} 的权限`)
+    roleSelect.setAttribute('aria-label', m.viewerClient.share.roleOf(grant.name))
     roleSelect.addEventListener('change', () => {
       this.#draft.setRole(grant.userId, roleSelect.value)
       this.#refreshSaveButton()
     })
-    const unsavedBadge = this.#draft.isNewPerson(grant.userId) ? element('span', { className: 'xxd-badge', 'data-tone': 'action' }, '保存后添加') : null
+    const unsavedBadge = this.#draft.isNewPerson(grant.userId) ? element('span', { className: 'xxd-badge', 'data-tone': 'action' }, m.viewerClient.share.addedOnSave) : null
     return element('li', { className: 'xxd-list__item share-person' },
       element('span', { className: 'xxd-avatar', 'data-size': 'sm', 'aria-hidden': 'true' }, initialOf(grant.name)),
       element('span', { className: 'xxd-list__main' }, element('span', { className: 'xxd-list__title xxd-cluster' }, grant.name, unsavedBadge), element('span', { className: 'xxd-list__meta' }, grant.email ?? '')),
       ShareDialog.#selectBox(roleSelect),
-      element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'sm', onClick: () => { this.#draft.removePerson(grant.userId); this.#render() } }, '移除'),
+      element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'sm', onClick: () => { this.#draft.removePerson(grant.userId); this.#render() } }, m.viewerClient.share.remove),
     )
   }
 
   static #roleSelect(selectedRole, selectId) {
-    return element('select', { id: selectId, 'aria-label': '权限' }, GRANT_ROLES.map(([role, label]) => element('option', { value: role, selected: role === selectedRole }, label)))
+    return element('select', { id: selectId, 'aria-label': m.viewerClient.share.role }, GRANT_ROLES.map(role => element('option', { value: role, selected: role === selectedRole }, m.viewerClient.share.roles[role])))
   }
 
   static #selectBox(select) {
@@ -280,23 +280,23 @@ export class ShareDialog extends EventTarget {
       this.#draft.expiryChoice = expirySelect.value
       this.#refreshSaveButton()
     })
-    const anonymousWrite = this.#draftSwitch('anonymous-write', 'anonymousWriteEnabled', '允许匿名访客写入共享数据', '适合对外的报名表。')
-    const showsComments = this.#draftSwitch('shows-comments', 'showsComments', '对外显示评论', '访客可以看到评论和评论人的名字，但不能发表评论。')
+    const anonymousWrite = this.#draftSwitch('anonymous-write', 'anonymousWriteEnabled', m.viewerClient.share.anonymousWrite, m.viewerClient.share.anonymousWriteHint)
+    const showsComments = this.#draftSwitch('shows-comments', 'showsComments', m.viewerClient.share.showsComments, m.viewerClient.share.showsCommentsHint)
     const listed = this.#listedSwitch()
     return element('section', { className: 'xxd-stack share-section' },
       element('div', { className: 'xxd-text-pair' },
-        element('h3', { className: 'share-section__title' }, '公开链接'),
-        element('p', { className: 'xxd-text', 'data-variant': 'caption' }, '访客只看到最新版本的页面，看不到版本记录和数据。')),
+        element('h3', { className: 'share-section__title' }, m.viewerClient.share.publicLink),
+        element('p', { className: 'xxd-text', 'data-variant': 'caption' }, m.viewerClient.share.publicLinkHint)),
       element('div', { className: 'xxd-layout', 'data-cols': '2up' },
-        element('div', { className: 'xxd-field' }, element('label', { className: 'xxd-label', for: 'link-expiry' }, '有效期'), element('label', { className: 'xxd-select' }, expirySelect)),
-        element('div', { className: 'xxd-field' }, element('label', { className: 'xxd-label', for: 'link-password', 'data-optional': true }, '访问密码'), this.#passwordControl())),
+        element('div', { className: 'xxd-field' }, element('label', { className: 'xxd-label', for: 'link-expiry' }, m.viewerClient.share.expiry), element('label', { className: 'xxd-select' }, expirySelect)),
+        element('div', { className: 'xxd-field' }, element('label', { className: 'xxd-label', for: 'link-password', 'data-optional': true }, m.viewerClient.share.password), this.#passwordControl())),
       listed, anonymousWrite, showsComments,
     )
   }
 
   // The personal page is for strangers to find, so the switch says so; a password rules it out.
   #listedSwitch() {
-    const listedSwitch = this.#draftSwitch('listed', 'listed', '列在我的主页', '')
+    const listedSwitch = this.#draftSwitch('listed', 'listed', m.viewerClient.share.listed, '')
     queueMicrotask(() => this.#refreshListedSwitch())
     return listedSwitch
   }
@@ -309,37 +309,37 @@ export class ShareDialog extends EventTarget {
     checkbox.disabled = !listable
     checkbox.checked = this.#draft.listed && listable
     const description = checkbox.closest('label').querySelector('small')
-    const pageLink = personalPageUrl ? element('a', { className: 'xxd-link', href: personalPageUrl, target: '_blank', rel: 'noopener' }, '看我的主页') : null
-    description.replaceChildren(...(listable ? ['陌生人能在你的主页上看到它，搜索引擎也能找到。', pageLink ? ' ' : '', pageLink ?? ''] : ['设了访问密码的文档不能列出。']))
+    const pageLink = personalPageUrl ? element('a', { className: 'xxd-link', href: personalPageUrl, target: '_blank', rel: 'noopener' }, m.viewerClient.share.personalPage) : null
+    description.replaceChildren(...(listable ? [m.viewerClient.share.listedHint, pageLink ? ' ' : '', pageLink ?? ''] : [m.viewerClient.share.notListable]))
   }
 
-  // The saved expiry is the selected option, so 永不过期 appears once whichever way the link is set.
+  // The saved expiry is the selected option, so never expiring appears once whichever way the link is set.
   #expiryOptions() {
     const { expiresAt } = this.#draft.saved.publicLink
     const option = (value, label) => element('option', { value, selected: this.#draft.expiryChoice === value }, label)
-    if (expiresAt === null) return [option('current', '永不过期'), option('7', '7 天后过期'), option('30', '30 天后过期')]
+    if (expiresAt === null) return [option('current', m.viewerClient.share.neverExpires), option('7', m.viewerClient.share.expiresIn(7)), option('30', m.viewerClient.share.expiresIn(30))]
     const expiryDate = dateText(expiresAt)
-    const savedLabel = expiresAt > Date.now() ? `保持 ${expiryDate} 过期` : `已于 ${expiryDate} 过期`
-    return [option('current', savedLabel), option('7', '7 天后过期'), option('30', '30 天后过期'), option('never', '永不过期')]
+    const savedLabel = expiresAt > Date.now() ? m.viewerClient.share.keepsExpiry(expiryDate) : m.viewerClient.share.expiredOn(expiryDate)
+    return [option('current', savedLabel), option('7', m.viewerClient.share.expiresIn(7)), option('30', m.viewerClient.share.expiresIn(30)), option('never', m.viewerClient.share.neverExpires)]
   }
 
   #passwordControl() {
     const passwordAction = (label, passwordChange) => element('button', { type: 'button', className: 'xxd-btn', 'data-size': 'sm', onClick: () => this.#choosePasswordChange(passwordChange) }, label)
     switch (this.#draft.passwordChange) {
       case 'keep':
-        return element('div', { className: 'xxd-cluster share-password' }, element('span', { className: 'xxd-text', id: 'link-password' }, '已设置访问密码'), passwordAction('更改', 'set'), passwordAction('取消密码', 'remove'))
+        return element('div', { className: 'xxd-cluster share-password' }, element('span', { className: 'xxd-text', id: 'link-password' }, m.viewerClient.share.passwordSet), passwordAction(m.viewerClient.share.changePassword, 'set'), passwordAction(m.viewerClient.share.removePassword, 'remove'))
       case 'remove':
-        return element('div', { className: 'xxd-cluster share-password' }, element('span', { className: 'xxd-text', id: 'link-password', 'data-variant': 'secondary' }, '保存后取消访问密码'), passwordAction('保留密码', 'keep'))
+        return element('div', { className: 'xxd-cluster share-password' }, element('span', { className: 'xxd-text', id: 'link-password', 'data-variant': 'secondary' }, m.viewerClient.share.passwordRemovedOnSave), passwordAction(m.viewerClient.share.keepPassword, 'keep'))
       case 'set': {
         const { hasPassword } = this.#draft.saved.publicLink
-        const passwordInput = element('input', { className: 'xxd-input', id: 'link-password', type: 'password', autocomplete: 'new-password', placeholder: hasPassword ? '输入新密码' : '不设置', value: this.#draft.newPassword })
+        const passwordInput = element('input', { className: 'xxd-input', id: 'link-password', type: 'password', autocomplete: 'new-password', placeholder: hasPassword ? m.viewerClient.share.newPassword : m.viewerClient.share.noPassword, value: this.#draft.newPassword })
         passwordInput.addEventListener('input', () => {
           this.#draft.newPassword = passwordInput.value
           this.#refreshListedSwitch()
           this.#refreshSaveButton()
         })
         if (hasPassword) queueMicrotask(() => passwordInput.focus())
-        return hasPassword ? element('div', { className: 'xxd-cluster share-password' }, passwordInput, passwordAction('保留原密码', 'keep')) : passwordInput
+        return hasPassword ? element('div', { className: 'xxd-cluster share-password' }, passwordInput, passwordAction(m.viewerClient.share.keepOldPassword, 'keep')) : passwordInput
       }
       default:
         throw new Error(`unknown password change ${this.#draft.passwordChange}`)
@@ -381,7 +381,7 @@ export class ShareDialog extends EventTarget {
       const savedSharing = await api(this.#sharingPath, { method: 'PUT', body: this.#draft.toRequest() })
       this.#draft = new SharingDraft(savedSharing)
       Xxd.closeDialog(this.#dialog)
-      Xxd.toast('分享设置已保存', { tone: 'success', within: this.#stage })
+      Xxd.toast(m.viewerClient.share.saved, { tone: 'success', within: this.#stage })
       this.dispatchEvent(new CustomEvent('saved', { detail: { label: this.#visibilityLabels[savedSharing.visibility] } }))
     } catch (error) {
       Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#dialog })

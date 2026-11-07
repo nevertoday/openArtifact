@@ -1,4 +1,4 @@
-import { userMessageOf } from '../common.js'
+import { m, userMessageOf } from '../common.js'
 import { BlockDiff } from './block-diff.js'
 
 const LIVE_REFRESH_MS = 15_000
@@ -57,13 +57,13 @@ export class LiveUpdates {
     if (!this.#drawer.isSheet) this.#list.select(fixedThreads[0].id, { reveal: false })
     const changedPaths = this.#followsLatest && this.#hasNewerVersion() ? await this.#changesOnLatest() : []
     if (changedPaths.length > 0) this.#frame.wash(changedPaths, { scroll: false })
-    Xxd.toast(`${agentName} 按你的意见改好了`, { tone: 'success', within: this.#stage, action: this.#nextStepAfterFix(changedPaths) })
+    Xxd.toast(m.viewerClient.liveUpdates.fixed(agentName), { tone: 'success', within: this.#stage, action: this.#nextStepAfterFix(changedPaths) })
   }
 
   // The changes when the new version is on screen; else a way to it when there is one.
   #nextStepAfterFix(changedPaths) {
-    if (changedPaths.length > 0) return { label: '看改了什么', onClick: () => this.#frame.wash(changedPaths, { scroll: true }) }
-    if (this.#hasNewerVersion()) return { label: '看最新版本', onClick: () => this.#showLatestAndChanges() }
+    if (changedPaths.length > 0) return { label: m.viewerClient.liveUpdates.seeChanges, onClick: () => this.#frame.wash(changedPaths, { scroll: true }) }
+    if (this.#hasNewerVersion()) return { label: m.viewerClient.liveUpdates.seeLatest, onClick: () => this.#showLatestAndChanges() }
     return undefined
   }
 
@@ -79,7 +79,7 @@ export class LiveUpdates {
       return
     }
     this.#announcedVersion = latest
-    Xxd.toast(`v${latest} 已发布`, { within: this.#stage, action: { label: '看新版本', onClick: () => this.#showLatestAndChanges() } })
+    Xxd.toast(m.viewerClient.liveUpdates.published(latest), { within: this.#stage, action: { label: m.viewerClient.liveUpdates.seeNew, onClick: () => this.#showLatestAndChanges() } })
   }
 
   // The agent's answer stands even when its new version cannot be shown; the toast then offers it instead.
