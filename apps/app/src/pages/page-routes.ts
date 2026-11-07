@@ -118,12 +118,12 @@ export class PageRoutes {
     const identity = await this.#context.identity()
     const openedArtifact = await this.#context.gate.open(artifactId, identity, request)
     if (!openedArtifact) return MessagePages.notFound(identity !== null)
-    if (!openedArtifact.permissions.canView) return this.#refusal(request, artifactId, identity, openedArtifact.permissions.needsPublicLinkPassword)
+    if (!openedArtifact.permissions.canView) return this.#refusal(request, openedArtifact, identity)
     const requestedVersion = Number(new URL(request.url).searchParams.get('v') ?? openedArtifact.summary.version)
     const versionExists = Number.isInteger(requestedVersion) && requestedVersion >= 1 && requestedVersion <= openedArtifact.summary.version
     const shownVersion = versionExists ? requestedVersion : openedArtifact.summary.version
     const showsOlderVersion = shownVersion !== openedArtifact.summary.version
-    if (showsOlderVersion && !openedArtifact.permissions.canSeeVersions) return this.#refusal(request, artifactId, identity, false)
+    if (showsOlderVersion && !openedArtifact.permissions.canSeeVersions) return identity ? MessagePages.notFound(true) : this.#redirectToLogin(request)
     const now = Date.now()
     const signedPrefix = await this.#settings.usercontentSignature.signedPrefix(artifactId, shownVersion, now + SIGNED_URL_LIFETIME_MS)
     const authorNames = await this.#context.people.namesOf([openedArtifact.summary.authorId])
@@ -215,10 +215,13 @@ export class PageRoutes {
     return { artifacts, auditEvents, names: new Map([...artifactNames, ...auditNames]) }
   }
 
-  #refusal(request: Request, artifactId: string, identity: Identity | null, needsPublicLinkPassword: boolean): Response {
-    if (needsPublicLinkPassword) return MessagePages.publicLinkPassword(artifactId, false)
+  async #refusal(request: Request, openedArtifact: OpenedArtifact, identity: Identity | null): Promise<Response> {
+    const { summary, permissions } = openedArtifact
+    if (permissions.needsPublicLinkPassword) return MessagePages.publicLinkPassword(summary.artifactId, false)
     if (!identity) return this.#redirectToLogin(request)
-    return MessagePages.notFound(true)
+    if (!ArtifactGate.mayAskForAccess(openedArtifact, identity)) return MessagePages.notFound(true)
+    const authorNames = await this.#context.people.namesOf([summary.authorId])
+    return MessagePages.noAccess(summary.artifactId, authorNames.get(summary.authorId) ?? '')
   }
 
   #redirectToLogin(request: Request): Response {

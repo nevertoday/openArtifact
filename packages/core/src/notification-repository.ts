@@ -1,4 +1,4 @@
-export const NOTIFICATION_KINDS = ['comment_on_my_artifact', 'reply_to_my_comment', 'my_comment_resolved', 'new_version', 'shared_with_me', 'public_link_opened'] as const
+export const NOTIFICATION_KINDS = ['comment_on_my_artifact', 'reply_to_my_comment', 'my_comment_resolved', 'new_version', 'shared_with_me', 'public_link_opened', 'access_requested'] as const
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number]
 
 /** Something that happened on an artifact, told to one person. */

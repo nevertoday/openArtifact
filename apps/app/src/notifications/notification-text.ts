@@ -24,6 +24,8 @@ export class NotificationText {
         return `${actorLabel}把「${artifactTitle}」分享给了你`
       case 'public_link_opened':
         return `${actorLabel}把「${artifactTitle}」设为公开链接`
+      case 'access_requested':
+        return `${actorLabel}想查看「${artifactTitle}」，请你分享给 TA`
     }
   }
 

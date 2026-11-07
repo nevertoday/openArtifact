@@ -7,6 +7,7 @@ import {
   type GrantRole,
   type PersonGrant,
 } from '@open-artifact/core'
+import { ArtifactGate } from '../access/artifact-gate.ts'
 import { HttpError } from '../http-error.ts'
 import { People } from '../people.ts'
 import type { ApiContext } from './api-context.ts'
@@ -32,6 +33,15 @@ export class SharingApi {
     const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canManageSharing', MANAGE_SHARING)
     const grants = await this.#context.repositories.artifactAccess.listGrants(artifactId)
     return Response.json(await this.#sharingJson(summary, grants))
+  }
+
+  /** A member who may not open the artifact asks its author to share it; the author hears through the notifier. */
+  async requestAccess(request: Request, artifactId: string): Promise<Response> {
+    const identity = await this.#context.requireBrowserSession()
+    const openedArtifact = await this.#context.gate.open(artifactId, identity, request)
+    if (openedArtifact === null || !ArtifactGate.mayAskForAccess(openedArtifact, identity)) throw HttpError.notFound(`artifact ${artifactId}`)
+    await this.#context.notifier.notify(identity, openedArtifact.summary, { kind: 'access_requested', requesterEmail: identity.email })
+    return new Response(null, { status: 204 })
   }
 
   /** The person the author is about to add; the share dialog shows them before anything is saved. */

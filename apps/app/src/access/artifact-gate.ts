@@ -50,6 +50,16 @@ export class ArtifactGate {
     return openedArtifact
   }
 
+  /**
+   * A member of the artifact's workspace who may not open it is told so and may ask the author to share it;
+   * anyone else is told it does not exist, so its existence never leaks outside the workspace.
+   */
+  static mayAskForAccess(openedArtifact: OpenedArtifact, identity: Identity | null): identity is Identity {
+    const { summary, permissions } = openedArtifact
+    const isWorkspaceMember = identity?.memberships.some(membership => membership.workspace.workspaceId === summary.workspaceId) ?? false
+    return isWorkspaceMember && !permissions.canView && summary.removal === null
+  }
+
   /** For a permission on an artifact already opened: throws the 401 or 403 the requester should see. */
   static demand(openedArtifact: OpenedArtifact, identity: Identity | null, permission: ArtifactPermission, action: string): void {
     if (openedArtifact.permissions[permission]) return

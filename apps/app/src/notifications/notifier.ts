@@ -11,6 +11,7 @@ export type ArtifactEvent =
   | { kind: 'version_published' }
   | { kind: 'artifact_shared'; sharedWithId: string; role: GrantRole }
   | { kind: 'public_link_opened_by_agent'; expiresAt: number }
+  | { kind: 'access_requested'; requesterEmail: string }
 
 /** What the notifier needs to know about the artifact an event happened on. */
 export type NotifiedArtifact = Pick<ArtifactSummary, 'artifactId' | 'title' | 'authorId'>
@@ -18,6 +19,7 @@ export type NotifiedArtifact = Pick<ArtifactSummary, 'artifactId' | 'title' | 'a
 export type Actor = Pick<Identity, 'userId' | 'name' | 'agentClient'>
 
 const DAY_MS = 24 * 60 * 60 * 1000
+const RECENT_NOTIFICATIONS_CHECKED = 50
 const ROLE_LABELS: Record<GrantRole, string> = { viewer: '可查看', commenter: '可评论', editor: '可编辑' }
 
 /**
@@ -37,7 +39,7 @@ export class Notifier {
 
   async notify(actor: Actor, artifact: NotifiedArtifact, event: ArtifactEvent): Promise<void> {
     try {
-      const kindByRecipient = await this.#kindByRecipient(artifact, event)
+      const kindByRecipient = await this.#kindByRecipient(artifact, event, actor)
       // An agent acts as its person, so news about what that agent did must still reach the person.
       const tellsPersonAboutTheirAgent = event.kind === 'public_link_opened_by_agent'
       if (!tellsPersonAboutTheirAgent) kindByRecipient.delete(actor.userId)
@@ -56,7 +58,7 @@ export class Notifier {
     }
   }
 
-  async #kindByRecipient(artifact: NotifiedArtifact, event: ArtifactEvent): Promise<Map<string, NotificationKind>> {
+  async #kindByRecipient(artifact: NotifiedArtifact, event: ArtifactEvent, actor: Actor): Promise<Map<string, NotificationKind>> {
     switch (event.kind) {
       case 'comment_added':
         return this.#commentRecipients(artifact, event.comment, event.resolvesThread)
@@ -68,7 +70,15 @@ export class Notifier {
         return new Map([[event.sharedWithId, 'shared_with_me']])
       case 'public_link_opened_by_agent':
         return new Map([[artifact.authorId, 'public_link_opened']])
+      case 'access_requested':
+        return (await this.#alreadyAsked(artifact, actor)) ? new Map() : new Map([[artifact.authorId, 'access_requested']])
     }
+  }
+
+  // Asking again before the author has read the first request would only repeat it.
+  async #alreadyAsked(artifact: NotifiedArtifact, requester: Actor): Promise<boolean> {
+    const authorNotifications = await this.#repositories.notifications.listForRecipient(artifact.authorId, RECENT_NOTIFICATIONS_CHECKED)
+    return authorNotifications.some(notification => notification.kind === 'access_requested' && notification.artifactId === artifact.artifactId && notification.actorId === requester.userId && notification.readAt === null)
   }
 
   // A more specific kind replaces a general one, so each person hears about one comment once.
@@ -132,6 +142,11 @@ export class Notifier {
         const subject = `${NotificationText.sentence(kind, actorLabel, artifactTitle)}，${daysLeft} 天后过期`
         return { subject, body: `${subject}（${expiryDate}）。拿到链接的人不用登录就能打开。要改过期时间或取消公开，打开页面后点「分享」。` }
       }
+      case 'access_requested': {
+        if (event.kind !== 'access_requested') return null
+        const subject = NotificationText.sentence(kind, actorLabel, artifactTitle)
+        return { subject, body: `${subject}。TA 的邮箱是 ${event.requesterEmail}。打开页面后点「分享」，把这个邮箱加进来。` }
+      }
     }
   }
 
@@ -160,6 +175,7 @@ export class Notifier {
       case 'version_published':
       case 'artifact_shared':
       case 'public_link_opened_by_agent':
+      case 'access_requested':
         return null
     }
   }

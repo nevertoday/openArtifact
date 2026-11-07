@@ -171,7 +171,7 @@ describe('full-screen view', () => {
     expect(authorResponse.status).toBe(200)
     expect(authorMarkup).toMatch(new RegExp(`<iframe [^>]*src="http://usercontent\\.test/s/[^"]+/${published.artifactId}/v1/index\\.html"`))
     expect(authorResponse.headers.get('Content-Security-Policy')).toContain('frame-src http://usercontent.test')
-    expect(reviewerResponse.status).toBe(404)
+    expect(reviewerResponse.status).toBe(403)
     expect(anonymousResponse.status).toBe(302)
     expect(anonymousResponse.headers.get('Location')).toBe(`${APP_ORIGIN}/login?next=${encodeURIComponent(fullViewPath)}`)
   })

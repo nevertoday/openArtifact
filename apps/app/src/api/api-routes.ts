@@ -86,6 +86,7 @@ const API_ROUTES: ApiRoute[] = [
   route('PATCH', '/api/comments/:commentId', (apis, request, params) => apis.comments.setResolved(request, param(params, 'commentId'))),
   route('GET', '/api/artifacts/:artifactId/sharing', (apis, request, params) => apis.sharing.read(request, param(params, 'artifactId'))),
   route('PUT', '/api/artifacts/:artifactId/sharing', (apis, request, params) => apis.sharing.update(request, param(params, 'artifactId'))),
+  route('POST', '/api/artifacts/:artifactId/access-requests', (apis, request, params) => apis.sharing.requestAccess(request, param(params, 'artifactId'))),
   route('GET', '/api/artifacts/:artifactId/sharing/people', (apis, request, params) => apis.sharing.findPerson(request, param(params, 'artifactId'))),
   route('GET', '/api/artifacts/:artifactId/data', (apis, request, params) => apis.sharedData.listCollections(request, param(params, 'artifactId'))),
   route('GET', '/api/artifacts/:artifactId/data/:collection', (apis, request, params) =>

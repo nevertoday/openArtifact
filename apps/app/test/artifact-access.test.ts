@@ -37,14 +37,15 @@ describe('visibility', () => {
     expect(await listedTitles(memberCookie)).toContain('Team plan')
   })
 
-  it('hides a private artifact from everyone but its author, even its existence', async () => {
+  it('hides a private artifact from everyone but its author, and tells a member only that they have no access', async () => {
     const published = await app.publish({ token: authorToken }, 'Private notes', '<h1>secret</h1>', 'private')
 
     const memberRead = await app.request(`/api/artifacts/${published.artifactId}`, { cookie: memberCookie })
     const memberPage = await app.request(`/a/${published.artifactId}`, { cookie: memberCookie })
 
     expect(memberRead.status).toBe(404)
-    expect(memberPage.status).toBe(404)
+    expect(memberPage.status).toBe(403)
+    expect(await memberPage.text()).not.toContain('Private notes')
     expect(await listedTitles(memberCookie)).not.toContain('Private notes')
     expect(await listedTitles(authorCookie)).toContain('Private notes')
   })

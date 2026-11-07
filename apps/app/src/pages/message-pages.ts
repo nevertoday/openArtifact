@@ -29,6 +29,21 @@ export class MessagePages {
     return PageShell.render({ title: '请稍后再试 · Open Artifact', body, status: 429 })
   }
 
+  /** A member of the workspace who may not open this artifact; the author's name tells them whom to ask. */
+  static noAccess(artifactId: string, authorName: string): Response {
+    const body = MessagePages.#centered(html`<section class="xxd-empty" data-access-request="${artifactId}" data-author-name="${authorName}">
+  ${PageShell.icon('Lock', 24)}
+  <h1 class="xxd-empty__title">你没有这个 artifact 的访问权限</h1>
+  <p class="xxd-empty__text">它是 ${authorName} 发布的，还没有分享给你。</p>
+  <div class="xxd-empty__actions">
+    <button type="button" class="xxd-btn" data-variant="primary" data-request-access>请作者分享给你</button>
+    <a class="xxd-btn" href="/">回到首页</a>
+  </div>
+  <p class="xxd-text" data-variant="secondary" role="status" data-access-request-status></p>
+</section>`)
+    return PageShell.render({ title: '没有访问权限 · Open Artifact', body, status: 403, scripts: ['common.js', 'access-request.js'] })
+  }
+
   static notFound(signedIn: boolean): Response {
     const body = MessagePages.#centered(html`<section class="xxd-empty">
   ${PageShell.icon('FileX', 24)}

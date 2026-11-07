@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:workers'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { TestApp } from './test-app.ts'
 
@@ -203,5 +204,38 @@ describe('reading notifications', () => {
     const response = await app.request('/api/notifications')
 
     expect(response.status).toBe(401)
+  })
+})
+
+describe('asking the author for access', () => {
+  it('tells a member without access whose artifact it is, and lets them ask the author once', async () => {
+    const draft = await app.publish({ token: linAgentToken }, 'Private draft', '<h1>x</h1>', 'private')
+
+    const noAccessPage = await app.request(`/a/${draft.artifactId}`, { cookie: zhouCookie })
+    const noAccessMarkup = await noAccessPage.text()
+    const firstAsk = await app.request(`/api/artifacts/${draft.artifactId}/access-requests`, { method: 'POST', cookie: zhouCookie })
+    const secondAsk = await app.request(`/api/artifacts/${draft.artifactId}/access-requests`, { method: 'POST', cookie: zhouCookie })
+    const authorHears = await notificationsAbout(linCookie, draft.artifactId)
+
+    expect(noAccessPage.status).toBe(403)
+    expect(noAccessMarkup).toContain('你没有这个 artifact 的访问权限')
+    expect(noAccessMarkup).toContain('它是 lin 发布的')
+    expect(noAccessMarkup).toContain('请作者分享给你')
+    expect(noAccessMarkup).not.toContain('Private draft')
+    expect([firstAsk.status, secondAsk.status]).toEqual([204, 204])
+    expect(authorHears.map(notification => notification.text)).toEqual(['zhou 想查看「Private draft」，请你分享给 TA'])
+    expect(app.mailer.lastTo('lin@example.com')?.text).toContain('zhou@example.com')
+  })
+
+  it('keeps answering 找不到 to people outside the workspace, and refuses their request', async () => {
+    await env.DB.prepare("INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES ('workspace-elsewhere', 'Elsewhere', ?)").bind(Date.now()).run()
+    const elsewhere = await app.repositories.artifacts.create({ workspaceId: 'workspace-elsewhere', authorId: 'user-elsewhere', title: 'Elsewhere plan', visibility: 'private', publicLinkExpiresAt: null, publishedVia: null, note: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+
+    const page = await app.request(`/a/${elsewhere.artifactId}`, { cookie: zhouCookie })
+    const ask = await app.json<{ code: string }>(`/api/artifacts/${elsewhere.artifactId}/access-requests`, { method: 'POST', cookie: zhouCookie })
+
+    expect(page.status).toBe(404)
+    expect(await page.text()).toContain('找不到这个 artifact')
+    expect(ask).toMatchObject({ status: 404, body: { code: 'not_found' } })
   })
 })
