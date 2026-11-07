@@ -285,6 +285,15 @@ function showAccountName(name) {
   document.querySelector('[data-account-button]')?.setAttribute('aria-label', `账户菜单：${name}`)
 }
 
+function wireThemeChoice() {
+  const themeInputs = document.querySelectorAll('input[name="theme"]')
+  const currentTheme = globalThis.XxdTheme?.read().theme ?? 'system'
+  for (const themeInput of themeInputs) {
+    themeInput.checked = themeInput.value === currentTheme
+    themeInput.addEventListener('change', () => globalThis.XxdTheme?.set({ theme: themeInput.value }))
+  }
+}
+
 function wireWorkspaceNameForm() {
   const workspaceNameForm = document.getElementById('workspace-name-form')
   workspaceNameForm?.addEventListener('submit', async event => {
@@ -508,6 +517,7 @@ function wireContentAdministration() {
 
 wireAgentConnection()
 wireProfileForm()
+wireThemeChoice()
 wireWorkspaceNameForm()
 wirePublicLinksSwitch()
 wireMemberAdministration()

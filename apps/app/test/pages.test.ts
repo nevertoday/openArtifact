@@ -374,6 +374,32 @@ describe('settings', () => {
     expect(profile).toContain('邮箱用来登录，不能修改。')
   })
 
+  it('shows a person icon on the account button until the person chooses a name, then their initial', async () => {
+    const accountAvatar = (markup: string) => markup.match(/<span class="xxd-avatar" data-account-initial>(.*?)<\/span>/)?.[1]
+    const unnamedCookie = await app.signIn('xavier.unnamed@example.com')
+
+    const before = accountAvatar(await pageText('/', unnamedCookie))
+    await app.request('/api/me', { method: 'PATCH', cookie: unnamedCookie, body: { name: '徐同学' } })
+    const after = accountAvatar(await pageText('/', unnamedCookie))
+
+    expect(before).toContain('data-xxd-icon="UserRound"')
+    expect(before).not.toContain('X')
+    expect(after).toBe('徐')
+  })
+
+  it('offers the three colour schemes on the profile page, following the system until the browser says otherwise', async () => {
+    const profile = await pageText('/settings/profile', authorCookie)
+    const themeChoices = [...profile.matchAll(/<input type="radio" class="xxd-radio" name="theme" id="theme-\w+" value="(\w+)" ?(checked)?><span>([^<]+)<\/span>/g)].map(match => ({ value: match[1], checked: Boolean(match[2]), label: match[3] }))
+
+    expect(profile).toContain('<legend class="xxd-label">外观</legend>')
+    expect(themeChoices).toEqual([
+      { value: 'system', checked: true, label: '跟随系统' },
+      { value: 'light', checked: false, label: '浅色' },
+      { value: 'dark', checked: false, label: '深色' },
+    ])
+    expect(profile).toContain('只对这台设备上的这个浏览器生效。')
+  })
+
   it('lists the settings sections in the same order in the account menu and the side navigation', async () => {
     const settingsMarkup = await pageText('/settings/profile', authorCookie)
     const menuOrder = [...settingsMarkup.matchAll(/class="xxd-menu__item" role="menuitem" href="\/settings\/(\w+)"/g)].map(match => match[1])
