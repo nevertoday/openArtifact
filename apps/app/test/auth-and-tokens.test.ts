@@ -231,7 +231,7 @@ describe('who may sign up', () => {
     const refused = await app.json<{ message: string; code: string }>('/api/auth/sign-in/magic-link', { method: 'POST', body: { email: 'stranger@other.org', callbackURL: '/' } })
 
     expect(refused.status).toBe(403)
-    expect(refused.body).toMatchObject({ code: 'EMAIL_NOT_ADMITTED', message: '这个邮箱不能登录 Open Artifact。请用公司邮箱，或请管理员邀请你。' })
+    expect(refused.body).toMatchObject({ code: 'EMAIL_NOT_ADMITTED', message: "This email can't sign in to Open Artifact. Use your work email, or ask an admin to invite you." })
     expect(refused.body.message).not.toContain('example.com')
     expect(app.mailer.lastTo('stranger@other.org')).toBeUndefined()
   })

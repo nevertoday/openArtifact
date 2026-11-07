@@ -14,7 +14,6 @@ import { HttpError, RemovedFromWorkspaceError } from './http-error.ts'
 import { LOCALE_COOKIE } from './i18n/resolve-locale.ts'
 import { MessagePages } from './pages/message-pages.ts'
 import { PageRoutes } from './pages/page-routes.ts'
-import { People } from './people.ts'
 import type { Repositories } from '@open-artifact/core'
 
 const VIEWER = new URLPattern({ pathname: '/a/:artifactId' })
@@ -96,7 +95,6 @@ export class AppRoutes {
       repositories,
       gate: new ArtifactGate(repositories, this.#signingKey, Date.now()),
       requestIdentity: new RequestIdentity(auth, repositories, admission, request),
-      people: new People(repositories.users),
       mailer,
       auth,
       admission,

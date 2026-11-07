@@ -118,7 +118,7 @@ export class McpEndpoint {
   }
 
   static #unauthorized(): Response {
-    const message = 'Send your Open Artifact personal API token as "Authorization: Bearer oa_pat_…". Create one under 设置 › Agent 接入.'
+    const message = 'Send your Open Artifact personal API token as "Authorization: Bearer oa_pat_…". Create one under Settings › Agent access (设置 › Agent 接入).'
     return Response.json(McpEndpoint.#errorResponse(null, -32001, message), { status: 401 })
   }
 
