@@ -127,8 +127,9 @@ export class ArtifactAccess {
   }
 
   /** Grants are the list of people of a 指定的人 artifact; under any other visibility they are kept but do nothing. */
+  // A private artifact is the author's alone; at every other level the people list can give someone more than the level does.
   static grantsApplyUnder(visibility: ArtifactVisibility): boolean {
-    return visibility === 'specified'
+    return visibility !== 'private'
   }
 
   #grantPermissions(viewer: ArtifactViewer): ArtifactPermissions {

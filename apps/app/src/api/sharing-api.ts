@@ -100,6 +100,7 @@ export class SharingApi {
     ])
     return {
       visibility: summary.sharing.visibility,
+      peopleApplyUnder: VISIBILITIES.filter(visibility => ArtifactAccess.grantsApplyUnder(visibility)),
       publicLink: {
         expiresAt: summary.sharing.publicLinkExpiresAt,
         hasPassword: summary.sharing.publicLinkPasswordHash !== null,

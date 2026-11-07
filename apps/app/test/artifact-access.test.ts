@@ -91,7 +91,7 @@ describe('visibility', () => {
 
 describe('saving sharing in one request', () => {
   async function sharingOf(artifactId: string) {
-    return (await app.json<{ visibility: string; grants: { userId: string; role: string }[]; publicLink: { expiresAt: number | null; hasPassword: boolean } }>(`/api/artifacts/${artifactId}/sharing`, { cookie: authorCookie })).body
+    return (await app.json<{ visibility: string; peopleApplyUnder: string[]; grants: { userId: string; role: string }[]; publicLink: { expiresAt: number | null; hasPassword: boolean } }>(`/api/artifacts/${artifactId}/sharing`, { cookie: authorCookie })).body
   }
 
   async function memberUserId(artifactId: string): Promise<string> {
@@ -130,20 +130,22 @@ describe('saving sharing in one request', () => {
     expect(await sharingOf(published.artifactId)).toMatchObject({ visibility: 'private', grants: [] })
   })
 
-  it('lets granted people in only while the artifact is shared with specified people', async () => {
+  it('lets granted people in at every level except private', async () => {
     const published = await app.publish({ token: authorToken }, 'Board memo', '<h1>v1</h1>', 'specified')
     await app.grant(authorCookie, published.artifactId, 'member@example.com', 'editor')
     const editAsSpecified = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', cookie: memberCookie, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
 
     await setSharing(published.artifactId, { visibility: 'workspace' })
     const editAsWorkspace = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', cookie: memberCookie, body: { baseVersion: 2, files: [{ path: 'index.html', content: '<h1>v3</h1>' }] } })
+    const peopleLevels = (await sharingOf(published.artifactId)).peopleApplyUnder
     await setSharing(published.artifactId, { visibility: 'private' })
     const readAsPrivate = await app.request(`/api/artifacts/${published.artifactId}`, { cookie: memberCookie })
 
     expect(editAsSpecified.status).toBe(200)
-    expect(editAsWorkspace.status).toBe(403)
+    expect(editAsWorkspace.status).toBe(200)
     expect(readAsPrivate.status).toBe(404)
     expect((await sharingOf(published.artifactId)).grants).toHaveLength(1)
+    expect(peopleLevels).toEqual(['specified', 'workspace', 'public_link'])
   })
 
   it('tells each person once when an artifact is shared with them', async () => {

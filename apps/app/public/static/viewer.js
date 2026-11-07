@@ -580,9 +580,14 @@ class SharingDraft {
     this.showsComments = saved.publicLink.showsComments
   }
 
+  /** Whether the people list counts at the chosen level; the server owns that rule and sends the levels. */
+  get peopleApply() {
+    return this.saved.peopleApplyUnder.includes(this.visibility)
+  }
+
   get hasChanges() {
     const visibilityChanged = this.visibility !== this.saved.visibility
-    const peopleChanged = this.visibility === 'specified' && this.#grantsChanged()
+    const peopleChanged = this.peopleApply && this.#grantsChanged()
     const publicLinkChanged = this.visibility === 'public_link' && Object.keys(this.#publicLinkChanges()).length > 0
     return visibilityChanged || peopleChanged || publicLinkChanged
   }
@@ -604,10 +609,10 @@ class SharingDraft {
     this.grants.delete(userId)
   }
 
-  /** The PUT body: the complete list of people for 指定的人, and only the link settings that changed. */
+  /** The PUT body: the complete list of people wherever it counts, and only the link settings that changed. */
   toRequest() {
     const sharingUpdate = { visibility: this.visibility }
-    if (this.visibility === 'specified') sharingUpdate.grants = [...this.grants.values()].map(grant => ({ userId: grant.userId, role: grant.role }))
+    if (this.peopleApply) sharingUpdate.grants = [...this.grants.values()].map(grant => ({ userId: grant.userId, role: grant.role }))
     if (this.visibility === 'public_link') Object.assign(sharingUpdate, this.#publicLinkChanges())
     return sharingUpdate
   }
@@ -729,7 +734,7 @@ class ShareDialog {
   }
 
   #peopleSection() {
-    if (this.draft.visibility !== 'specified') return null
+    if (!this.draft.peopleApply) return null
     const emailInput = element('input', { className: 'xxd-input', 'data-size': 'sm', id: 'grant-email', type: 'email', required: true, placeholder: '输入成员邮箱', 'aria-label': '成员邮箱', list: 'workspace-members', 'data-error-type': '请输入有效的邮箱，比如 name@example.com' })
     const roleSelect = ShareDialog.#roleSelect('viewer', 'grant-role')
     const addForm = element('form', { className: 'share-grant-form', 'data-xxd-validate': true },
@@ -742,11 +747,11 @@ class ShareDialog {
     const grants = [...this.draft.grants.values()]
     const peopleList = grants.length > 0
       ? element('ul', { className: 'xxd-list' }, grants.map(grant => this.#personRow(grant)))
-      : element('p', { className: 'xxd-text', 'data-variant': 'secondary' }, '还没有添加任何人，现在只有你能看到。')
+      : element('p', { className: 'xxd-text', 'data-variant': 'secondary' }, this.draft.visibility === 'specified' ? '还没有添加任何人，现在只有你能看到。' : '还没有单独添加任何人。')
     return element('section', { className: 'xxd-stack share-section' },
       element('div', { className: 'xxd-text-pair' },
         element('h3', { className: 'share-section__title' }, '添加的人'),
-        element('p', { className: 'xxd-text', 'data-variant': 'caption' }, '保存后，新添加的人会收到邮件。可查看：使用页面；可评论：再加评论；可编辑：还能发布新版本。')),
+        element('p', { className: 'xxd-text', 'data-variant': 'caption' }, this.draft.visibility === 'specified' ? '保存后，新添加的人会收到邮件。可查看：使用页面；可评论：再加评论；可编辑：还能发布新版本。' : '给某个人比其他人更多的权限，比如可编辑：还能发布新版本。保存后，新添加的人会收到邮件。')),
       addForm, memberOptions, peopleList,
     )
   }
