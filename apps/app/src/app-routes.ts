@@ -1,4 +1,4 @@
-import { SigningKey, UsercontentSignature } from '@open-artifact/core'
+import { ArtifactPath, SigningKey, UsercontentSignature } from '@open-artifact/core'
 import { ArtifactGate } from './access/artifact-gate.ts'
 import { ArtifactPageAddress } from './access/artifact-page-address.ts'
 import { ApiContext } from './api/api-context.ts'
@@ -15,9 +15,9 @@ import { MessagePages } from './pages/message-pages.ts'
 import { PageRoutes } from './pages/page-routes.ts'
 import type { Repositories } from '@open-artifact/core'
 
-const VIEWER = new URLPattern({ pathname: '/a/:artifactId' })
-const FULL_VIEW = new URLPattern({ pathname: '/a/:artifactId/full' })
-const UNLOCK = new URLPattern({ pathname: '/a/:artifactId/unlock' })
+const VIEWER = new URLPattern({ pathname: '/a/:segment' })
+const FULL_VIEW = new URLPattern({ pathname: '/a/:segment/full' })
+const UNLOCK = new URLPattern({ pathname: '/a/:segment/unlock' })
 const SETTINGS = new URLPattern({ pathname: '/settings{/:section}?' })
 const INVITE = new URLPattern({ pathname: '/invite/:inviteCode' })
 const PERSONAL_PAGE = new URLPattern({ pathname: '/@:handle' })
@@ -65,18 +65,19 @@ export class AppRoutes {
       unlockRateLimiter: this.#dependencies.env.UNLOCK_RATE_LIMITER,
     })
     const unlockMatch = UNLOCK.exec(requestUrl)
-    if (unlockMatch && request.method === 'POST') return pageRoutes.unlock(request, decodeURIComponent(unlockMatch.pathname.groups.artifactId ?? ''))
+    const unlockSegment = decodeURIComponent(unlockMatch?.pathname.groups.segment ?? '')
+    if (unlockMatch && request.method === 'POST') return pageRoutes.unlock(request, unlockSegment)
     // The unlock address only takes the form; opened directly it leads to the artifact, which asks again.
-    if (unlockMatch) return new Response(null, { status: 303, headers: { Location: `/a/${unlockMatch.pathname.groups.artifactId ?? ''}` } })
+    if (unlockMatch) return new Response(null, { status: 303, headers: { Location: ArtifactPath.atSegment(unlockSegment) } })
     if (requestUrl.pathname === '/locale' && request.method === 'POST') return pageRoutes.chooseLocale(request)
     if (request.method !== 'GET' && request.method !== 'HEAD') return MessagePages.unknownAddress(await context.messages(), 405)
     if (requestUrl.pathname === '/') return pageRoutes.home(request)
     if (requestUrl.pathname === '/login') return pageRoutes.login(request)
     if (requestUrl.pathname === '/llms.txt') return pageRoutes.llmsTxt()
     const viewerMatch = VIEWER.exec(requestUrl)
-    if (viewerMatch) return pageRoutes.viewer(request, decodeURIComponent(viewerMatch.pathname.groups.artifactId ?? ''))
+    if (viewerMatch) return pageRoutes.viewer(request, decodeURIComponent(viewerMatch.pathname.groups.segment ?? ''))
     const fullViewMatch = FULL_VIEW.exec(requestUrl)
-    if (fullViewMatch) return pageRoutes.fullView(request, decodeURIComponent(fullViewMatch.pathname.groups.artifactId ?? ''))
+    if (fullViewMatch) return pageRoutes.fullView(request, decodeURIComponent(fullViewMatch.pathname.groups.segment ?? ''))
     const inviteMatch = INVITE.exec(requestUrl)
     if (inviteMatch) return pageRoutes.invite(request, decodeURIComponent(inviteMatch.pathname.groups.inviteCode ?? ''))
     const personalPageMatch = PERSONAL_PAGE.exec(requestUrl)

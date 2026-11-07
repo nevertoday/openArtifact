@@ -1,5 +1,5 @@
 import type { Messages } from '../i18n/messages.ts'
-import { ArtifactRemoval, type AccessToken, type AuditEvent, type WorkspaceMember } from '@open-artifact/core'
+import { ArtifactPath, ArtifactRemoval, type AccessToken, type AuditEvent, type WorkspaceMember } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import type { GuideFile, GuidePackFormat } from '../guide/agent-guide.ts'
@@ -223,7 +223,7 @@ ${administration ? SettingsPage.#auditSection(model.m, administration, model.now
     const { content } = m.settings.workspace
     const row = (openedArtifact: OpenedArtifact) => {
       const { summary, permissions } = openedArtifact
-      const titleCell = permissions.canView ? html`<a class="xxd-link" href="/a/${encodeURIComponent(summary.artifactId)}">${summary.title}</a>` : summary.title
+      const titleCell = permissions.canView ? html`<a class="xxd-link" href="${ArtifactPath.of(summary)}">${summary.title}</a>` : summary.title
       return html`<tr>
     <td>${titleCell}</td>
     <td><span class="xxd-text" data-variant="secondary">${administration.names.get(summary.authorId)}</span></td>

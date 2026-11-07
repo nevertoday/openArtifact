@@ -1,4 +1,4 @@
-import { SigningKey, UsercontentSignature } from '@open-artifact/core'
+import { ArtifactPath, SigningKey, UsercontentSignature } from '@open-artifact/core'
 import { env } from 'cloudflare:workers'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { APP_ORIGIN, SIGNING_KEY, TestApp, USERCONTENT_ORIGIN } from './test-app.ts'
@@ -41,7 +41,7 @@ describe('visibility', () => {
     const published = await app.publish({ token: authorToken }, 'Private notes', '<h1>secret</h1>', 'private')
 
     const memberRead = await app.request(`/api/artifacts/${published.artifactId}`, { cookie: memberCookie })
-    const memberPage = await app.request(`/a/${published.artifactId}`, { cookie: memberCookie })
+    const memberPage = await app.request(published.path, { cookie: memberCookie })
 
     expect(memberRead.status).toBe(404)
     expect(memberPage.status).toBe(403)
@@ -160,7 +160,7 @@ describe('saving sharing in one request', () => {
 
     expect(shareMail).toHaveLength(1)
     expect(shareMail[0]).toMatchObject({ to: 'member@example.com', subject: 'author 把「Quarterly numbers」分享给了你' })
-    expect(shareMail[0]?.text).toContain(`${APP_ORIGIN}/a/${published.artifactId}`)
+    expect(shareMail[0]?.text).toContain(published.url)
     expect(shareMail[0]?.text).toContain('可查看')
     const memberNotifications = await app.json<{ notifications: { kind: string; text: string; artifactId: string }[] }>('/api/notifications', { cookie: memberCookie })
     const sharedNotifications = memberNotifications.body.notifications.filter(notification => notification.artifactId === published.artifactId)
@@ -210,7 +210,7 @@ describe('a public link opened by an agent', () => {
 
   it('expires in 7 days when the agent publishes straight to a public link, and tells the author', async () => {
     const publishedAt = Date.now()
-    const published = await app.json<{ artifactId: string; publicLinkExpiresAt: number }>('/api/artifacts', {
+    const published = await app.json<{ artifactId: string; url: string; publicLinkExpiresAt: number }>('/api/artifacts', {
       method: 'POST',
       token: authorToken,
       agentClient: 'Claude Code',
@@ -223,7 +223,7 @@ describe('a public link opened by an agent', () => {
     expect(expiresAt).toBeLessThan(publishedAt + 7 * DAY + 60_000)
     expect(published.body.publicLinkExpiresAt).toBe(expiresAt)
     expect(app.mailer.lastTo('author@example.com')?.subject).toBe('Claude Code（代 author）把「Launch teaser」设为公开链接，7 天后过期')
-    expect(app.mailer.lastTo('author@example.com')?.text).toContain(`${APP_ORIGIN}/a/${published.body.artifactId}`)
+    expect(app.mailer.lastTo('author@example.com')?.text).toContain(published.body.url)
   })
 
   it('keeps the expiry the agent asks for', async () => {
@@ -281,7 +281,7 @@ describe('public links', () => {
     const published = await app.publish({ token: authorToken }, 'Workshop sign-up')
     await setSharing(published.artifactId, { visibility: 'public_link', publicLinkExpiresAt: null })
 
-    const anonymousPage = await app.request(`/a/${published.artifactId}`)
+    const anonymousPage = await app.request(published.path)
     const anonymousRead = await app.request(`/api/artifacts/${published.artifactId}`)
     const anonymousWrite = await app.request(`/api/artifacts/${published.artifactId}/data/signups/guest-1`, { method: 'PUT', body: { data: { name: 'Guest' } } })
     await setSharing(published.artifactId, { visibility: 'public_link', anonymousWriteEnabled: true })
@@ -300,13 +300,13 @@ describe('public links', () => {
     const published = await app.publish({ token: authorToken }, 'Board deck')
     await setSharing(published.artifactId, { visibility: 'public_link', publicLinkPassword: 'board-2026' })
 
-    const locked = await app.request(`/a/${published.artifactId}`)
-    const wrongPassword = await app.request(`/a/${published.artifactId}/unlock`, { method: 'POST', form: { password: 'guess' } })
-    const rightPassword = await app.request(`/a/${published.artifactId}/unlock`, { method: 'POST', form: { password: 'board-2026' } })
+    const locked = await app.request(published.path)
+    const wrongPassword = await app.request(`${published.path}/unlock`, { method: 'POST', form: { password: 'guess' } })
+    const rightPassword = await app.request(`${published.path}/unlock`, { method: 'POST', form: { password: 'board-2026' } })
     const unlockCookie = (rightPassword.headers.get('Set-Cookie') ?? '').split(';')[0] ?? ''
-    const unlocked = await app.request(`/a/${published.artifactId}`, { cookie: unlockCookie })
+    const unlocked = await app.request(published.path, { cookie: unlockCookie })
     await setSharing(published.artifactId, { visibility: 'public_link', publicLinkPassword: 'board-2027' })
-    const afterPasswordChange = await app.request(`/a/${published.artifactId}`, { cookie: unlockCookie })
+    const afterPasswordChange = await app.request(published.path, { cookie: unlockCookie })
 
     expect(await locked.text()).toContain('这个链接需要密码')
     expect(wrongPassword.status).toBe(303)
@@ -322,7 +322,7 @@ describe('public links', () => {
 
     const memberToggle = await app.request('/api/workspace', { method: 'PATCH', cookie: memberCookie, body: { publicLinksEnabled: false } })
     const adminToggle = await app.request('/api/workspace', { method: 'PATCH', cookie: authorCookie, body: { publicLinksEnabled: false } })
-    const anonymousAfter = await app.request(`/a/${published.artifactId}`)
+    const anonymousAfter = await app.request(published.path)
     const newPublicLink = await setSharing(published.artifactId, { visibility: 'public_link' })
     await app.request('/api/workspace', { method: 'PATCH', cookie: authorCookie, body: { publicLinksEnabled: true } })
 
@@ -350,20 +350,20 @@ describe('public links', () => {
     await setSharing(published.artifactId, { visibility: 'public_link', publicLinkPassword: 'right-one' })
 
     const attempts = []
-    for (let attempt = 0; attempt < 6; attempt++) attempts.push((await app.request(`/a/${published.artifactId}/unlock`, { method: 'POST', form: { password: `guess-${attempt}` } })).headers.get('Location'))
+    for (let attempt = 0; attempt < 6; attempt++) attempts.push((await app.request(`${published.path}/unlock`, { method: 'POST', form: { password: `guess-${attempt}` } })).headers.get('Location'))
 
-    expect(attempts.slice(0, 5)).toEqual(Array(5).fill(`/a/${published.artifactId}?password=wrong`))
-    expect(attempts[5]).toBe(`/a/${published.artifactId}?password=wait`)
+    expect(attempts.slice(0, 5)).toEqual(Array(5).fill(`${published.path}?password=wrong`))
+    expect(attempts[5]).toBe(`${published.path}?password=wait`)
   })
 
   it('answers each password with a redirect, so the address never shows /unlock and a reload never resubmits', async () => {
     const published = await app.publish({ token: authorToken }, 'Redirected deck')
     await setSharing(published.artifactId, { visibility: 'public_link', publicLinkPassword: 'right-one' })
 
-    const wrong = await app.request(`/a/${published.artifactId}/unlock`, { method: 'POST', form: { password: 'nope' } })
+    const wrong = await app.request(`${published.path}/unlock`, { method: 'POST', form: { password: 'nope' } })
     const wrongPrompt = await app.request(wrong.headers.get('Location') ?? '')
-    const waitPrompt = await app.request(`/a/${published.artifactId}?password=wait`)
-    const unlockOpenedDirectly = await app.request(`/a/${published.artifactId}/unlock`)
+    const waitPrompt = await app.request(`${published.path}?password=wait`)
+    const unlockOpenedDirectly = await app.request(`${published.path}/unlock`)
 
     expect(wrong.status).toBe(303)
     expect(wrongPrompt.status).toBe(401)
@@ -371,7 +371,7 @@ describe('public links', () => {
     expect(waitPrompt.status).toBe(429)
     expect(await waitPrompt.text()).toContain('1 分钟后可以再试')
     expect(unlockOpenedDirectly.status).toBe(303)
-    expect(unlockOpenedDirectly.headers.get('Location')).toBe(`/a/${published.artifactId}`)
+    expect(unlockOpenedDirectly.headers.get('Location')).toBe(published.path)
   })
 
   it('sends a visitor who finds nothing to sign in and come back to the same address', async () => {
@@ -391,25 +391,25 @@ describe('public links', () => {
 })
 
 describe('what a visitor of a public link sees', () => {
-  async function publicArtifactWithHistory(title: string): Promise<string> {
+  async function publicArtifactWithHistory(title: string): Promise<{ artifactId: string; viewerPath: string }> {
     const published = await app.publish({ token: authorToken }, title, '<h1>v1</h1>')
     const artifactPath = `/api/artifacts/${published.artifactId}`
     await app.request(artifactPath, { method: 'PUT', token: authorToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
     await app.request(`${artifactPath}/comments`, { method: 'POST', cookie: memberCookie, body: { body: 'Internal note from a member' } })
     await app.request(`${artifactPath}/data/signups/member-1`, { method: 'PUT', cookie: memberCookie, body: { data: { name: 'Member' } } })
     await setSharing(published.artifactId, { visibility: 'public_link', publicLinkExpiresAt: null })
-    return published.artifactId
+    return { artifactId: published.artifactId, viewerPath: published.path }
   }
 
   it('shows an anonymous visitor the current page alone, with a way to sign in', async () => {
-    const artifactId = await publicArtifactWithHistory('Launch page')
+    const { viewerPath } = await publicArtifactWithHistory('Launch page')
 
-    const pageMarkup = await (await app.request(`/a/${artifactId}`)).text()
+    const pageMarkup = await (await app.request(viewerPath)).text()
 
     expect(pageMarkup).toContain('artifact-frame')
     expect(pageMarkup).toContain('Launch page')
     expect(pageMarkup.match(/登录/g)).toHaveLength(1)
-    expect(pageMarkup).toContain(`href="/login?next=${encodeURIComponent(`/a/${artifactId}`)}">登录后评论</a>`)
+    expect(pageMarkup).toContain(`href="/login?next=${encodeURIComponent(viewerPath)}">登录后评论</a>`)
     expect(pageMarkup).not.toContain('id="viewer-drawer"')
     expect(pageMarkup).not.toContain('data-version-button')
     expect(pageMarkup).not.toContain('data-open-data')
@@ -419,15 +419,15 @@ describe('what a visitor of a public link sees', () => {
   })
 
   it('refuses an anonymous visitor the comments, the versions, older files and the data listing', async () => {
-    const artifactId = await publicArtifactWithHistory('Closed history')
+    const { artifactId, viewerPath } = await publicArtifactWithHistory('Closed history')
     const artifactPath = `/api/artifacts/${artifactId}`
 
     const comments = await app.request(`${artifactPath}/comments`)
     const versions = await app.request(`${artifactPath}/versions`)
     const olderVersion = await app.request(`${artifactPath}?version=1`)
     const currentVersion = await app.request(`${artifactPath}?version=2`)
-    const olderPage = await app.request(`/a/${artifactId}?v=1`)
-    const olderFullPage = await app.request(`/a/${artifactId}/full?v=1`)
+    const olderPage = await app.request(`${viewerPath}?v=1`)
+    const olderFullPage = await app.request(`${viewerPath}/full?v=1`)
     const dataListing = await app.request(`${artifactPath}/data`)
 
     expect([comments.status, versions.status, olderVersion.status, dataListing.status]).toEqual([401, 401, 401, 401])
@@ -437,7 +437,7 @@ describe('what a visitor of a public link sees', () => {
   })
 
   it('keeps the page\'s own shared data working for an anonymous visitor', async () => {
-    const artifactId = await publicArtifactWithHistory('Public sign-up')
+    const { artifactId } = await publicArtifactWithHistory('Public sign-up')
     await setSharing(artifactId, { visibility: 'public_link', anonymousWriteEnabled: true })
 
     const signups = await app.request(`/api/artifacts/${artifactId}/data/signups`)
@@ -447,13 +447,13 @@ describe('what a visitor of a public link sees', () => {
   })
 
   it('shows an anonymous visitor the comments, read-only, once the author turns them on', async () => {
-    const artifactId = await publicArtifactWithHistory('Open feedback')
+    const { artifactId, viewerPath } = await publicArtifactWithHistory('Open feedback')
     await setSharing(artifactId, { visibility: 'public_link', publicLinkShowsComments: true })
 
     const comments = await app.json<{ comments: { body: string; author: { name: string } }[] }>(`/api/artifacts/${artifactId}/comments`)
     const anonymousComment = await app.request(`/api/artifacts/${artifactId}/comments`, { method: 'POST', body: { body: 'hello' } })
     const versions = await app.request(`/api/artifacts/${artifactId}/versions`)
-    const pageMarkup = await (await app.request(`/a/${artifactId}`)).text()
+    const pageMarkup = await (await app.request(viewerPath)).text()
     const sharing = await app.json<{ publicLink: { showsComments: boolean } }>(`/api/artifacts/${artifactId}/sharing`, { cookie: authorCookie })
 
     expect(comments.status).toBe(200)
@@ -471,10 +471,10 @@ describe('what a visitor of a public link sees', () => {
 
   it('treats a signed-in person from another workspace like any visitor of the link', async () => {
     await env.DB.prepare("INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES ('workspace-partner', 'Partner team', ?)").bind(Date.now()).run()
-    const partnerPage = await app.repositories.artifacts.create({ workspaceId: 'workspace-partner', authorId: 'user-partner', title: 'Partner brief', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: null, listed: false, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+    const partnerPage = await app.repositories.artifacts.create({ workspaceId: 'workspace-partner', authorId: 'user-partner', title: 'Partner brief', slug: 'partner-brief', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: null, listed: false, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
 
     const versions = await app.request(`/api/artifacts/${partnerPage.artifactId}/versions`, { cookie: memberCookie })
-    const pageMarkup = await (await app.request(`/a/${partnerPage.artifactId}`, { cookie: memberCookie })).text()
+    const pageMarkup = await (await app.request(ArtifactPath.of({ slug: 'partner-brief', shortId: partnerPage.shortId }), { cookie: memberCookie })).text()
 
     expect(versions.status).toBe(403)
     expect(pageMarkup).toContain('artifact-frame')
@@ -483,11 +483,11 @@ describe('what a visitor of a public link sees', () => {
   })
 
   it('still shows members the comments, versions and data of an artifact that has a public link', async () => {
-    const artifactId = await publicArtifactWithHistory('Member view')
+    const { artifactId, viewerPath } = await publicArtifactWithHistory('Member view')
     const artifactPath = `/api/artifacts/${artifactId}`
 
     const statuses = await Promise.all([`${artifactPath}/comments`, `${artifactPath}/versions`, `${artifactPath}?version=1`, `${artifactPath}/data`].map(async path => (await app.request(path, { cookie: memberCookie })).status))
-    const pageMarkup = await (await app.request(`/a/${artifactId}`, { cookie: memberCookie })).text()
+    const pageMarkup = await (await app.request(viewerPath, { cookie: memberCookie })).text()
 
     expect(statuses).toEqual([200, 200, 200, 200])
     expect(pageMarkup).toContain('data-version-button')
@@ -500,7 +500,7 @@ describe('the viewer page', () => {
   it('frames the artifact through a signed usercontent URL without same-origin access', async () => {
     const published = await app.publish({ token: authorToken }, 'Signed frame')
 
-    const viewerMarkup = await (await app.request(`/a/${published.artifactId}`, { cookie: memberCookie })).text()
+    const viewerMarkup = await (await app.request(published.path, { cookie: memberCookie })).text()
     const frameSource = viewerMarkup.match(/<iframe id="artifact-frame" src="([^"]+)"/)?.[1] ?? ''
     const verifiedRequest = await new UsercontentSignature(new SigningKey(SIGNING_KEY)).verifiedRequest(new URL(frameSource).pathname, Date.now())
 
@@ -533,8 +533,8 @@ describe('the viewer page', () => {
   it('offers sharing only to the author', async () => {
     const published = await app.publish({ token: authorToken }, 'Share button')
 
-    const authorMarkup = await (await app.request(`/a/${published.artifactId}`, { cookie: authorCookie })).text()
-    const memberMarkup = await (await app.request(`/a/${published.artifactId}`, { cookie: memberCookie })).text()
+    const authorMarkup = await (await app.request(published.path, { cookie: authorCookie })).text()
+    const memberMarkup = await (await app.request(published.path, { cookie: memberCookie })).text()
 
     expect(authorMarkup).toContain('data-open-share')
     expect(memberMarkup).not.toContain('data-open-share')
@@ -543,9 +543,9 @@ describe('the viewer page', () => {
   it('sends a signed-out visitor of a workspace artifact to the login page and back', async () => {
     const published = await app.publish({ token: authorToken }, 'Login first')
 
-    const signedOut = await app.request(`/a/${published.artifactId}`)
+    const signedOut = await app.request(published.path)
 
     expect(signedOut.status).toBe(302)
-    expect(signedOut.headers.get('Location')).toBe(`${APP_ORIGIN}/login?next=${encodeURIComponent(`/a/${published.artifactId}`)}`)
+    expect(signedOut.headers.get('Location')).toBe(`${APP_ORIGIN}/login?next=${encodeURIComponent(published.path)}`)
   })
 })

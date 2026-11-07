@@ -34,6 +34,7 @@ async function createArtifactIn(workspaceId: string, authorId: string) {
     workspaceId,
     authorId,
     title: 'Signup sheet',
+    slug: 'signup-sheet',
     visibility: 'workspace',
     publicLinkExpiresAt: null,
     publishedVia: null,
@@ -286,8 +287,8 @@ describe('listing on a personal page', () => {
     const authorId = await addUser('Lister')
     const workspaceId = (await joinedFirstWorkspace(authorId)).workspace.workspaceId
     const publicSharing = { visibility: 'public_link', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false } as const
-    const withOpening = await artifactRepository.create({ workspaceId, authorId, title: 'Opening', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: '页面开头的话', listed: true, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
-    const withSummary = await artifactRepository.create({ workspaceId, authorId, title: 'Summarized', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: '页面开头的话', listed: true, summary: '作者写的摘要', files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+    const withOpening = await artifactRepository.create({ workspaceId, authorId, title: 'Opening', slug: 'opening', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: '页面开头的话', listed: true, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+    const withSummary = await artifactRepository.create({ workspaceId, authorId, title: 'Summarized', slug: 'summarized', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: '页面开头的话', listed: true, summary: '作者写的摘要', files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
     const unlisted = await createArtifactIn(workspaceId, authorId)
     await accessRepository.saveSharing(unlisted.artifactId, { ...publicSharing, listed: false }, [])
 

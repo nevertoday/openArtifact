@@ -11,6 +11,8 @@ const authorId = 'user-author'
 function artifactWith(sharing: Partial<ArtifactSharing>, removal: ArtifactRemoval | null = null): ArtifactSummary {
   return {
     artifactId: 'artifact-1',
+    shortId: 'k7f3q9x2m4ab',
+    slug: 'roadmap',
     workspaceId: 'workspace-1',
     title: 'Design doc',
     authorId,

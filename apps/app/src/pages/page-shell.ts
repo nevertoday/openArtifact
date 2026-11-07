@@ -110,6 +110,8 @@ ${(options.styles ?? []).map(style => html`<link rel="stylesheet" href="/static/
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-store',
         'X-Frame-Options': 'DENY',
+        // Other sites learn only our origin, never an artifact's address and the words in it.
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
         'Content-Security-Policy': PageShell.#contentSecurityPolicy(options.frameOrigin),
         ...(options.publicCard ? {} : { 'X-Robots-Tag': 'noindex' }),
         ...options.headers,

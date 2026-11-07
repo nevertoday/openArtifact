@@ -1,4 +1,4 @@
-import { CommentThread, type ArtifactComment, type ArtifactSummary, type GrantRole, type Locale, type NewNotification, type NotificationKind, type Repositories } from '@open-artifact/core'
+import { CommentThread, type AddressedArtifact, type ArtifactComment, type ArtifactSummary, type GrantRole, type Locale, type NewNotification, type NotificationKind, type Repositories } from '@open-artifact/core'
 import { dateText } from '../../public/static/time-text.js'
 import type { Mailer } from '../auth/mailer.ts'
 import type { Identity } from '../auth/request-identity.ts'
@@ -15,7 +15,7 @@ export type ArtifactEvent =
   | { kind: 'access_requested'; requesterEmail: string }
 
 /** What the notifier needs to know about the artifact an event happened on. */
-export type NotifiedArtifact = Pick<ArtifactSummary, 'artifactId' | 'title' | 'authorId'>
+export type NotifiedArtifact = Pick<ArtifactSummary, 'artifactId' | 'shortId' | 'slug' | 'title' | 'authorId'>
 
 export type Actor = Pick<Identity, 'userId' | 'name' | 'agentClient'>
 
@@ -30,13 +30,13 @@ const RECENT_NOTIFICATIONS_CHECKED = 50
 export class Notifier {
   readonly #repositories: Repositories
   readonly #mailer: Mailer
-  readonly #viewerUrl: (artifactId: string) => string
+  readonly #artifactUrl: (artifact: AddressedArtifact) => string
   readonly #fallbackLocale: Locale
 
-  constructor(repositories: Repositories, mailer: Mailer, viewerUrl: (artifactId: string) => string, fallbackLocale: Locale) {
+  constructor(repositories: Repositories, mailer: Mailer, artifactUrl: (artifact: AddressedArtifact) => string, fallbackLocale: Locale) {
     this.#repositories = repositories
     this.#mailer = mailer
-    this.#viewerUrl = viewerUrl
+    this.#artifactUrl = artifactUrl
     this.#fallbackLocale = fallbackLocale
   }
 
@@ -110,7 +110,7 @@ export class Notifier {
 
   async #mail(actor: Actor, artifact: NotifiedArtifact, event: ArtifactEvent, newNotifications: NewNotification[]): Promise<void> {
     const recipients = await this.#repositories.users.profilesOf(newNotifications.map(newNotification => newNotification.recipientId))
-    const link = NotificationLink.to(this.#viewerUrl(artifact.artifactId), Notifier.#commentIdOf(event), event.kind === 'access_requested' ? actor.userId : null)
+    const link = NotificationLink.to(this.#artifactUrl(artifact), Notifier.#commentIdOf(event), event.kind === 'access_requested' ? actor.userId : null)
     const mails = newNotifications.flatMap(newNotification => {
       const recipient = recipients.get(newNotification.recipientId)
       if (!recipient) return []

@@ -1,5 +1,5 @@
 import type { Messages } from '../i18n/messages.ts'
-import { ArtifactRemoval } from '@open-artifact/core'
+import { ArtifactPath, ArtifactRemoval } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
@@ -22,7 +22,7 @@ export interface Byline {
   /** Where search engines and share cards should send people: the artifact's own address. */
   articleUrl: string
   /** The next piece on the author's page; null when this is the only one. */
-  next: { artifactId: string; title: string } | null
+  next: { path: string; title: string } | null
 }
 
 export interface ViewerModel {
@@ -86,7 +86,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     return html`<footer class="viewer-byline">
   <a class="viewer-byline__avatar" href="${byline.personalPagePath}" aria-label="${model.m.viewer.byline.authorPage(byline.authorName)}">${PageShell.initialOf(byline.authorName)}</a>
   <p class="viewer-byline__who"><a href="${byline.personalPagePath}">${byline.authorName}</a><span>${model.m.viewer.byline.updated({ version: summary.version, time: PageShell.relativeTime(model.m, summary.currentVersionAt, model.now) })}</span></p>
-  ${byline.next ? html`<p class="viewer-byline__next"><span>${model.m.viewer.byline.next}</span><a href="/a/${encodeURIComponent(byline.next.artifactId)}">${byline.next.title} ${PageShell.icon('ArrowRight', 14)}</a></p>` : html`<p class="viewer-byline__next"><a href="${byline.personalPagePath}">${model.m.viewer.byline.more} ${PageShell.icon('ArrowRight', 14)}</a></p>`}
+  ${byline.next ? html`<p class="viewer-byline__next"><span>${model.m.viewer.byline.next}</span><a href="${byline.next.path}">${byline.next.title} ${PageShell.icon('ArrowRight', 14)}</a></p>` : html`<p class="viewer-byline__next"><a href="${byline.personalPagePath}">${model.m.viewer.byline.more} ${PageShell.icon('ArrowRight', 14)}</a></p>`}
 </footer>`
   }
 
@@ -95,7 +95,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     const { summary } = model.openedArtifact
     const body = html`<div class="viewer-full">
 <header class="viewer-full__bar">
-  <a class="xxd-btn" data-variant="ghost" data-size="sm" href="${ViewerPage.#pathOf(model, '')}">${PageShell.icon('ArrowLeft')}${model.m.viewer.full.back}</a>
+  <a class="xxd-btn" data-variant="ghost" data-size="sm" href="${ViewerPage.#pathOf(model, 'viewer')}">${PageShell.icon('ArrowLeft')}${model.m.viewer.full.back}</a>
   <span class="viewer-full__title" tabindex="0" data-tooltip="${summary.title}" data-tooltip-placement="bottom-start">${summary.title}</span>
   <span class="xxd-text xxd-mono" data-variant="caption">v${model.shownVersion}</span>
 </header>
@@ -114,16 +114,18 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   }
 
   // An older version keeps its number, so a link from it shows the same version.
-  static #pathOf(model: ViewerModel, suffix: '' | '/full'): string {
+  static #pathOf(model: ViewerModel, page: 'viewer' | 'full'): string {
     const { summary } = model.openedArtifact
     const versionQuery = model.shownVersion === summary.version ? '' : `?v=${model.shownVersion}`
-    return `/a/${encodeURIComponent(summary.artifactId)}${suffix}${versionQuery}`
+    return `${ArtifactPath.of(summary, page)}${versionQuery}`
   }
 
   static #viewerConfig(model: ViewerModel) {
     const { summary, permissions } = model.openedArtifact
     return {
       artifactId: summary.artifactId,
+      path: ArtifactPath.of(summary),
+      fullViewPath: ArtifactPath.of(summary, 'full'),
       title: summary.title,
       shownVersion: model.shownVersion,
       currentVersion: summary.version,
@@ -198,7 +200,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   }
 
   static #signInLink(model: ViewerModel): SafeHtml {
-    const loginPath = `/login?next=${encodeURIComponent(ViewerPage.#pathOf(model, ''))}`
+    const loginPath = `/login?next=${encodeURIComponent(ViewerPage.#pathOf(model, 'viewer'))}`
     return html`<a class="xxd-link viewer-sign-in" href="${loginPath}">${model.m.viewer.bar.signInToComment}</a>`
   }
 
@@ -215,7 +217,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     const removeItem = html`${separator}<button type="button" class="xxd-menu__item" role="menuitem" data-tone="danger" data-remove-artifact>${PageShell.icon('Trash2', 14)}${ArtifactLabels.removal(model.m, ViewerPage.#removalTakesDown(model))}</button>`
     return html`<button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" data-xxd-menu="artifact-menu" aria-label="${model.m.viewer.more.label}" data-tooltip="${model.m.viewer.more.label}">${PageShell.icon('Ellipsis')}</button>
 <div class="xxd-menu viewer-more-menu" id="artifact-menu" role="menu" popover aria-label="${model.m.viewer.more.label}">
-  <a class="xxd-menu__item" role="menuitem" href="${ViewerPage.#pathOf(model, '/full')}" target="_blank" rel="noopener" data-full-view-link>${PageShell.icon('ExternalLink', 14)}${model.m.viewer.more.openInNewTab}</a>
+  <a class="xxd-menu__item" role="menuitem" href="${ViewerPage.#pathOf(model, 'full')}" target="_blank" rel="noopener" data-full-view-link>${PageShell.icon('ExternalLink', 14)}${model.m.viewer.more.openInNewTab}</a>
   ${permissions.canBrowseSharedData ? menuItem('Database', model.m.viewer.more.data, 'data-open-data') : ''}
   ${permissions.canRename ? menuItem('Pen', model.m.viewer.more.rename, 'data-rename-artifact') : ''}
   ${menuItem('Link', model.m.viewer.more.copyLink, 'data-copy-artifact-link')}

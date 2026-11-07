@@ -1,4 +1,4 @@
-import { ArtifactRemoval, type ArtifactFile, type ArtifactSummary, type ArtifactVisibility, type PublishResult, type VersionOrigin } from '@open-artifact/core'
+import { ArtifactRemoval, ArtifactSlug, type ArtifactFile, type ArtifactSummary, type ArtifactVisibility, type PublishResult, type VersionOrigin } from '@open-artifact/core'
 import { ArtifactGate, type OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { HttpError, type ErrorCode } from '../http-error.ts'
@@ -10,6 +10,8 @@ import { PublicLinkExpiry } from './public-link-expiry.ts'
 
 const VISIBILITIES: readonly ArtifactVisibility[] = ['private', 'specified', 'workspace', 'public_link']
 const MAX_TITLE_LENGTH = 200
+// The words kept in the address are cut to 60 characters; this only bounds what a caller may send.
+const MAX_SLUG_INPUT_LENGTH = 200
 const MAX_NOTE_LENGTH = 200
 export const MAX_SUMMARY_LENGTH = 300
 const LIST_ON_PERSONAL_PAGE = 'list it on your personal page'
@@ -27,6 +29,7 @@ export class ArtifactApi {
     const identity = await this.#context.requireIdentity()
     const requestBody = await JsonBody.of(request)
     const title = requestBody.text('title', MAX_TITLE_LENGTH)
+    const slug = ArtifactSlug.forNewArtifact(requestBody.optionalText('slug', MAX_SLUG_INPUT_LENGTH), title)
     const visibility = requestBody.oneOf('visibility', VISIBILITIES, 'workspace')
     const listed = ArtifactApi.#listedOnCreate(requestBody, identity, visibility)
     const publicLinkExpiry = PublicLinkExpiry.of(requestBody, identity, { visibilityBefore: null, visibilityAfter: visibility, savedExpiresAt: null, listedAfter: listed }, Date.now())
@@ -38,18 +41,19 @@ export class ArtifactApi {
       note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
       excerpt: await PageExcerpt.of(files),
       title,
+      slug,
       visibility,
       publicLinkExpiresAt: publicLinkExpiry.expiresAt,
       listed,
       summary: requestBody.optionalText('summary', MAX_SUMMARY_LENGTH),
       files,
     })
+    const createdSummary = { artifactId: createdArtifact.artifactId, shortId: createdArtifact.shortId, slug, title, authorId: identity.userId }
     if (listed) await this.#context.personalPages.claim(identity.userId)
     if (publicLinkExpiry.agentDefaultExpiresAt !== null) {
-      const createdSummary = { artifactId: createdArtifact.artifactId, title, authorId: identity.userId }
       await this.#context.notifier.notify(identity, createdSummary, { kind: 'public_link_opened_by_agent', expiresAt: publicLinkExpiry.agentDefaultExpiresAt })
     }
-    const createdJson = { ...createdArtifact, url: this.#context.viewerUrl(createdArtifact.artifactId), visibility, publicLinkExpiresAt: publicLinkExpiry.expiresAt, listed }
+    const createdJson = { ...createdArtifact, slug, url: this.#context.artifactUrl(createdSummary), visibility, publicLinkExpiresAt: publicLinkExpiry.expiresAt, listed }
     return Response.json(createdJson, { status: 201 })
   }
 
@@ -94,7 +98,7 @@ export class ArtifactApi {
     const openedArtifact = await this.#context.gate.require(artifactId, identity, request, 'canEdit', 'publish a new version of this artifact')
     const requestBody = await JsonBody.of(request)
     const files = ArtifactFileJson.filesFrom(requestBody.raw('files'))
-    const newTitle = requestBody.optionalText('title', MAX_TITLE_LENGTH)
+    const newName = { title: requestBody.optionalText('title', MAX_TITLE_LENGTH), slug: requestBody.optionalText('slug', MAX_SLUG_INPUT_LENGTH) }
     const newSummary = requestBody.optionalText('summary', MAX_SUMMARY_LENGTH)
     const baseVersion = requestBody.boolean('force', false) ? openedArtifact.summary.version : requestBody.positiveInteger('baseVersion', BASE_VERSION_HINT)
     const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
@@ -105,25 +109,31 @@ export class ArtifactApi {
       excerpt: await PageExcerpt.of(files),
       files,
     })
-    const published = publishResult.status === 'published'
-    if (published && newTitle !== null) await this.#rename(identity, openedArtifact.summary, newTitle)
-    if (published && newSummary !== null) await this.#context.repositories.artifacts.setSummary(artifactId, newSummary)
-    return this.#publishResponse(identity, openedArtifact, publishResult)
+    if (publishResult.status !== 'published') return this.#publishResponse(identity, openedArtifact.summary, publishResult)
+    const renamedSummary = await this.#rename(identity, openedArtifact.summary, newName)
+    if (newSummary !== null) await this.#context.repositories.artifacts.setSummary(artifactId, newSummary)
+    return this.#publishResponse(identity, renamedSummary, publishResult)
   }
 
-  /** Changes the title, the summary on the personal page, or both; a summary of null goes back to the page's opening words. */
+  /**
+   * Changes the title, the words in the address, the summary on the personal page, or any of them; a summary
+   * of null goes back to the page's opening words.
+   */
   async rename(request: Request, artifactId: string): Promise<Response> {
     const identity = await this.#context.requireIdentity()
     const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canRename', 'rename this artifact')
     const requestBody = await JsonBody.of(request)
-    const changesTitle = requestBody.has('title')
     const changesSummary = requestBody.has('summary')
-    if (!changesTitle && !changesSummary) throw HttpError.badRequest('send a title, a summary, or both')
-    const title = changesTitle ? requestBody.text('title', MAX_TITLE_LENGTH) : summary.title
-    if (changesTitle) await this.#rename(identity, summary, title)
+    if (!requestBody.has('title') && !requestBody.has('slug') && !changesSummary) throw HttpError.badRequest('send a title, a slug, a summary, or several of them')
+    const newName = {
+      title: requestBody.has('title') ? requestBody.text('title', MAX_TITLE_LENGTH) : null,
+      slug: requestBody.optionalText('slug', MAX_SLUG_INPUT_LENGTH),
+    }
+    const renamedSummary = await this.#rename(identity, summary, newName)
     if (changesSummary) await this.#context.repositories.artifacts.setSummary(artifactId, requestBody.optionalText('summary', MAX_SUMMARY_LENGTH))
     const savedSummary = await this.#context.repositories.artifacts.findSummary(artifactId)
-    return Response.json({ artifactId, title, summary: savedSummary?.summary ?? null })
+    const { title, shortId, slug } = renamedSummary
+    return Response.json({ artifactId, title, shortId, slug, url: this.#context.artifactUrl(renamedSummary), summary: savedSummary?.summary ?? null })
   }
 
   /** Hides the artifact from everyone at once; it can be restored for 30 days, then it is purged. */
@@ -157,7 +167,7 @@ export class ArtifactApi {
       targetId: artifactId,
       detail: { title: summary.title },
     })
-    return Response.json({ artifactId, title: summary.title, url: this.#context.viewerUrl(artifactId) })
+    return Response.json({ artifactId, title: summary.title, url: this.#context.artifactUrl(summary) })
   }
 
   async listVersions(request: Request, artifactId: string): Promise<Response> {
@@ -206,7 +216,7 @@ export class ArtifactApi {
       excerpt: await PageExcerpt.of(olderVersion.files),
       files: olderVersion.files,
     })
-    return this.#publishResponse(identity, openedArtifact, publishResult)
+    return this.#publishResponse(identity, openedArtifact.summary, publishResult)
   }
 
   static #originJson(origin: VersionOrigin): { origin: VersionOrigin['kind']; restoredFrom: number | null } {
@@ -218,12 +228,12 @@ export class ArtifactApi {
     }
   }
 
-  async #publishResponse(publisher: Identity, openedArtifact: OpenedArtifact, publishResult: PublishResult): Promise<Response> {
-    const artifactId = openedArtifact.summary.artifactId
+  async #publishResponse(publisher: Identity, summary: ArtifactSummary, publishResult: PublishResult): Promise<Response> {
+    const { artifactId, shortId, slug } = summary
     switch (publishResult.status) {
       case 'published':
-        await this.#context.notifier.notify(publisher, openedArtifact.summary, { kind: 'version_published' })
-        return Response.json({ artifactId, version: publishResult.version, url: this.#context.viewerUrl(artifactId) })
+        await this.#context.notifier.notify(publisher, summary, { kind: 'version_published' })
+        return Response.json({ artifactId, shortId, slug, version: publishResult.version, url: this.#context.artifactUrl(summary) })
       case 'conflict':
         return this.#conflict(artifactId, publishResult.currentVersion)
       case 'not_found':
@@ -244,9 +254,18 @@ export class ArtifactApi {
     return Response.json(conflictBody, { status: 409 })
   }
 
-  async #rename(identity: Identity, summary: ArtifactSummary, title: string): Promise<void> {
-    if (title === summary.title) return
-    await this.#context.repositories.artifacts.rename(summary.artifactId, title)
+  /** Returns the summary as renamed; null in either field keeps what the artifact has, see ArtifactSlug.afterChange. */
+  async #rename(identity: Identity, summary: ArtifactSummary, newName: { title: string | null; slug: string | null }): Promise<ArtifactSummary> {
+    const title = newName.title ?? summary.title
+    const changedTitle = title === summary.title ? null : title
+    const slug = ArtifactSlug.afterChange(summary.slug, newName.slug, changedTitle)
+    if (changedTitle === null && slug === summary.slug) return summary
+    await this.#context.repositories.artifacts.rename(summary.artifactId, { title, slug })
+    if (changedTitle !== null) await this.#recordRename(identity, summary, title)
+    return { ...summary, title, slug }
+  }
+
+  async #recordRename(identity: Identity, summary: ArtifactSummary, title: string): Promise<void> {
     await this.#context.repositories.auditLog.record({
       workspaceId: summary.workspaceId,
       actorId: identity.userId,
@@ -277,7 +296,7 @@ export class ArtifactApi {
       publishedVia: summary.publishedVia,
       updatedAt: summary.updatedAt,
       removal: summary.removal === null ? null : ArtifactApi.#removalJson(summary.removal, names),
-      url: permissions.canView ? this.#context.viewerUrl(summary.artifactId) : null,
+      url: permissions.canView ? this.#context.artifactUrl(summary) : null,
       permissions: {
         canEdit: permissions.canEdit,
         canComment: permissions.canComment,

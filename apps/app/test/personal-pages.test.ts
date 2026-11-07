@@ -83,13 +83,13 @@ describe('listing on a personal page', () => {
     await setSharing(first.artifactId, { listed: true })
     await setSharing(second.artifactId, { listed: true })
 
-    const listedView = await app.request(`/a/${second.artifactId}`)
+    const listedView = await app.request(second.path)
     const listedMarkup = await listedView.text()
-    const unlistedView = await app.request(`/a/${unlisted.artifactId}`)
-    const memberView = await app.request(`/a/${second.artifactId}`, { cookie: zhouCookie })
+    const unlistedView = await app.request(unlisted.path)
+    const memberView = await app.request(second.path, { cookie: zhouCookie })
 
     expect(listedView.headers.get('X-Robots-Tag')).toBeNull()
-    expect(listedMarkup).toContain(`<link rel="canonical" href="http://app.test/a/${second.artifactId}">`)
+    expect(listedMarkup).toContain(`<link rel="canonical" href="http://app.test${second.path}">`)
     expect(listedMarkup).toContain('class="viewer-byline"')
     expect(listedMarkup).toContain('href="/@lin"')
     expect(listedMarkup).toContain('下一篇')

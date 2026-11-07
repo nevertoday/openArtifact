@@ -126,13 +126,14 @@ export class TestApp {
     return this.request(sharingPath, { method: 'PUT', cookie, body: { grants: [...otherGrants, { userId: person.body.userId, role }] } })
   }
 
-  async publish(caller: Caller, title: string, page = '<h1>hello</h1>', visibility?: string): Promise<{ artifactId: string; version: number; url: string }> {
+  /** `path` is the artifact's address on the app, the path of the returned `url`. */
+  async publish(caller: Caller, title: string, page = '<h1>hello</h1>', visibility?: string): Promise<{ artifactId: string; version: number; url: string; path: string }> {
     const { status, body } = await this.json<{ artifactId: string; version: number; url: string }>('/api/artifacts', {
       ...caller,
       method: 'POST',
       body: { title, visibility, files: [{ path: 'index.html', content: page }] },
     })
     if (status !== 201) throw new Error(`publish failed with ${status}: ${JSON.stringify(body)}`)
-    return body
+    return { ...body, path: new URL(body.url).pathname }
   }
 }
