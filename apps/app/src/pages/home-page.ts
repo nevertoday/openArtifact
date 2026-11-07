@@ -59,13 +59,25 @@ export class HomeListing {
     return [...this.#visibleArtifacts, ...this.#restorableArtifacts].flatMap(({ summary }) => [summary.authorId, summary.removal?.removedBy ?? null])
   }
 
-  agentCounts(m: Messages): { agent: string; count: number }[] {
+  agentCounts(): { agent: string; count: number }[] {
     const countByAgent = new Map<string, number>()
     for (const { summary } of this.#visibleArtifacts) {
-      const agent = ArtifactLabels.publishedVia(m, summary.publishedVia)
+      const agent = HomeListing.sourceOf(summary.publishedVia)
       countByAgent.set(agent, (countByAgent.get(agent) ?? 0) + 1)
     }
     return [...countByAgent].map(([agent, count]) => ({ agent, count })).sort((left, right) => right.count - left.count)
+  }
+
+  /**
+   * The source a listing filters by, in the address as `?agent=`: the agent's client name, or the empty string for
+   * the web page, which no agent can be called. The address stays the same whatever language the page is in.
+   */
+  static sourceOf(publishedVia: string | null): string {
+    return publishedVia ?? ''
+  }
+
+  static sourceLabel(m: Messages, source: string): string {
+    return ArtifactLabels.publishedVia(m, source === '' ? null : source)
   }
 
   /** A search matches the title, the author's name or the source, ignoring case. */
@@ -73,9 +85,8 @@ export class HomeListing {
     const searchText = query.search.trim().toLowerCase()
     return this.#artifactsFor(query.filter).filter(openedArtifact => {
       const { summary } = openedArtifact
-      const source = ArtifactLabels.publishedVia(m, summary.publishedVia)
-      const matchesAgent = query.agent === null || source === query.agent
-      const searchedFields = [summary.title, authorNames.get(summary.authorId) ?? '', source]
+      const matchesAgent = query.agent === null || HomeListing.sourceOf(summary.publishedVia) === query.agent
+      const searchedFields = [summary.title, authorNames.get(summary.authorId) ?? '', ArtifactLabels.publishedVia(m, summary.publishedVia)]
       const matchesSearch = searchText === '' || searchedFields.some(field => field.toLowerCase().includes(searchText))
       return this.#matchesFilter(openedArtifact, query.filter) && matchesAgent && matchesSearch
     })
@@ -168,12 +179,12 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
 
   // The heading names what the list shows, so it never runs the workspace name into a sentence.
   static #heading(m: Messages, query: HomeQuery): string {
-    if (query.agent !== null) return m.home.headingByAgent(query.agent)
+    if (query.agent !== null) return m.home.headingByAgent(HomeListing.sourceLabel(m, query.agent))
     return query.filter === 'all' ? m.home.headingAll : m.home.filters[query.filter]
   }
 
   static #description(m: Messages, query: HomeQuery): string {
-    return query.agent === null ? m.home.filterDescriptions[query.filter] : m.home.descriptionByAgent(query.agent)
+    return query.agent === null ? m.home.filterDescriptions[query.filter] : m.home.descriptionByAgent(HomeListing.sourceLabel(m, query.agent))
   }
 
   // Said in a live region, so a screen reader hears the count change as the search narrows.
@@ -245,9 +256,9 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     }
     const agentLink = ({ agent, count }: { agent: string; count: number }) => {
       const isCurrent = model.query.agent === agent
-      return html`<a class="xxd-sidebar__item" href="${HomePage.#homePath({ filter: 'all', agent, search })}" title="${agent}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(HomePage.#sourceIcon(m, agent), 18)}<span>${agent}</span><span class="xxd-badge" title="${m.home.sidebar.countTitle(count)}">${count}</span></a>`
+      return html`<a class="xxd-sidebar__item" href="${HomePage.#homePath({ filter: 'all', agent, search })}" title="${HomeListing.sourceLabel(m, agent)}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(HomePage.#sourceIcon(agent), 18)}<span>${HomeListing.sourceLabel(m, agent)}</span><span class="xxd-badge" title="${m.home.sidebar.countTitle(count)}">${count}</span></a>`
     }
-    const agentCounts = model.listing.agentCounts(m)
+    const agentCounts = model.listing.agentCounts()
     return html`<nav class="xxd-sidebar app-sidebar home-sidebar" aria-label="${m.home.sidebar.filter}"><div class="xxd-sidebar__body">
   <div class="home-sidebar__filter-row">
     <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">${m.home.sidebar.filter}</div>${ARTIFACT_FILTERS.map(filterLink)}</div>
@@ -265,12 +276,12 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     const search = model.query.search
     return html`<label class="xxd-select home-source-picker"><span class="xxd-sr-only">${model.m.home.sidebar.sources}</span><select data-source-picker>
   ${option(model.m.home.sidebar.allSources, HomePage.#homePath({ filter: model.query.agent === null ? model.query.filter : 'all', agent: null, search }), model.query.agent === null)}
-  ${agentCounts.map(({ agent, count }) => option(model.m.home.sidebar.sourceOption({ agent, count }), HomePage.#homePath({ filter: 'all', agent, search }), model.query.agent === agent))}
+  ${agentCounts.map(({ agent, count }) => option(model.m.home.sidebar.sourceOption({ agent: HomeListing.sourceLabel(model.m, agent), count }), HomePage.#homePath({ filter: 'all', agent, search }), model.query.agent === agent))}
 </select></label>`
   }
 
-  static #sourceIcon(m: Messages, agent: string): IconName {
-    return agent === ArtifactLabels.publishedVia(m, null) ? 'Globe' : 'Bot'
+  static #sourceIcon(agent: string): IconName {
+    return agent === HomeListing.sourceOf(null) ? 'Globe' : 'Bot'
   }
 
   static #grid(shownArtifacts: OpenedArtifact[], model: HomeModel): SafeHtml {
@@ -311,7 +322,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     if (searchText !== '') {
       return { icon: 'SearchX', title: empty.searchTitle(searchText), text: empty.searchText, action: { label: empty.clearSearch, href: HomePage.#homePath({ ...query, search: '' }), primary: false } }
     }
-    if (query.agent !== null) return { icon: 'SearchX', title: empty.agentTitle(query.agent), text: '', action: { label: empty.viewAll, href: '/', primary: false } }
+    if (query.agent !== null) return { icon: 'SearchX', title: empty.agentTitle(HomeListing.sourceLabel(m, query.agent)), text: '', action: { label: empty.viewAll, href: '/', primary: false } }
     switch (query.filter) {
       case 'all':
         return { icon: 'Inbox', ...empty.filters.all, action: { label: empty.connectAgent, href: '/settings/agents', primary: true } }

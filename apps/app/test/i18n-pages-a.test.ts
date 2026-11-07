@@ -118,3 +118,19 @@ describe('the server-rendered pages in English', () => {
     for (const page of [unknownAddress, notFound, password, noAccess, inviteUnusable]) expect(page.markup).not.toMatch(anyChinese)
   })
 })
+
+describe('the home page’s source filter', () => {
+  it('keeps the same address in every language, the web page included', async () => {
+    const author = await app.signIn('source-filter@example.com')
+    await app.request('/api/artifacts', { method: 'POST', cookie: author, body: { title: 'Made on the web page', files: [{ path: 'index.html', content: '<p>web</p>' }] } })
+
+    const chinese = await app.request('/', { cookie: author })
+    const english = await app.request('/', { cookie: author, headers: { 'Accept-Language': 'en' } })
+    const webSource = /href="(\/\?[^"]*agent=)"/
+
+    expect((await chinese.text()).match(webSource)?.[1]).toBe('/?agent=')
+    expect((await english.text()).match(webSource)?.[1]).toBe('/?agent=')
+    const filtered = await (await app.request('/?agent=', { cookie: author, headers: { 'Accept-Language': 'en' } })).text()
+    expect(filtered).toContain('Made on the web page')
+  })
+})
