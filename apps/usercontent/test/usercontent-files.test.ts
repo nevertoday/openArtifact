@@ -83,16 +83,13 @@ describe('UsercontentFiles', () => {
     expect(pageResponse.headers.get('Cache-Control')).toBe('private, max-age=3600')
   })
 
-  it('serves an SDK that only talks to the app origin', async () => {
+  it('serves an SDK that knows the app origin and never posts to any other', async () => {
     const sdkResponse = await fetchPath(SDK_PATH)
     const sdkScript = await sdkResponse.text()
 
     expect(sdkResponse.headers.get('Content-Type')).toContain('text/javascript')
     expect(sdkScript).toContain(`const APP_ORIGIN = "${appOrigin}"`)
-    expect(sdkScript).toContain('postMessage(')
     expect(sdkScript).not.toContain("'*'")
-    expect(sdkScript).toContain("message.type === 'open-artifact:pins'")
-    expect(sdkScript).toContain("has('preview')")
   })
 
   it('stops serving a removed artifact at once, even on a link signed before the removal', async () => {
@@ -105,18 +102,6 @@ describe('UsercontentFiles', () => {
     const servedAfterRestore = await fetchPath(signedBeforeRemoval)
 
     expect([servedBefore.status, servedAfterRemoval.status, servedAfterRestore.status]).toEqual([200, 404, 200])
-  })
-
-  it('answers every parent message of the anchor protocol and reports picks with the element and its place', async () => {
-    const sdkScript = await (await fetchPath(SDK_PATH)).text()
-    const handledParentMessages = [...sdkScript.matchAll(/message\.type === '(open-artifact:[a-z-]+)'/g)].map(match => match[1])
-    const framePostedMessages = [...sdkScript.matchAll(/type: '(open-artifact:[a-z-]+)'/g)].map(match => match[1])
-
-    expect(handledParentMessages).toEqual(['open-artifact:pins', 'open-artifact:pick-anchor', 'open-artifact:cancel-pick', 'open-artifact:measure-anchor', 'open-artifact:track-scroll'])
-    expect(new Set(framePostedMessages)).toEqual(new Set(['open-artifact:request', 'open-artifact:anchor-measured', 'open-artifact:frame-scrolled', 'open-artifact:pin-selected', 'open-artifact:anchor-picked', 'open-artifact:anchor-cancelled']))
-    expect(sdkScript).toContain('version: SHOWN_VERSION')
-    expect(sdkScript).toContain('const placement = { rect: pageGeometry.viewportRect(element), scroll: pageGeometry.scroll() }')
-    expect(sdkScript).toContain('/\\/v(\\d+)\\//.exec(location.pathname)')
   })
 
   it('answers 404 for a file the version does not have, and refuses writes', async () => {

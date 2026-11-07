@@ -11,9 +11,10 @@
     "@open-artifact/core": "workspace:*"
   },
   "devDependencies": {
-    "wrangler": "4.147.0",
     "@cloudflare/vitest-pool-workers": "0.22.0",
+    "@open-artifact/storage-cloudflare": "workspace:*",
+    "happy-dom": "21.0.4",
     "vitest": "4.1.12",
-    "@open-artifact/storage-cloudflare": "workspace:*"
+    "wrangler": "4.147.0"
   }
 }
