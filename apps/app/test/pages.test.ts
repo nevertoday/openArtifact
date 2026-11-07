@@ -183,6 +183,20 @@ describe('home page', () => {
     expect(mineMarkup).not.toContain('Reviewer only')
     expect(sharedMarkup).toContain('Reviewer only')
   })
+
+  it('names a reach only when it differs from the workspace default, and leaves a count of zero blank', async () => {
+    await app.publish({ token: agentToken }, 'Team roadmap', '<h1>x</h1>', 'workspace')
+    await app.publish({ token: agentToken }, 'Private notes', '<h1>x</h1>', 'private')
+    const newcomerCookie = await app.signIn('newcomer@example.com')
+
+    const authorHome = await pageText('/', authorCookie)
+    const newcomerHome = await pageText('/', newcomerCookie)
+    const cardOf = (title: string) => authorHome.slice(authorHome.indexOf(`title="${title}"`), authorHome.indexOf('</a>', authorHome.indexOf(`title="${title}"`)))
+
+    expect(cardOf('Team roadmap')).not.toContain('workspace 内可见')
+    expect(cardOf('Private notes')).toContain('<span class="xxd-badge">私有</span>')
+    expect(newcomerHome).toMatch(/href="\/\?filter=mine"[^>]*>.*?我发布的<\/span><span class="xxd-badge"\s+title="0 个 artifact"><\/span>/)
+  })
 })
 
 describe('viewer page', () => {
