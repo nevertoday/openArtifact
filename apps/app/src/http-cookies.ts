@@ -4,8 +4,9 @@ export interface CookieOptions {
 }
 
 export class HttpCookies {
-  static read(request: Request, name: string): string | null {
-    const cookieHeader = request.headers.get('Cookie') ?? ''
+  /** Reads from a request, or from anything else carrying its headers. */
+  static read(source: { headers: Headers }, name: string): string | null {
+    const cookieHeader = source.headers.get('Cookie') ?? ''
     for (const cookiePair of cookieHeader.split(';')) {
       const separatorIndex = cookiePair.indexOf('=')
       if (separatorIndex === -1) continue

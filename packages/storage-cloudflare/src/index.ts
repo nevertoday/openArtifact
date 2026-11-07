@@ -4,6 +4,7 @@ export { CloudflareArtifactRepository } from './cloudflare-artifact-repository.t
 export { CloudflareAuditLog } from './cloudflare-audit-log.ts'
 export { CloudflareCommentRepository } from './cloudflare-comment-repository.ts'
 export { CloudflareNotificationRepository } from './cloudflare-notification-repository.ts'
+export { CloudflareInviteRepository } from './cloudflare-invite-repository.ts'
 export { CloudflareSharedDataRepository } from './cloudflare-shared-data-repository.ts'
 export { CloudflareUserDirectory, CloudflareWorkspaceRepository } from './cloudflare-workspace-repository.ts'
 export { cloudflareRepositories } from './cloudflare-repositories.ts'

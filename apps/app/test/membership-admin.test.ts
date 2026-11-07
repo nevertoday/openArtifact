@@ -141,3 +141,54 @@ describe('removing a member', () => {
     expect(unknownPerson.status).toBe(404)
   })
 })
+
+describe('renaming the workspace', () => {
+  it('lets an admin rename it, trimmed, and records the change', async () => {
+    const before = await app.json<{ workspace: { name: string } }>('/api/me', { cookie: adminCookie })
+
+    const renamed = await app.json<{ name: string }>('/api/workspace', { method: 'PATCH', cookie: adminCookie, body: { name: '  设计组  ' } })
+    const after = await app.json<{ workspace: { name: string } }>('/api/me', { cookie: adminCookie })
+    const renameEvent = await latestAuditEvent()
+
+    expect(renamed.status).toBe(200)
+    expect(after.body.workspace.name).toBe('设计组')
+    expect(renameEvent).toMatchObject({ action: 'workspace.renamed', actor: { name: 'admin' }, member: null, detail: { from: before.body.workspace.name, to: '设计组' } })
+  })
+
+  it('refuses a blank or too long name, a member and a token', async () => {
+    const memberCookie = await app.signIn('renamer@example.com')
+    const adminToken = await app.createToken(adminCookie)
+
+    const blank = await app.request('/api/workspace', { method: 'PATCH', cookie: adminCookie, body: { name: '   ' } })
+    const tooLong = await app.request('/api/workspace', { method: 'PATCH', cookie: adminCookie, body: { name: '名'.repeat(41) } })
+    const byMember = await app.request('/api/workspace', { method: 'PATCH', cookie: memberCookie, body: { name: '我的' } })
+    const byToken = await app.request('/api/workspace', { method: 'PATCH', token: adminToken, body: { name: '我的' } })
+
+    expect([blank.status, tooLong.status, byMember.status, byToken.status]).toEqual([400, 400, 403, 403])
+  })
+
+  it('keeps the workspace name out of running text', async () => {
+    await app.request('/api/workspace', { method: 'PATCH', cookie: adminCookie, body: { name: '增长组' } })
+
+    const homeMarkup = await (await app.request('/', { cookie: adminCookie })).text()
+    const agentsMarkup = await (await app.request('/settings/agents', { cookie: adminCookie })).text()
+
+    expect(homeMarkup).toContain('全部 artifact')
+    expect(homeMarkup).not.toContain('增长组的 artifact')
+    expect(agentsMarkup).not.toContain('在 增长组 里')
+  })
+})
+
+describe('public links setting', () => {
+  it('shows a member the setting as text, and gives an admin the count of links a switch-off ends', async () => {
+    const memberCookie = await app.signIn('reader@example.com')
+    await app.publish({ cookie: memberCookie }, 'Open roadmap', '<h1>x</h1>', 'public_link')
+
+    const memberMarkup = await (await app.request('/settings/workspace', { cookie: memberCookie })).text()
+    const adminMarkup = await (await app.request('/settings/workspace', { cookie: adminCookie })).text()
+
+    expect(memberMarkup).toContain('已允许 · 只有管理员可以修改')
+    expect(memberMarkup).not.toContain('id="public-links-enabled"')
+    expect(adminMarkup).toMatch(/data-public-link-count="[1-9]\d*"/)
+  })
+})

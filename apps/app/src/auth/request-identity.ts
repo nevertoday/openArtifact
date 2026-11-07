@@ -3,6 +3,7 @@ import { HttpCookies } from '../http-cookies.ts'
 import { RemovedFromWorkspaceError } from '../http-error.ts'
 import { People } from '../people.ts'
 import type { Repositories } from '@open-artifact/core'
+import { INVITE_COOKIE, type Admission } from './admission.ts'
 import type { OpenArtifactAuth } from './open-artifact-auth.ts'
 
 export const WORKSPACE_COOKIE = 'oa_workspace'
@@ -28,12 +29,14 @@ export interface Identity {
 export class RequestIdentity {
   readonly #auth: OpenArtifactAuth
   readonly #repositories: Repositories
+  readonly #admission: Admission
   readonly #request: Request
   #resolvedIdentity: Promise<Identity | null> | null = null
 
-  constructor(auth: OpenArtifactAuth, repositories: Repositories, request: Request) {
+  constructor(auth: OpenArtifactAuth, repositories: Repositories, admission: Admission, request: Request) {
     this.#auth = auth
     this.#repositories = repositories
+    this.#admission = admission
     this.#request = request
   }
 
@@ -63,18 +66,18 @@ export class RequestIdentity {
   async #sessionIdentity(): Promise<Identity | null> {
     const signedInUser = await this.#auth.signedInUser(this.#request)
     if (!signedInUser) return null
-    const memberships = await this.#membershipsOf(signedInUser.userId)
+    const memberships = await this.#membershipsOf(signedInUser)
     const chosenWorkspaceId = HttpCookies.read(this.#request, WORKSPACE_COOKIE)
     const membership = memberships.find(candidate => candidate.workspace.workspaceId === chosenWorkspaceId) ?? memberships[0]
     if (!membership) throw new Error(`User ${signedInUser.userId} has no workspace`)
     return { userId: signedInUser.userId, name: People.displayName(signedInUser), email: signedInUser.email, membership, memberships, agentClient: null, tokenScope: null }
   }
 
-  // Accounts created before workspaces existed join one on their next visit; a person an admin removed does not.
-  async #membershipsOf(userId: string): Promise<Membership[]> {
-    const memberships = await this.#repositories.workspaces.membershipsOf(userId)
+  // A person joins a workspace on the first visit after sign-in, through the invite link this browser opened if any.
+  async #membershipsOf(signedInUser: { userId: string; email: string }): Promise<Membership[]> {
+    const memberships = await this.#repositories.workspaces.membershipsOf(signedInUser.userId)
     if (memberships.length > 0) return memberships
-    const joinedMembership = await this.#repositories.workspaces.joinFirstWorkspace(userId, '我的团队')
+    const joinedMembership = await this.#admission.join(signedInUser, HttpCookies.read(this.#request, INVITE_COOKIE))
     if (joinedMembership === null) throw new RemovedFromWorkspaceError()
     return [joinedMembership]
   }

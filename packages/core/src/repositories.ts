@@ -4,6 +4,7 @@ import type { ArtifactRepository } from './artifact-repository.ts'
 import type { AuditLog } from './audit-log.ts'
 import type { CommentRepository } from './comment-repository.ts'
 import type { NotificationRepository } from './notification-repository.ts'
+import type { InviteRepository } from './invite-repository.ts'
 import type { SharedDataRepository } from './shared-data-repository.ts'
 import type { UserDirectory, WorkspaceRepository } from './workspace-repository.ts'
 
@@ -15,6 +16,7 @@ export interface Repositories {
   notifications: NotificationRepository
   accessTokens: AccessTokenRepository
   workspaces: WorkspaceRepository
+  invites: InviteRepository
   users: UserDirectory
   sharedData: SharedDataRepository
   auditLog: AuditLog

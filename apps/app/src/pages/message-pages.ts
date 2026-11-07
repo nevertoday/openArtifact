@@ -49,6 +49,26 @@ export class MessagePages {
     return PageShell.render({ title: '已被移出 · Open Artifact', body, status: 403, scripts: ['common.js'] })
   }
 
+  static inviteUnusable(): Response {
+    const body = MessagePages.#centered(html`<section class="xxd-empty">
+  ${PageShell.icon('MailX', 24)}
+  <h1 class="xxd-empty__title">这个邀请已经失效</h1>
+  <p class="xxd-empty__text">邀请 7 天后失效，管理员也可能撤销了它。请管理员重新邀请你。</p>
+  <div class="xxd-empty__actions"><a class="xxd-btn" data-variant="primary" href="/login">去登录</a></div>
+</section>`)
+    return PageShell.render({ title: '邀请已失效 · Open Artifact', body, status: 410 })
+  }
+
+  static inviteForOtherAddress(invitedEmail: string): Response {
+    const body = MessagePages.#centered(html`<section class="xxd-empty">
+  ${PageShell.icon('MailX', 24)}
+  <h1 class="xxd-empty__title">这个邀请是发给 ${invitedEmail} 的</h1>
+  <p class="xxd-empty__text">退出后用这个邮箱登录，就能加入。</p>
+  <div class="xxd-empty__actions"><button type="button" class="xxd-btn" data-variant="primary" data-sign-out>退出登录</button></div>
+</section>`)
+    return PageShell.render({ title: '邀请发给了别人 · Open Artifact', body, status: 403, scripts: ['common.js'] })
+  }
+
   static #centered(content: SafeHtml): SafeHtml {
     return html`${PageShell.brandBar()}<main class="app-center">${content}</main>`
   }

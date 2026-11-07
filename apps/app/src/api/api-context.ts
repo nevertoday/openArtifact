@@ -1,4 +1,5 @@
 import type { ArtifactGate } from '../access/artifact-gate.ts'
+import type { Admission } from '../auth/admission.ts'
 import type { Mailer } from '../auth/mailer.ts'
 import type { OpenArtifactAuth } from '../auth/open-artifact-auth.ts'
 import type { Identity, RequestIdentity } from '../auth/request-identity.ts'
@@ -14,6 +15,7 @@ export interface ApiContextFields {
   people: People
   mailer: Mailer
   auth: OpenArtifactAuth
+  admission: Admission
   appOrigin: string
 }
 
@@ -24,7 +26,10 @@ export class ApiContext {
   readonly requestIdentity: RequestIdentity
   readonly people: People
   readonly notifier: Notifier
+  /** For mail to addresses that have no account yet, such as invites; mail to people goes through the notifier. */
+  readonly mailer: Mailer
   readonly auth: OpenArtifactAuth
+  readonly admission: Admission
   readonly appOrigin: string
 
   constructor(fields: ApiContextFields) {
@@ -32,8 +37,10 @@ export class ApiContext {
     this.gate = fields.gate
     this.requestIdentity = fields.requestIdentity
     this.people = fields.people
+    this.mailer = fields.mailer
     this.notifier = new Notifier(fields.repositories, fields.mailer, artifactId => this.viewerUrl(artifactId))
     this.auth = fields.auth
+    this.admission = fields.admission
     this.appOrigin = fields.appOrigin
   }
 
@@ -58,6 +65,10 @@ export class ApiContext {
     const identity = await this.requireBrowserSession()
     if (identity.membership.role !== 'admin') throw HttpError.forbidden(`${action}; ask a workspace admin`)
     return identity
+  }
+
+  inviteUrl(inviteCode: string): string {
+    return `${this.appOrigin}/invite/${encodeURIComponent(inviteCode)}`
   }
 
   viewerUrl(artifactId: string): string {

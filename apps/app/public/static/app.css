@@ -61,12 +61,32 @@
 .artifact-card__badges { --cluster-gap: var(--space-1-5); margin-top: var(--space-1); }
 
 /* Settings */
-.token-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--gap-items); }
+.token-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--gap-items); }
 .token-form__name { flex: 1 1 220px; }
 .token-form__scope { flex-basis: 100%; }
-.token-created { --stack-gap: var(--space-2); min-width: 0; flex: 1; }
+.connect-panel { --stack-gap: var(--space-2); padding-top: var(--space-3); }
+.connect-panel > p { margin: 0; }
+.connect-snippet { position: relative; }
+.connect-snippet .xxd-code { padding-inline-end: calc(var(--space-6) + var(--space-3)); }
+.connect-snippet__copy { position: absolute; top: var(--space-2); right: var(--space-2); }
+.agent-connect .xxd-clipboard code { overflow-wrap: anywhere; }
+.token-table tr[data-just-created] { background: var(--selected-bg); }
+@media (prefers-reduced-motion: no-preference) { .token-table tr { transition: background-color var(--motion-quick) ease; } }
+/* On a phone each token is a small stacked card, so 撤销 never scrolls off screen. */
+@media (max-width: 640px) {
+  .token-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .token-table, .token-table tbody, .token-table tr, .token-table td { display: block; }
+  .token-table tr { display: grid; grid-template-columns: auto 1fr; gap: var(--space-1) var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
+  .token-table td { display: contents; }
+  .token-table td[data-label]::before { content: attr(data-label); color: var(--muted); }
+  .token-table td.xxd-table__actions > * { grid-column: 1 / -1; justify-self: start; margin-top: var(--space-1); }
+}
 .profile-form { max-width: 400px; }
 .member-reason { margin: var(--space-1) 0 0; }
+.invite-form { display: grid; gap: var(--gap-items); }
+.invite-section .xxd-list__item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.invite-section .xxd-list__main { flex: 1 1 12em; min-width: 0; overflow-wrap: anywhere; }
+.invite-actions { --cluster-gap: var(--space-1); flex: none; }
 
 /* Viewer: the artifact on the left, comments, versions and data on the right. */
 .viewer-page { display: flex; flex-direction: column; height: 100dvh; }

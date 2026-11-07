@@ -2,6 +2,8 @@ import { ArtifactRemoval, type AccessToken, type AuditEvent, type WorkspaceMembe
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import type { GuideFile } from '../guide/agent-guide.ts'
+import { AgentConnectSection } from './agent-connect-section.ts'
+import { INVITE_LIFETIME_DAYS } from '../api/invite-api.ts'
 import { People } from '../people.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
 import { html, SafeHtml } from './html.ts'
@@ -10,7 +12,7 @@ import { type IconName, PageShell } from './page-shell.ts'
 export const SETTINGS_SECTIONS = ['agents', 'profile', 'members', 'workspace'] as const
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
 
-const SECTION_LABELS: Record<SettingsSection, string> = { agents: 'Agent 接入', profile: '个人资料', members: '成员', workspace: 'Workspace 设置' }
+const SECTION_LABELS: Record<SettingsSection, string> = { agents: 'Agent 接入', profile: '个人资料', members: '成员', workspace: 'workspace 设置' }
 
 /** What only an admin sees: every artifact of the workspace as metadata, and the latest audit events. */
 export interface WorkspaceAdministration {
@@ -24,6 +26,7 @@ export interface SettingsModel {
   identity: Identity
   section: SettingsSection
   mcpUrl: string
+  appOrigin: string
   accessTokens: AccessToken[]
   guideFiles: GuideFile[]
   members: WorkspaceMember[]
@@ -38,7 +41,7 @@ export class SettingsPage {
     const body = html`
 ${PageShell.topBar(model.identity, html`<span class="xxd-text app-topbar__context" data-variant="secondary">/ 设置</span>`)}
 ${PageShell.withSidebar(SettingsPage.#sidebar(model), html`<div class="xxd-read">${SettingsPage.#section(model)}</div>`)}
-${PageShell.jsonData('settings-config', { accessTokens: model.accessTokens })}`
+${PageShell.jsonData('settings-config', { userId: model.identity.userId, accessTokens: model.accessTokens })}`
     return PageShell.render({ title: `${SECTION_LABELS[model.section]} · Open Artifact`, body, scripts: ['common.js', 'settings.js'] })
   }
 
@@ -72,61 +75,8 @@ ${PageShell.jsonData('settings-config', { accessTokens: model.accessTokens })}`
   }
 
   static #agentsSection(model: SettingsModel): SafeHtml {
-    const clients = SettingsPage.#mcpSnippets(model.mcpUrl)
-    return html`${SettingsPage.#pageHeader('Agent 接入', `让 Claude Code、Codex、Cursor、Gemini CLI 等 agent 以你的身份在 ${model.identity.membership.workspace.name} 里发布和修改 artifact。agent 能做什么，由 token 的权限决定。`)}
-<div class="xxd-settings">
-<section class="xxd-stack" aria-labelledby="mcp-title">
-  <div class="xxd-text-pair">
-    <div class="xxd-cluster"><h2 class="xxd-text" data-variant="heading3" id="mcp-title">1 · 连接 MCP server</h2><span class="xxd-badge">推荐</span></div>
-    <p class="xxd-text" data-variant="secondary">支持 MCP 的 agent 用这一种就够了。工具说明会自动进入 agent 的上下文。把 <code class="xxd-code-inline">oa_pat_…</code> 换成第 2 步生成的 token。</p>
-  </div>
-  <div class="xxd-tabs" data-xxd-tabs aria-label="MCP 客户端">
-    ${clients.map((client, index) => html`<button type="button" role="tab" id="mcp-client-${index}" aria-controls="mcp-snippet-${index}" aria-selected="${index === 0 ? 'true' : 'false'}">${client.name}</button>`)}
-  </div>
-  ${clients.map((client, index) => html`<div class="xxd-code-block" id="mcp-snippet-${index}" ${index === 0 ? '' : new SafeHtml('hidden')}>
-    <div class="xxd-code__head">${client.name}<button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="xs" aria-label="复制 ${client.name} 配置" data-copy="${client.snippet}">${PageShell.icon('Copy', 14)}</button></div>
-    <pre class="xxd-code" tabindex="0"><code>${client.snippet}</code></pre>
-  </div>`)}
-</section>
-
-<section class="xxd-stack" aria-labelledby="pat-title">
-  <h2 class="xxd-text" data-variant="heading3" id="pat-title">2 · 个人 API token</h2>
-  <form class="token-form" id="create-token-form" data-xxd-validate>
-    <div class="xxd-field token-form__name">
-      <label class="xxd-sr-only" for="token-name">token 名称</label>
-      <input class="xxd-input" id="token-name" name="name" required maxlength="80" placeholder="名称，例如 Claude Code · 工作机" data-error-required="给 token 起个名字，比如它装在哪台机器上">
-    </div>
-    <label class="xxd-select"><span class="xxd-sr-only">有效期</span><select id="token-expiry" name="expiresInDays"><option value="90">90 天</option><option value="30">30 天</option><option value="365">1 年</option><option value="never">永不过期</option></select></label>
-    <button type="submit" class="xxd-btn" data-variant="primary">新建 token</button>
-    <fieldset class="xxd-choices token-form__scope">
-      <legend class="xxd-label">权限</legend>
-      <label class="xxd-choice" for="token-scope-publish"><input type="radio" class="xxd-radio" name="scope" id="token-scope-publish" value="publish" checked><span>仅发布<small>发布、更新和读取 artifact，处理评论和共享数据；不能修改谁能看到它。</small></span></label>
-      <label class="xxd-choice" for="token-scope-full"><input type="radio" class="xxd-radio" name="scope" id="token-scope-full" value="full"><span>完全权限<small>和你在网页上能做的一样，也能修改分享设置，比如设为公开链接。</small></span></label>
-    </fieldset>
-  </form>
-  <div class="xxd-banner" data-tone="warning" id="token-reveal" role="status" hidden>
-    ${PageShell.icon('TriangleAlert')}
-    <div class="xxd-stack token-created">
-      <p class="xxd-banner__title" data-token-reveal-title></p>
-      <div class="xxd-clipboard"><code data-token-value></code><button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" aria-label="复制 token" data-copy-target="[data-token-value]" data-copy-done="token 已复制">${PageShell.icon('Copy', 14)}</button></div>
-    </div>
-  </div>
-  <div id="token-table"></div>
-</section>
-
-<section class="xxd-group" aria-labelledby="guide-title">
-  <div class="xxd-text-pair">
-    <h2 class="xxd-text" data-variant="heading3" id="guide-title">3 · 指南包（不支持 MCP 时用）</h2>
-    <p class="xxd-text" data-variant="secondary">告诉 agent 什么时候发布、页面要遵守什么约定、该更新而不是新建。已经填好本实例的地址。</p>
-  </div>
-  <div class="xxd-group__body">
-    ${model.guideFiles.map(guideFile => html`<div class="xxd-row">
-      <div class="xxd-row__text"><span class="xxd-row__title">${guideFile.label}</span><span class="xxd-row__desc xxd-mono">${guideFile.savePath}</span></div>
-      <div class="xxd-row__control"><button type="button" class="xxd-btn" data-size="sm" data-copy="${guideFile.content}" data-copy-done="已复制 ${guideFile.label}">${PageShell.icon('Copy', 14)}复制内容</button></div>
-    </div>`)}
-  </div>
-</section>
-</div>`
+    return html`${SettingsPage.#pageHeader('Agent 接入', 'Claude Code、Codex、Cursor、Gemini CLI 等 agent 以你的身份发布和修改 artifact。agent 能做什么，由 token 的权限决定。')}
+${AgentConnectSection.render(model)}`
   }
 
   static #profileSection(identity: Identity): SafeHtml {
@@ -156,11 +106,35 @@ ${PageShell.jsonData('settings-config', { accessTokens: model.accessTokens })}`
     ${isAdmin ? SettingsPage.#memberControls(member, name, identity.userId, adminCount) : html`<td>${member.role === 'admin' ? html`<span class="xxd-badge">管理员</span>` : '成员'}</td>`}
   </tr>`
     }
-    return html`${SettingsPage.#pageHeader('成员', `${members.length} 人。新同事第一次登录后会自动加入。`)}
+    const joiningHint = isAdmin ? '' : '要请同事加入，请管理员邀请。'
+    return html`${SettingsPage.#pageHeader('成员', `${members.length} 人。${joiningHint}`)}
+${isAdmin ? SettingsPage.#inviteSection() : ''}
 <div class="xxd-table-wrap"><table class="xxd-table">
   <thead><tr><th>名称</th><th>邮箱</th><th>角色</th>${isAdmin ? html`<th class="xxd-table__actions"><span class="xxd-sr-only">操作</span></th>` : ''}</tr></thead>
   <tbody>${members.map(memberRow)}</tbody>
 </table></div>`
+  }
+
+  // The pending list is drawn by settings.js from /api/workspace/invites, the same JSON every later change returns.
+  static #inviteSection(): SafeHtml {
+    return html`<section class="xxd-stack invite-section" aria-labelledby="invite-title">
+  <div class="xxd-text-pair">
+    <h2 class="xxd-text" data-variant="heading3" id="invite-title">邀请同事</h2>
+    <p class="xxd-text" data-variant="secondary">收到邀请的人登录后就会加入，不受邮箱域名限制。邀请 ${INVITE_LIFETIME_DAYS} 天后失效。</p>
+  </div>
+  <form class="invite-form" id="invite-email-form" novalidate>
+    <div class="xxd-field invite-form__emails">
+      <label class="xxd-label" for="invite-emails">用邮箱邀请</label>
+      <textarea class="xxd-textarea" id="invite-emails" name="emails" rows="2" data-autosize placeholder="name@example.com" aria-describedby="invite-emails-help"></textarea>
+      <p class="xxd-help" id="invite-emails-help">可以一次填多个，用逗号或换行分开。每人会收到一封带链接的邮件。</p>
+    </div>
+    <div class="xxd-cluster invite-form__actions">
+      <button type="submit" class="xxd-btn" data-variant="primary">发送邀请</button>
+      <button type="button" class="xxd-btn" id="create-invite-link">${PageShell.icon('Link', 14)}生成邀请链接</button>
+    </div>
+  </form>
+  <div class="xxd-stack" id="pending-invites" aria-live="polite"></div>
+</section>`
   }
 
   // An admin acting on someone else always leaves themselves as admin, so only their own row can hit the limits.
@@ -180,21 +154,43 @@ ${PageShell.jsonData('settings-config', { accessTokens: model.accessTokens })}`
   }
 
   static #workspaceSection(model: SettingsModel): SafeHtml {
-    const { identity } = model
-    const isAdmin = identity.membership.role === 'admin'
-    return html`${SettingsPage.#pageHeader('Workspace 设置')}
+    const { identity, administration } = model
+    return html`${SettingsPage.#pageHeader(SECTION_LABELS.workspace)}
+${administration ? SettingsPage.#workspaceNameForm(identity) : ''}
 <section class="xxd-group" aria-labelledby="public-links-title">
   <h2 class="xxd-group__title" id="public-links-title">公开链接</h2>
   <div class="xxd-group__body">
     <div class="xxd-row">
-      <div class="xxd-row__text"><label class="xxd-row__title" for="public-links-enabled">允许成员把 artifact 分享为公开链接</label><span class="xxd-row__desc" id="public-links-help">关闭后，现有的公开链接立即失效；成员仍然可以在 workspace 内查看。</span></div>
-      <div class="xxd-row__control"><input type="checkbox" role="switch" class="xxd-switch" id="public-links-enabled" aria-describedby="public-links-help" ${identity.membership.workspace.publicLinksEnabled ? new SafeHtml('checked') : ''} ${isAdmin ? '' : new SafeHtml('disabled')}></div>
+      <div class="xxd-row__text"><span class="xxd-row__title" id="public-links-label">允许成员把 artifact 分享为公开链接</span><span class="xxd-row__desc" id="public-links-help">关闭后，现有的公开链接立即失效；成员仍然可以在 workspace 内查看。</span></div>
+      <div class="xxd-row__control">${administration ? SettingsPage.#publicLinksSwitch(identity, administration) : SettingsPage.#publicLinksState(identity)}</div>
     </div>
   </div>
-  ${isAdmin ? '' : html`<p class="xxd-group__note">只有管理员可以修改。</p>`}
 </section>
-${model.administration ? SettingsPage.#contentSection(model.administration, identity, model.now) : ''}
-${model.administration ? SettingsPage.#auditSection(model.administration, model.now) : ''}`
+${administration ? SettingsPage.#contentSection(administration, identity, model.now) : ''}
+${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
+  }
+
+  static #workspaceNameForm(identity: Identity): SafeHtml {
+    return html`<form class="xxd-stack workspace-name-form" id="workspace-name-form" data-xxd-validate>
+  <div class="xxd-field">
+    <label class="xxd-label" for="workspace-name">名称</label>
+    <input class="xxd-input" id="workspace-name" name="name" required maxlength="40" value="${identity.membership.workspace.name}" aria-describedby="workspace-name-help" data-error-required="写一个名称，比如团队或项目的名字">
+    <p class="xxd-help" id="workspace-name-help">成员在侧栏和切换 workspace 时看到它。最多 40 个字。</p>
+  </div>
+  <div><button type="submit" class="xxd-btn" data-variant="primary">保存</button></div>
+</form>`
+  }
+
+  // Turning public links off ends every live one at once, so the switch carries how many that is for the confirmation.
+  static #publicLinksSwitch(identity: Identity, administration: WorkspaceAdministration): SafeHtml {
+    const livePublicLinks = administration.artifacts.filter(({ summary }) => summary.sharing.visibility === 'public_link' && summary.removal === null)
+    return html`<input type="checkbox" role="switch" class="xxd-switch" id="public-links-enabled" aria-labelledby="public-links-label" aria-describedby="public-links-help" data-public-link-count="${livePublicLinks.length}" ${identity.membership.workspace.publicLinksEnabled ? new SafeHtml('checked') : ''}>`
+  }
+
+  // A disabled switch reads as "off", so a member sees the setting as words.
+  static #publicLinksState(identity: Identity): SafeHtml {
+    const state = identity.membership.workspace.publicLinksEnabled ? '已允许' : '已关闭'
+    return html`<span class="xxd-text" data-variant="secondary">${state} · 只有管理员可以修改</span>`
   }
 
   // Metadata only: a private artifact shows its title but no link, since an admin may not open it.
@@ -247,7 +243,7 @@ ${model.administration ? SettingsPage.#auditSection(model.administration, model.
     return html`<section class="xxd-stack" aria-labelledby="audit-title">
   <div class="xxd-text-pair">
     <h2 class="xxd-text" data-variant="heading3" id="audit-title">管理记录</h2>
-    <p class="xxd-text" data-variant="secondary">最近 ${auditEvents.length} 条删除、下架、恢复、重命名和成员变动。</p>
+    <p class="xxd-text" data-variant="secondary">最近 ${auditEvents.length} 条删除、下架、恢复、重命名、邀请和成员变动。</p>
   </div>
   ${auditEvents.length > 0 ? html`<ul class="xxd-list">${auditEvents.map(eventItem)}</ul>` : html`<p class="xxd-text" data-variant="secondary">还没有管理记录。</p>`}
 </section>`
@@ -266,15 +262,14 @@ ${model.administration ? SettingsPage.#auditSection(model.administration, model.
         return `${actor} 把 ${names.get(auditEvent.targetId)} 移出了 workspace`
       case 'member.role_changed':
         return `${actor} 把 ${names.get(auditEvent.targetId)} 设为${ArtifactLabels.role(auditEvent.detail.to)}`
+      case 'member.invited':
+        return auditEvent.detail.email === null ? `${actor} 生成了一个邀请链接` : `${actor} 邀请了 ${auditEvent.detail.email}`
+      case 'invite.revoked':
+        return auditEvent.detail.email === null ? `${actor} 撤销了一个邀请链接` : `${actor} 撤销了给 ${auditEvent.detail.email} 的邀请`
+      case 'member.joined':
+        return auditEvent.detail.via === 'link' ? `${actor} 通过邀请链接加入了 workspace` : `${actor} 接受邀请加入了 workspace`
+      case 'workspace.renamed':
+        return `${actor} 把 workspace 从「${auditEvent.detail.from}」改名为「${auditEvent.detail.to}」`
     }
-  }
-
-  static #mcpSnippets(mcpUrl: string): { name: string; snippet: string }[] {
-    return [
-      { name: 'Claude Code', snippet: `claude mcp add --transport http open-artifact ${mcpUrl} \\\n  --header "Authorization: Bearer oa_pat_…"` },
-      { name: 'Codex', snippet: `# ~/.codex/config.toml\n[mcp_servers.open-artifact]\nurl = "${mcpUrl}"\nbearer_token_env_var = "OPEN_ARTIFACT_TOKEN"` },
-      { name: 'Cursor', snippet: `// .cursor/mcp.json\n{ "mcpServers": { "open-artifact": {\n    "url": "${mcpUrl}",\n    "headers": { "Authorization": "Bearer oa_pat_…" } } } }` },
-      { name: 'Gemini CLI', snippet: `// ~/.gemini/settings.json\n{ "mcpServers": { "open-artifact": {\n    "httpUrl": "${mcpUrl}",\n    "headers": { "Authorization": "Bearer oa_pat_…" } } } }` },
-    ]
   }
 }

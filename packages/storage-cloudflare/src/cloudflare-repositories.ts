@@ -5,6 +5,7 @@ import { CloudflareArtifactRepository } from './cloudflare-artifact-repository.t
 import { CloudflareAuditLog } from './cloudflare-audit-log.ts'
 import { CloudflareCommentRepository } from './cloudflare-comment-repository.ts'
 import { CloudflareNotificationRepository } from './cloudflare-notification-repository.ts'
+import { CloudflareInviteRepository } from './cloudflare-invite-repository.ts'
 import { CloudflareSharedDataRepository } from './cloudflare-shared-data-repository.ts'
 import { CloudflareUserDirectory, CloudflareWorkspaceRepository } from './cloudflare-workspace-repository.ts'
 
@@ -16,6 +17,7 @@ export function cloudflareRepositories(db: D1Database, files: R2Bucket): Reposit
     notifications: new CloudflareNotificationRepository(db),
     accessTokens: new CloudflareAccessTokenRepository(db),
     workspaces: new CloudflareWorkspaceRepository(db),
+    invites: new CloudflareInviteRepository(db),
     users: new CloudflareUserDirectory(db),
     sharedData: new CloudflareSharedDataRepository(db),
     auditLog: new CloudflareAuditLog(db),

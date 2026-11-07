@@ -1,5 +1,5 @@
 import { WORKSPACE_ROLES, type MembershipChange } from '@open-artifact/core'
-import { WORKSPACE_COOKIE } from '../auth/request-identity.ts'
+import { WORKSPACE_COOKIE, type Identity } from '../auth/request-identity.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { HttpError } from '../http-error.ts'
 import { People } from '../people.ts'
@@ -7,6 +7,7 @@ import type { ApiContext } from './api-context.ts'
 import { JsonBody } from './json-body.ts'
 
 const MAX_NAME_LENGTH = 60
+const MAX_WORKSPACE_NAME_LENGTH = 40
 const YEAR_SECONDS = 365 * 24 * 60 * 60
 const AUDIT_PAGE_SIZE = 50
 
@@ -110,11 +111,21 @@ export class WorkspaceApi {
     }
   }
 
+  /** Each field present in the body is changed; both are read before either is written. */
   async updateSettings(request: Request): Promise<Response> {
     const identity = await this.#context.requireWorkspaceAdmin('change workspace settings')
     const requestBody = await JsonBody.of(request)
-    const publicLinksEnabled = requestBody.boolean('publicLinksEnabled', identity.membership.workspace.publicLinksEnabled)
-    await this.#context.repositories.workspaces.setPublicLinksEnabled(identity.membership.workspace.workspaceId, publicLinksEnabled)
-    return Response.json({ publicLinksEnabled })
+    const workspace = identity.membership.workspace
+    const name = requestBody.has('name') ? requestBody.text('name', MAX_WORKSPACE_NAME_LENGTH) : workspace.name
+    const publicLinksEnabled = requestBody.boolean('publicLinksEnabled', workspace.publicLinksEnabled)
+    if (name !== workspace.name) await this.#renameWorkspace(identity, name)
+    await this.#context.repositories.workspaces.setPublicLinksEnabled(workspace.workspaceId, publicLinksEnabled)
+    return Response.json({ name, publicLinksEnabled })
+  }
+
+  async #renameWorkspace(admin: Identity, name: string): Promise<void> {
+    const workspace = admin.membership.workspace
+    await this.#context.repositories.workspaces.rename(workspace.workspaceId, name)
+    await this.#context.repositories.auditLog.record({ workspaceId: workspace.workspaceId, actorId: admin.userId, action: 'workspace.renamed', targetType: 'workspace', targetId: workspace.workspaceId, detail: { from: workspace.name, to: name } })
   }
 }

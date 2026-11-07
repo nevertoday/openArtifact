@@ -2,6 +2,7 @@ import { SigningKey, UsercontentSignature } from '@open-artifact/core'
 import { ArtifactGate } from './access/artifact-gate.ts'
 import { ApiContext } from './api/api-context.ts'
 import { ApiRoutes } from './api/api-routes.ts'
+import { Admission } from './auth/admission.ts'
 import type { Mailer } from './auth/mailer.ts'
 import { OpenArtifactAuth } from './auth/open-artifact-auth.ts'
 import { RequestIdentity } from './auth/request-identity.ts'
@@ -16,6 +17,7 @@ const VIEWER = new URLPattern({ pathname: '/a/:artifactId' })
 const FULL_VIEW = new URLPattern({ pathname: '/a/:artifactId/full' })
 const UNLOCK = new URLPattern({ pathname: '/a/:artifactId/unlock' })
 const SETTINGS = new URLPattern({ pathname: '/settings{/:section}?' })
+const INVITE = new URLPattern({ pathname: '/invite/:inviteCode' })
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 export interface AppDependencies {
@@ -66,6 +68,8 @@ export class AppRoutes {
     if (viewerMatch) return pageRoutes.viewer(request, decodeURIComponent(viewerMatch.pathname.groups.artifactId ?? ''))
     const fullViewMatch = FULL_VIEW.exec(requestUrl)
     if (fullViewMatch) return pageRoutes.fullView(request, decodeURIComponent(fullViewMatch.pathname.groups.artifactId ?? ''))
+    const inviteMatch = INVITE.exec(requestUrl)
+    if (inviteMatch) return pageRoutes.invite(request, decodeURIComponent(inviteMatch.pathname.groups.inviteCode ?? ''))
     const settingsMatch = SETTINGS.exec(requestUrl)
     if (settingsMatch) return pageRoutes.settings(request, settingsMatch.pathname.groups.section)
     return new Response('Not found', { status: 404 })
@@ -73,14 +77,16 @@ export class AppRoutes {
 
   #contextFor(request: Request, appOrigin: string): ApiContext {
     const { env, repositories, mailer } = this.#dependencies
-    const auth = new OpenArtifactAuth(env, appOrigin, mailer, repositories)
+    const admission = new Admission(env.ALLOWED_EMAIL_DOMAINS, repositories)
+    const auth = new OpenArtifactAuth(env, appOrigin, mailer, repositories, admission)
     return new ApiContext({
       repositories,
       gate: new ArtifactGate(repositories, this.#signingKey, Date.now()),
-      requestIdentity: new RequestIdentity(auth, repositories, request),
+      requestIdentity: new RequestIdentity(auth, repositories, admission, request),
       people: new People(repositories.users),
       mailer,
       auth,
+      admission,
       appOrigin,
     })
   }
