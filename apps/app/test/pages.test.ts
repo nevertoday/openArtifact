@@ -183,6 +183,24 @@ describe('home page', () => {
     expect(mineMarkup).not.toContain('Reviewer only')
     expect(sharedMarkup).toContain('Reviewer only')
   })
+
+  it('names a reach only when it differs from the workspace default, shows the version only after a revision, and leaves a count of zero blank', async () => {
+    await app.publish({ token: agentToken }, 'Team roadmap', '<h1>x</h1>', 'workspace')
+    await app.publish({ token: agentToken }, 'Private notes', '<h1>x</h1>', 'private')
+    const revised = await app.publish({ token: agentToken }, 'Revised brief', '<h1>v1</h1>')
+    await app.request(`/api/artifacts/${revised.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+    const newcomerCookie = await app.signIn('newcomer@example.com')
+
+    const authorHome = await pageText('/', authorCookie)
+    const newcomerHome = await pageText('/', newcomerCookie)
+    const cardOf = (title: string) => authorHome.slice(authorHome.indexOf(`title="${title}"`), authorHome.indexOf('</a>', authorHome.indexOf(`title="${title}"`)))
+
+    expect(cardOf('Team roadmap')).not.toContain('workspace 内可见')
+    expect(cardOf('Private notes')).toContain('<span class="xxd-badge">私有</span>')
+    expect(cardOf('Team roadmap')).not.toContain('>v1</span>')
+    expect(cardOf('Revised brief')).toContain('<span class="xxd-mono">v2</span>')
+    expect(newcomerHome).toMatch(/href="\/\?filter=mine"[^>]*>.*?我发布的<\/span><span class="xxd-badge"\s+title="0 个 artifact"><\/span>/)
+  })
 })
 
 describe('viewer page', () => {
@@ -358,6 +376,32 @@ describe('settings', () => {
     expect(after).not.toContain('设置你的名字')
     expect(profile).toContain('value="新同事"')
     expect(profile).toContain('邮箱用来登录，不能修改。')
+  })
+
+  it('shows a person icon on the account button until the person chooses a name, then their initial', async () => {
+    const accountAvatar = (markup: string) => markup.match(/<span class="xxd-avatar" data-account-initial>(.*?)<\/span>/)?.[1]
+    const unnamedCookie = await app.signIn('xavier.unnamed@example.com')
+
+    const before = accountAvatar(await pageText('/', unnamedCookie))
+    await app.request('/api/me', { method: 'PATCH', cookie: unnamedCookie, body: { name: '徐同学' } })
+    const after = accountAvatar(await pageText('/', unnamedCookie))
+
+    expect(before).toContain('data-xxd-icon="UserRound"')
+    expect(before).not.toContain('X')
+    expect(after).toBe('徐')
+  })
+
+  it('offers the three colour schemes on the profile page, following the system until the browser says otherwise', async () => {
+    const profile = await pageText('/settings/profile', authorCookie)
+    const themeChoices = [...profile.matchAll(/<input type="radio" class="xxd-radio" name="theme" id="theme-\w+" value="(\w+)" ?(checked)?><span>([^<]+)<\/span>/g)].map(match => ({ value: match[1], checked: Boolean(match[2]), label: match[3] }))
+
+    expect(profile).toContain('<legend class="xxd-label">外观</legend>')
+    expect(themeChoices).toEqual([
+      { value: 'system', checked: true, label: '跟随系统' },
+      { value: 'light', checked: false, label: '浅色' },
+      { value: 'dark', checked: false, label: '深色' },
+    ])
+    expect(profile).toContain('只对这台设备上的这个浏览器生效。')
   })
 
   it('lists the settings sections in the same order in the account menu and the side navigation', async () => {

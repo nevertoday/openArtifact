@@ -8,7 +8,7 @@ import { People } from '../people.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
 import { html, SafeHtml } from './html.ts'
 import { PageShell } from './page-shell.ts'
-import { SETTINGS_SECTION_ICONS, SETTINGS_SECTION_LABELS, type SettingsSection } from './settings-sections.ts'
+import { SETTINGS_SECTION_ICONS, SETTINGS_SECTION_LABELS, THEME_CHOICES, type SettingsSection } from './settings-sections.ts'
 
 
 /** What only an admin sees: every artifact of the workspace as metadata, and the latest audit events. */
@@ -89,7 +89,19 @@ ${AgentConnectSection.render(model)}`
     <p class="xxd-help">邮箱用来登录，不能修改。</p>
   </div>
   <div><button type="submit" class="xxd-btn" data-variant="primary" disabled>保存</button></div>
-</form>`
+</form>
+${SettingsPage.#appearanceSection()}`
+  }
+
+  // The choice lives in this browser, so the server cannot know it: 跟随系统 is checked until settings.js reads the real one.
+  static #appearanceSection(): SafeHtml {
+    const choice = ([theme, label]: [string, string]) =>
+      html`<label class="xxd-choice" for="theme-${theme}"><input type="radio" class="xxd-radio" name="theme" id="theme-${theme}" value="${theme}" ${theme === 'system' ? new SafeHtml('checked') : ''}><span>${label}</span></label>`
+    return html`<fieldset class="xxd-choices" aria-describedby="appearance-help">
+  <legend class="xxd-label">外观</legend>
+  ${Object.entries(THEME_CHOICES).map(choice)}
+  <p class="xxd-help" id="appearance-help">只对这台设备上的这个浏览器生效。</p>
+</fieldset>`
   }
 
   static #membersSection(model: SettingsModel): SafeHtml {

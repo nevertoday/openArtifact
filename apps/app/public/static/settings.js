@@ -52,9 +52,10 @@ class TokenTable {
     const inactiveTokens = accessTokens.filter(accessToken => !tokenStateOf(accessToken).isActive)
     const inactiveFold = element('details', { className: 'xxd-collapse token-fold', open: showInactive },
       element('summary', {}, `显示已失效的 token（${inactiveTokens.length}）`), this.#table(inactiveTokens, null))
+    // replaceChildren writes a null child out as the text "null", so the fold is left out rather than passed as null.
     this.container.replaceChildren(
       activeTokens.length > 0 ? this.#table(activeTokens, justCreatedTokenId) : secondaryText('没有有效的 token。'),
-      inactiveTokens.length > 0 ? inactiveFold : null,
+      ...(inactiveTokens.length > 0 ? [inactiveFold] : []),
     )
   }
 
@@ -284,6 +285,15 @@ function showAccountName(name) {
   document.querySelector('[data-account-button]')?.setAttribute('aria-label', `账户菜单：${name}`)
 }
 
+function wireThemeChoice() {
+  const themeInputs = document.querySelectorAll('input[name="theme"]')
+  const currentTheme = globalThis.XxdTheme?.read().theme ?? 'system'
+  for (const themeInput of themeInputs) {
+    themeInput.checked = themeInput.value === currentTheme
+    themeInput.addEventListener('change', () => globalThis.XxdTheme?.set({ theme: themeInput.value }))
+  }
+}
+
 function wireWorkspaceNameForm() {
   const workspaceNameForm = document.getElementById('workspace-name-form')
   workspaceNameForm?.addEventListener('submit', async event => {
@@ -507,6 +517,7 @@ function wireContentAdministration() {
 
 wireAgentConnection()
 wireProfileForm()
+wireThemeChoice()
 wireWorkspaceNameForm()
 wirePublicLinksSwitch()
 wireMemberAdministration()

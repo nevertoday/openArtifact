@@ -165,7 +165,7 @@ ${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(mod
   }
 
   static #artifactsSection(shownArtifacts: OpenedArtifact[], model: HomeModel): SafeHtml {
-    return html`${model.identity.hasChosenName ? '' : HomePage.#nameNudge(model.identity)}<header class="xxd-page-header">
+    return html`${model.identity.hasChosenName ? '' : HomePage.#nameNudge(model.identity)}<header class="xxd-page-header home-header">
   <div class="xxd-page-header__row">
     <h1 class="xxd-page-header__title">${HomePage.#heading(model.query)}</h1>
     <div class="xxd-page-header__actions"><a class="xxd-btn" data-variant="primary" href="/settings/agents">让 agent 发布</a></div>
@@ -255,7 +255,8 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
       const isCurrent = model.query.filter === filter && model.query.agent === null
       const count = model.listing.countFor(filter)
       const somethingWaits = WAITING_FILTERS.some(waitingFilter => waitingFilter === filter) && count > 0
-      return html`<a class="xxd-sidebar__item" ${filter === 'removed' ? html`data-removed-count` : ''} href="${HomePage.#homePath({ filter, agent: null, search })}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(FILTER_ICONS[filter], 18)}<span>${FILTER_LABELS[filter]}</span><span class="xxd-badge" ${somethingWaits ? html`data-tone="warning"` : ''} title="${count} 个 artifact">${count}</span></a>`
+      // An empty badge is hidden: a column of zeros says nothing, so only a filter holding something shows its count.
+      return html`<a class="xxd-sidebar__item" ${filter === 'removed' ? html`data-removed-count` : ''} href="${HomePage.#homePath({ filter, agent: null, search })}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(FILTER_ICONS[filter], 18)}<span>${FILTER_LABELS[filter]}</span><span class="xxd-badge" ${somethingWaits ? html`data-tone="warning"` : ''} title="${count} 个 artifact">${count > 0 ? count : ''}</span></a>`
     }
     const agentLink = ({ agent, count }: { agent: string; count: number }) => {
       const isCurrent = model.query.agent === agent
@@ -267,11 +268,13 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">筛选</div>${ARTIFACT_FILTERS.map(filterLink)}</div>
     <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">待处理</div>${WAITING_FILTERS.map(filterLink)}</div>
   </div>
-  ${agentCounts.length > 0 ? html`<div class="xxd-sidebar__group home-sidebar__sources"><div class="xxd-sidebar__label">来源</div>${agentCounts.map(agentLink)}</div>${HomePage.#sourcePicker(model, agentCounts)}` : ''}
+  ${agentCounts.length > 0 ? html`<div class="xxd-sidebar__group home-sidebar__sources"><div class="xxd-sidebar__label">来源</div>${agentCounts.map(agentLink)}</div>` : ''}
+  ${agentCounts.length > 1 || model.query.agent !== null ? HomePage.#sourcePicker(model, agentCounts) : ''}
 </div></nav>`
   }
 
-  // On narrow screens the sources become one select, so the filters keep a row of their own.
+  // On narrow screens the sources become one select, so the filters keep a row of their own. With a single source
+  // there is nothing to pick, so the select is left out unless a source is already chosen and needs a way back.
   static #sourcePicker(model: HomeModel, agentCounts: { agent: string; count: number }[]): SafeHtml {
     const option = (label: string, path: string, selected: boolean) => html`<option value="${path}" ${selected ? new SafeHtml('selected') : ''}>${label}</option>`
     const search = model.query.search
@@ -294,6 +297,9 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     const forAgentCount = model.listing.forAgentCount(summary.artifactId)
     const forAgentPart = forAgentCount > 0 ? ` · 其中 ${forAgentCount} 条给 agent` : ''
     const publishedBy = ArtifactLabels.publishedBy(model.authorNames.get(summary.authorId) ?? '', summary.publishedVia)
+    // Visible to the workspace is the default, which the 全部 description states, so only a different reach gets a badge.
+    const sharingBadge = summary.sharing.visibility === 'workspace' ? '' : html`<span class="xxd-badge">${ArtifactLabels.sharingBadge(summary.sharing, model.now)}</span>`
+    const commentBadge = unresolvedCount > 0 ? html`<span class="xxd-badge" data-appearance="dot" data-tone="warning">${unresolvedCount} 条未解决评论${forAgentPart}</span>` : ''
     return html`<a class="xxd-card artifact-card" href="/a/${encodeURIComponent(summary.artifactId)}">
   <div class="xxd-card__media artifact-cover" aria-hidden="true">
     <span class="artifact-cover__title"></span><span class="artifact-cover__line"></span><span class="artifact-cover__line"></span>
@@ -302,12 +308,8 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
   </div>
   <div class="xxd-card__body">
     <p class="xxd-card__title artifact-card__title" title="${summary.title}">${summary.title}</p>
-    <p class="xxd-card__meta artifact-meta" title="${publishedBy}">${publishedBy}</p>
-    <p class="xxd-card__meta artifact-meta"><span class="xxd-mono">v${summary.version}</span>${PageShell.relativeTime(summary.updatedAt, model.now)}</p>
-    <div class="xxd-cluster artifact-card__badges">
-      <span class="xxd-badge">${ArtifactLabels.sharingBadge(summary.sharing, model.now)}</span>
-      ${unresolvedCount > 0 ? html`<span class="xxd-badge" data-appearance="dot" data-tone="warning">${unresolvedCount} 条未解决评论${forAgentPart}</span>` : ''}
-    </div>
+    <p class="xxd-card__meta artifact-meta" title="${publishedBy} · ${ArtifactLabels.updatedAgo(summary.updatedAt, model.now)}${summary.version > 1 ? ` · v${summary.version}` : ''}"><span>${publishedBy}</span>${PageShell.relativeTime(summary.updatedAt, model.now)}${summary.version > 1 ? html`<span class="xxd-mono">v${summary.version}</span>` : ''}</p>
+    ${sharingBadge || commentBadge ? html`<div class="xxd-cluster artifact-card__badges">${sharingBadge}${commentBadge}</div>` : ''}
   </div>
 </a>`
   }

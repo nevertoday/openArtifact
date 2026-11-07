@@ -39,7 +39,10 @@ async function restoreFromList(restoreButton) {
 
 function showOneFewerRemoved() {
   const removedCount = document.querySelector('[data-removed-count] .xxd-badge')
-  if (removedCount) removedCount.textContent = String(Math.max(0, Number(removedCount.textContent) - 1))
+  if (!removedCount) return
+  const remaining = Math.max(0, Number(removedCount.textContent) - 1)
+  removedCount.textContent = remaining > 0 ? String(remaining) : ''
+  removedCount.title = `${remaining} 个 artifact`
 }
 
 /**

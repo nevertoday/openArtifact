@@ -12,13 +12,17 @@
 .viewer-version { flex: none; gap: var(--space-1); font-variant-numeric: tabular-nums; }
 .viewer-version[data-old] { color: var(--warning-text); }
 .viewer-bar__end { flex: none; display: flex; align-items: center; gap: var(--space-1); margin-inline-start: auto; }
-.viewer-visibility { flex: none; border: 1px solid var(--line); background: transparent; color: var(--muted); font: inherit; font-size: var(--text-xs); }
+/* Who can see the page is a quiet fact beside 分享, not a second button competing with it. */
+.viewer-visibility { flex: none; height: var(--control-h-sm); padding-inline: var(--space-1-5); border: 0; background: transparent; color: var(--muted); font: inherit; font-size: var(--text-xs); }
 button.viewer-visibility { cursor: pointer; }
-@media (hover: hover) { button.viewer-visibility:hover { border-color: var(--line-control-hover); color: var(--ink); } }
+@media (hover: hover) { button.viewer-visibility:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; } }
+/* The page's own actions, then a hairline, then the person's: notifications and account. */
+.viewer-bar__end > .app-bell { margin-inline-start: var(--space-1); }
+.viewer-bar__end > .app-bell::before { content: ""; position: absolute; inset-inline-start: calc(-1 * var(--space-1) - 1px); top: 8px; bottom: 8px; width: 1px; background: var(--line); pointer-events: none; }
 .viewer-count-button { gap: var(--space-1-5); }
 .viewer-count { min-width: 18px; height: 18px; padding: 0 5px; background: var(--ink); color: var(--paper); font: var(--weight-medium) 11px / 18px var(--font-body); text-align: center; font-variant-numeric: tabular-nums; }
-.viewer-count:empty { display: none; }
-.viewer-count[data-zero] { background: var(--wash-strong); color: var(--muted); }
+/* No open comments shows the icon alone; the button's label still says the count to a screen reader. */
+.viewer-count:empty, .viewer-count[data-zero] { display: none; }
 .viewer-comment-mode[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
 .viewer-sign-in { padding-inline: var(--space-2); white-space: nowrap; }
 .viewer-more-menu__visibility { display: none; }
@@ -192,6 +196,10 @@ button.viewer-visibility { cursor: pointer; }
   .viewer-comment-mode { padding-inline: var(--space-2); }
   .viewer-more-menu__visibility { display: block; }
   .viewer-bar__end { gap: 0; }
+  /* Every pixel of a phone's bar goes to the title, so the hairline before the account controls is dropped. */
+  .viewer-bar__end > .app-bell { margin-inline-start: 0; }
+  .viewer-bar__end > .app-bell::before { display: none; }
+  .viewer-version { padding-inline: var(--space-1); }
   .viewer-notice { padding-inline: var(--space-2); }
   .viewer-drawer { position: absolute; right: 0; bottom: 0; left: 0; z-index: 7; width: auto; height: 55%; padding-bottom: env(safe-area-inset-bottom, 0px); border-inline-start: 0; border-top: 1px solid var(--line); box-shadow: var(--shadow-sheet); animation: viewer-sheet-in var(--motion-sheet) var(--ease-out-expo); }
   .viewer[data-sheet-height="full"] .viewer-drawer { height: calc(100% - 24px); }

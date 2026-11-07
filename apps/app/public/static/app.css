@@ -1,4 +1,14 @@
-/* Only what the UI kit has no component for: the app frame, artifact covers, settings, login. The viewer has viewer.css. Kit tokens only. */
+/* Only what the UI kit has no component for: the app frame, artifact covers, settings, login. The viewer has viewer.css. Kit tokens only,
+   except the page-title size below, which the kit's scale has no step for. */
+
+/* Type scale of the app's own pages. The kit sets 13px everywhere, which suits menus and toolbars; the pages people
+   read get one step more, and the page title a clear jump above the section headings, so what matters is seen first. */
+:root { --app-title-size: 32px; --app-title-leading: 40px; }
+.app-main .xxd-page-header__title { font-size: var(--app-title-size); line-height: var(--app-title-leading); letter-spacing: -0.01em; }
+.app-main .xxd-page-header__desc { font-size: var(--text-base); line-height: var(--leading-md); }
+.app-main :is(.xxd-text:not([data-variant]), .xxd-text[data-variant="secondary"], .xxd-help, .xxd-empty__text) { font-size: var(--text-base); line-height: var(--leading-md); }
+.app-sidebar .xxd-sidebar__item { font-size: var(--text-base); }
+@media (max-width: 640px) { :root { --app-title-size: 26px; --app-title-leading: 32px; } }
 
 /* App frame: top bar, side navigation, one content column. */
 .app-topbar { position: sticky; top: 0; z-index: var(--z-dock); gap: var(--space-3); }
@@ -8,7 +18,10 @@
 .app-search { flex: 0 1 360px; min-width: 0; }
 .app-account-head { padding-block: var(--space-1); }
 .app-bell { position: relative; }
-.app-bell__count { position: absolute; top: 0; inset-inline-end: 0; min-width: 18px; height: 18px; padding-inline: 4px; justify-content: center; font-size: 11px; line-height: 18px; pointer-events: none; }
+/* Hangs off the bell's corner so it covers less of the bell; the bell keeps that overhang free so the count stays off
+   whatever sits next to it. */
+.app-bell { margin-inline-end: 6px; }
+.app-bell__count { position: absolute; top: -4px; inset-inline-end: -6px; min-width: 18px; height: 18px; padding-inline: 4px; justify-content: center; font-size: 11px; line-height: 18px; pointer-events: none; }
 .app-bell__count[hidden] { display: none; }
 .app-notifications { width: min(360px, calc(100vw - 16px)); max-width: min(360px, calc(100vw - 16px)); padding: 0; }
 .app-notifications__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); }
@@ -48,25 +61,36 @@
 /* Home: artifact cards. The cover is a monochrome sketch of a page until the live preview loads over it. */
 .artifact-grid { --grid-min: 240px; grid-auto-rows: 1fr; }
 /* Every card in a row is as tall as the tallest; a long title stops at two lines and shows in full on hover. */
-.artifact-card .xxd-card__body { grid-template-rows: auto auto auto 1fr; }
-.artifact-card__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.artifact-cover { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--inset-md); --ratio: 16 / 9; }
+.artifact-card .xxd-card__body { grid-template-rows: auto auto 1fr; }
+.artifact-card__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--text-md); line-height: var(--leading-md); }
+.artifact-card .xxd-card__meta { font-size: var(--text-sm); }
+.artifact-cover { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--inset-md); --ratio: 4 / 3; }
 .artifact-cover__title { width: 55%; height: 10px; background: var(--line-strong); }
 .artifact-cover__line { width: 80%; height: 6px; background: var(--line); }
 .artifact-cover__line + .artifact-cover__line { width: 64%; }
 .artifact-cover__blocks { flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); padding-top: var(--space-1); }
 .artifact-cover__blocks span { background: var(--wash-strong); }
-/* Rendered at four times the card's width and scaled down, so the preview shows a desktop-wide page. */
+/* Rendered at three times the card's width (about 770px) and scaled down: wide enough for a page's desktop layout,
+   narrow enough that its content fills the cover instead of floating small in the middle of it. */
 /* An artifact page without its own background is written for white paper, whatever theme the app is in. */
 .artifact-cover__preview { color-scheme: light; background: #fff; }
-.artifact-cover__preview { position: absolute; inset: 0 auto auto 0; width: 400%; height: 400%; border: 0; transform: scale(0.25); transform-origin: 0 0; pointer-events: none; }
+/* 12px taller than the cover, so lifting it 4px on hover never shows the cover's ground beneath it. */
+.artifact-cover__preview { position: absolute; inset: 0 auto auto 0; width: 300%; height: calc(300% + 12px); border: 0; transform: scale(calc(1 / 3)); transform-origin: 0 0; pointer-events: none; }
 .xxd-card__media.artifact-cover { border-bottom: 1px solid var(--line); }
 .artifact-meta { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .artifact-meta > * + *::before { content: "·"; padding-inline: var(--space-1-5); color: var(--muted-2); }
 .artifact-card__badges { --cluster-gap: var(--space-1-5); align-self: end; margin-top: var(--space-1); }
+/* On hover the cover's page eases up a little, as if picked up; the kit already darkens the border at once. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .artifact-cover__preview { transition: translate var(--motion-medium) var(--ease-out-quint); }
+  .artifact-card:hover .artifact-cover__preview { translate: 0 -4px; }
+}
 
 /* Home: the count under the heading, and the filters. Below 1024px the side navigation becomes rows above the cards. */
 .home-result-line { margin: 0 0 var(--space-3); }
+/* Counts are quiet figures beside the label; only a count that asks for action (data-tone) keeps the badge's fill. */
+.home-sidebar .xxd-badge:empty { display: none; }
+.home-sidebar .xxd-badge:not([data-tone]) { border-color: transparent; background: transparent; box-shadow: none; color: var(--muted); font-variant-numeric: tabular-nums; }
 .home-sidebar__sources { margin-top: var(--space-4); }
 .home-source-picker { display: none; }
 @media (max-width: 1024px) {
@@ -81,6 +105,13 @@
   .home-source-picker { display: inline-flex; justify-self: start; }
 }
 @media (max-width: 640px) {
+  /* On a phone the cards come first: the heading and its action share one line. The description stays, since it is
+     where 全部 says what reach an unbadged card has. */
+  .home-header { align-items: center; padding-block: var(--space-4) var(--space-3); }
+  .home-header .xxd-page-header__title { min-width: 0; }
+  .home-header .xxd-page-header__actions { grid-column: 2; grid-row: 1; order: 0; margin-top: 0; }
+  .home-header .xxd-page-header__desc { grid-column: 1 / -1; }
+  .home-header .xxd-page-header__actions .xxd-btn { height: var(--control-h-sm); padding-inline: var(--control-pad-x-sm); }
   .home-sidebar .xxd-sidebar__item { min-height: 44px; }
   .home-sidebar .xxd-sidebar__body { padding-inline: var(--space-4); }
   .home-source-picker { justify-self: stretch; }

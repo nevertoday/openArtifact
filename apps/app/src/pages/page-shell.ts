@@ -193,9 +193,9 @@ ${options.description ? html`<meta name="twitter:description" content="${options
     return html`<script type="application/json" id="${elementId}">${new SafeHtml(json)}</script>`
   }
 
-  // common.js fills the count and the list; the list refreshes each time the panel opens.
+  // common.js fills the count and the list; the list refreshes each time the panel opens. Small, like every other control in a top bar.
   static #notificationBell(): SafeHtml {
-    return html`<button type="button" class="xxd-btn app-bell" data-variant="ghost" data-icon-only data-xxd-popover="notification-panel" aria-label="通知" data-notification-bell>${PageShell.icon('Bell', 18)}<span class="xxd-badge app-bell__count" data-variant="solid" data-tone="action" aria-hidden="true" data-unread-count hidden></span></button>
+    return html`<button type="button" class="xxd-btn app-bell" data-variant="ghost" data-size="sm" data-icon-only data-xxd-popover="notification-panel" aria-label="通知" data-notification-bell>${PageShell.icon('Bell', 18)}<span class="xxd-badge app-bell__count" data-variant="solid" data-tone="action" aria-hidden="true" data-unread-count hidden></span></button>
 <div class="xxd-popover app-notifications" id="notification-panel" popover data-placement="bottom-end" aria-label="通知">
   <div class="app-notifications__head"><p class="xxd-popover__title">通知</p><button type="button" class="xxd-btn" data-variant="ghost" data-size="xs" data-mark-all-read hidden>全部标为已读</button></div>
   <div class="app-notifications__body" data-notification-list></div>
@@ -205,7 +205,7 @@ ${options.description ? html`<meta name="twitter:description" content="${options
   static #accountMenu(identity: Identity): SafeHtml {
     const menuLink = (section: (typeof SETTINGS_SECTIONS)[number]) =>
       html`<a class="xxd-menu__item" role="menuitem" href="/settings/${section}">${PageShell.icon(SETTINGS_SECTION_ICONS[section], 14)}${SETTINGS_SECTION_LABELS[section]}</a>`
-    return html`<button type="button" class="xxd-btn app-account-button" data-variant="ghost" data-icon-only data-xxd-menu="account-menu" aria-label="账户菜单：${identity.name}" data-account-button><span class="xxd-avatar" data-account-initial>${PageShell.initialOf(identity.name)}</span></button>
+    return html`<button type="button" class="xxd-btn app-account-button" data-variant="ghost" data-size="sm" data-icon-only data-xxd-menu="account-menu" aria-label="账户菜单：${identity.name}" data-account-button><span class="xxd-avatar" data-account-initial>${identity.hasChosenName ? PageShell.initialOf(identity.name) : PageShell.icon('UserRound', 16)}</span></button>
 <div class="xxd-menu" id="account-menu" role="menu" popover>
   <div class="xxd-menu__label xxd-text-pair app-account-head"><span class="xxd-text" data-account-name>${identity.name}</span><span class="xxd-text" data-variant="caption">${identity.email}</span></div>
   <div class="xxd-menu__sep" role="separator"></div>
