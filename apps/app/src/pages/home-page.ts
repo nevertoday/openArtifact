@@ -49,6 +49,10 @@ export class HomeListing {
     return this.#openThreadsOf(artifactId).length
   }
 
+  forAgentCount(artifactId: string): number {
+    return this.#openThreadsOf(artifactId).filter(thread => thread.root.forAgent).length
+  }
+
   countFor(filter: HomeFilter): number {
     return this.#artifactsFor(filter).filter(openedArtifact => this.#matchesFilter(openedArtifact, filter)).length
   }
@@ -287,6 +291,8 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
 
   static #card({ summary }: OpenedArtifact, model: HomeModel): SafeHtml {
     const unresolvedCount = model.listing.unresolvedCount(summary.artifactId)
+    const forAgentCount = model.listing.forAgentCount(summary.artifactId)
+    const forAgentPart = forAgentCount > 0 ? ` · 其中 ${forAgentCount} 条给 agent` : ''
     const publishedBy = ArtifactLabels.publishedBy(model.authorNames.get(summary.authorId) ?? '', summary.publishedVia)
     return html`<a class="xxd-card artifact-card" href="/a/${encodeURIComponent(summary.artifactId)}">
   <div class="xxd-card__media artifact-cover" aria-hidden="true">
@@ -300,7 +306,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     <p class="xxd-card__meta artifact-meta"><span class="xxd-mono">v${summary.version}</span>${PageShell.relativeTime(summary.updatedAt, model.now)}</p>
     <div class="xxd-cluster artifact-card__badges">
       <span class="xxd-badge">${ArtifactLabels.sharingBadge(summary.sharing, model.now)}</span>
-      ${unresolvedCount > 0 ? html`<span class="xxd-badge" data-appearance="dot" data-tone="warning">${unresolvedCount} 条未解决评论</span>` : ''}
+      ${unresolvedCount > 0 ? html`<span class="xxd-badge" data-appearance="dot" data-tone="warning">${unresolvedCount} 条未解决评论${forAgentPart}</span>` : ''}
     </div>
   </div>
 </a>`

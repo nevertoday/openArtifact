@@ -95,7 +95,8 @@ describe('home page', () => {
     const forMyAgentMarkup = await pageText('/?filter=waiting_for_my_agent', authorCookie)
     const reviewerForMeMarkup = await pageText('/?filter=waiting_for_me', reviewerCookie)
 
-    expect(homeMarkup).toContain('2 条未解决评论')
+    expect(homeMarkup).toContain('2 条未解决评论</span>')
+    expect(homeMarkup).toContain('1 条未解决评论 · 其中 1 条给 agent')
     expect(homeMarkup).toContain('等我处理')
     expect(homeMarkup).toContain('等我的 agent 处理')
     expect(homeMarkup).not.toContain('待 agent 处理')
