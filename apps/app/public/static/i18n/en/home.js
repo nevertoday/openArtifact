@@ -1,2 +1,66 @@
 // @ts-check
-export default /** @satisfies {import('../messages').Messages['home']} */ ({})
+const artifacts = (/** @type {number} */ count) => `${count} ${count === 1 ? 'artifact' : 'artifacts'}`
+
+export default /** @satisfies {import('../messages').Messages['home']} */ ({
+  filters: {
+    all: 'All',
+    mine: 'Published by me',
+    shared: 'Shared with me',
+    removed: 'Recently deleted',
+    waiting_for_me: 'Waiting for me',
+    waiting_for_my_agent: 'Waiting for my agent',
+  },
+  filterDescriptions: {
+    all: 'Artifacts published by your teammates and their agents. The whole workspace can see them by default.',
+    mine: 'What you published, and what your agents published for you.',
+    shared: 'Artifacts whose authors added you to the share list.',
+    removed: 'Deleted artifacts are hidden from everyone. You can restore them for 30 days, then they\'re deleted for good.',
+    waiting_for_me: 'Comments are waiting for your reply.',
+    waiting_for_my_agent: 'Comments for an agent are still open, waiting for your agent.',
+  },
+  connectAgents: 'Connect agents',
+  letAgentPublish: 'Publish with an agent',
+  nameNudge: {
+    title: 'Set your name',
+    text: name => `Your teammates see “${name}” in comments and notifications. Pick a name they'll recognize.`,
+    action: 'Set name',
+  },
+  headingAll: 'All artifacts',
+  headingByAgent: agent => `Published with ${agent}`,
+  descriptionByAgent: agent => `Artifacts published with ${agent}.`,
+  resultCount: artifacts,
+  searchResultCount: ({ search, count }) => `Search “${search}” · ${artifacts(count)}`,
+  removedTable: {
+    title: 'Title',
+    removed: 'Deleted',
+    kept: 'Kept',
+    actions: 'Actions',
+    restore: 'Restore',
+  },
+  searchPlaceholder: 'Search titles, authors or agents',
+  sidebar: {
+    filter: 'Filter',
+    waiting: 'To do',
+    sources: 'Sources',
+    allSources: 'All sources',
+    sourceOption: ({ agent, count }) => `${agent} (${count})`,
+    countTitle: artifacts,
+  },
+  unresolvedComments: ({ count, forAgent }) => `${count} unresolved ${count === 1 ? 'comment' : 'comments'}${forAgent > 0 ? ` · ${forAgent} for an agent` : ''}`,
+  empty: {
+    searchTitle: search => `Nothing found for “${search}”`,
+    searchText: 'Search looks at titles, authors\' names and the agent that published each artifact.',
+    clearSearch: 'Clear search',
+    agentTitle: agent => `No artifacts from ${agent}`,
+    viewAll: 'View all',
+    connectAgent: 'Connect an agent',
+    filters: {
+      all: { title: 'No artifacts yet', text: 'Connect your agent under “Connect agents”, then have it publish design docs, reports or dashboards here.' },
+      mine: { title: 'You haven\'t published an artifact yet', text: 'Connect your agent and have it publish pages here.' },
+      shared: { title: 'Nothing has been shared with you yet', text: 'Artifacts show up here once their authors add you in the share settings.' },
+      removed: { title: 'Nothing to restore', text: 'Artifacts you delete stay here for 30 days.' },
+      waiting_for_me: { title: 'No comments waiting for your reply', text: 'Comments on your artifacts, and replies to your comments, show up here.' },
+      waiting_for_my_agent: { title: 'No comments for an agent', text: 'When someone picks “For agent” on a comment, your agent sees the work here.' },
+    },
+  },
+})

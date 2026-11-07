@@ -115,10 +115,10 @@ export class PageRoutes {
       agent: searchParams.get('agent'),
       search: searchParams.get('q') ?? '',
     }
-    const authorNames = await this.#context.people.namesOf(listing.peopleIds())
-    const previewUrls = await this.#previewUrls(listing.matching(query, authorNames))
+    const [authorNames, m] = await Promise.all([this.#context.people.namesOf(listing.peopleIds()), this.#context.messages()])
+    const previewUrls = await this.#previewUrls(listing.matching(m, query, authorNames))
     const justRemoved = listing.restorable(searchParams.get('removed'))
-    return HomePage.render({ m: await this.#context.messages(), identity, listing, query, authorNames, previewUrls, justRemoved, usercontentOrigin: this.#settings.usercontentOrigin, now: Date.now() })
+    return HomePage.render({ m, identity, listing, query, authorNames, previewUrls, justRemoved, usercontentOrigin: this.#settings.usercontentOrigin, now: Date.now() })
   }
 
   /** Anyone may read a personal page; `/@me` takes a signed-in person to their own, making it the first time. */

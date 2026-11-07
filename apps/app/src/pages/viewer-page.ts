@@ -131,7 +131,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
       olderVersion: model.olderVersion,
       usercontentOrigin: model.usercontentOrigin,
       visibility: summary.sharing.visibility,
-      visibilityLabels: ArtifactLabels.visibilityLabels(),
+      visibilityLabels: ArtifactLabels.visibilityLabels(model.m),
       permissions: {
         canComment: permissions.canComment,
         canEdit: permissions.canEdit,
@@ -150,7 +150,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   static #description(model: ViewerModel): string {
     const { summary } = model.openedArtifact
     if (model.byline && summary.summary) return summary.summary
-    return `${model.authorName} 发布 · v${summary.version} · ${ArtifactLabels.publishedVia(summary.publishedVia)}`
+    return `${model.authorName} 发布 · v${summary.version} · ${ArtifactLabels.publishedVia(model.m, summary.publishedVia)}`
   }
 
   // Someone who reaches the artifact only through its public link sees the page, not the people who work on it:
@@ -188,7 +188,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   // Whoever manages sharing opens 分享 from the badge; everyone else reads it as a fact.
   static #visibilityBadge(model: ViewerModel): SafeHtml {
     const { summary, permissions } = model.openedArtifact
-    const label = ArtifactLabels.visibility(summary.sharing.visibility)
+    const label = ArtifactLabels.visibility(model.m, summary.sharing.visibility)
     if (permissions.canManageSharing) return html`<button type="button" class="xxd-badge viewer-visibility" data-tooltip="谁能看到这个页面 · 点一下分享" data-open-share data-visibility-label>${label}</button>`
     return html`<span class="xxd-badge viewer-visibility" tabindex="0" data-tooltip="谁能看到这个页面" data-visibility-label>${label}</span>`
   }
@@ -212,7 +212,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     const menuItem = (icon: IconName, label: string, marker: string) =>
       html`<button type="button" class="xxd-menu__item" role="menuitem" ${new SafeHtml(marker)}>${PageShell.icon(icon, 14)}${label}</button>`
     const separator = html`<div class="xxd-menu__sep" role="separator"></div>`
-    const removeItem = html`${separator}<button type="button" class="xxd-menu__item" role="menuitem" data-tone="danger" data-remove-artifact>${PageShell.icon('Trash2', 14)}${ArtifactLabels.removal(ViewerPage.#removalTakesDown(model))}</button>`
+    const removeItem = html`${separator}<button type="button" class="xxd-menu__item" role="menuitem" data-tone="danger" data-remove-artifact>${PageShell.icon('Trash2', 14)}${ArtifactLabels.removal(model.m, ViewerPage.#removalTakesDown(model))}</button>`
     return html`<button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" data-xxd-menu="artifact-menu" aria-label="更多" data-tooltip="更多">${PageShell.icon('Ellipsis')}</button>
 <div class="xxd-menu viewer-more-menu" id="artifact-menu" role="menu" popover aria-label="更多">
   <a class="xxd-menu__item" role="menuitem" href="${ViewerPage.#pathOf(model, '/full')}" target="_blank" rel="noopener" data-full-view-link>${PageShell.icon('ExternalLink', 14)}在新标签页打开</a>
@@ -221,7 +221,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   ${menuItem('Link', '复制链接', 'data-copy-artifact-link')}
   ${permissions.canRemove ? removeItem : ''}
   ${separator}
-  <div class="xxd-menu__label viewer-more-menu__visibility">可见范围：<span data-visibility-label>${ArtifactLabels.visibility(summary.sharing.visibility)}</span></div>
+  <div class="xxd-menu__label viewer-more-menu__visibility">可见范围：<span data-visibility-label>${ArtifactLabels.visibility(model.m, summary.sharing.visibility)}</span></div>
   <div class="xxd-menu__label viewer-more-menu__note">${PageShell.icon('ShieldCheck', 14)}这个页面在隔离环境里运行，读不到你的登录信息</div>
 </div>`
   }
