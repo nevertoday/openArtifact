@@ -258,7 +258,7 @@ export class ArtifactApi {
   async #rename(identity: Identity, summary: ArtifactSummary, newName: { title: string | null; slug: string | null }): Promise<ArtifactSummary> {
     const title = newName.title ?? summary.title
     const changedTitle = title === summary.title ? null : title
-    const slug = ArtifactSlug.afterChange(summary.slug, newName.slug, changedTitle)
+    const slug = ArtifactSlug.afterChange(summary.slug, newName.slug, title)
     if (changedTitle === null && slug === summary.slug) return summary
     await this.#context.repositories.artifacts.rename(summary.artifactId, { title, slug })
     if (changedTitle !== null) await this.#recordRename(identity, summary, title)
