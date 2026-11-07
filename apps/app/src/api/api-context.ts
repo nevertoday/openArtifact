@@ -6,7 +6,7 @@ import type { OpenArtifactAuth } from '../auth/open-artifact-auth.ts'
 import type { Identity, RequestIdentity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
 import { Notifier } from '../notifications/notifier.ts'
-import type { People } from '../people.ts'
+import { People } from '../people.ts'
 import { PersonalPages } from '../personal-pages.ts'
 import type { Locale, Repositories } from '@open-artifact/core'
 import { messagesFor, type Messages } from '../i18n/messages.ts'
@@ -16,7 +16,6 @@ export interface ApiContextFields {
   repositories: Repositories
   gate: ArtifactGate
   requestIdentity: RequestIdentity
-  people: People
   mailer: Mailer
   auth: OpenArtifactAuth
   admission: Admission
@@ -47,9 +46,9 @@ export class ApiContext {
     this.repositories = fields.repositories
     this.gate = fields.gate
     this.requestIdentity = fields.requestIdentity
-    this.people = fields.people
+    this.people = new People(fields.repositories.users, async () => (await this.messages()).server.deletedPerson)
     this.mailer = fields.mailer
-    this.notifier = new Notifier(fields.repositories, fields.mailer, artifactId => this.viewerUrl(artifactId))
+    this.notifier = new Notifier(fields.repositories, fields.mailer, artifactId => this.viewerUrl(artifactId), fields.localeSignals.fallback)
     this.auth = fields.auth
     this.admission = fields.admission
     this.appOrigin = fields.appOrigin

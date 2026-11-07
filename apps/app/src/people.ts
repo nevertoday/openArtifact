@@ -8,9 +8,12 @@ export interface PersonRef {
 /** How a person is named on screen: the name they set, else the part of their email before the @. */
 export class People {
   readonly #users: UserDirectory
+  readonly #deletedPersonName: () => Promise<string>
 
-  constructor(users: UserDirectory) {
+  /** `deletedPersonName` words an account that no longer exists, in the request's language. */
+  constructor(users: UserDirectory, deletedPersonName: () => Promise<string>) {
     this.#users = users
+    this.#deletedPersonName = deletedPersonName
   }
 
   /** False until the person sets a name; until then others see the part of their email before the @. */
@@ -32,13 +35,14 @@ export class People {
     return auditEvent.targetType === 'member' ? auditEvent.targetId : null
   }
 
-  /** Names for every id; an id whose account was deleted shows as 已删除的用户. */
+  /** Names for every id; an id whose account was deleted shows as a deleted person. */
   async namesOf(userIds: Iterable<string | null>): Promise<Map<string, string>> {
     const knownIds = [...userIds].filter((userId): userId is string => userId !== null)
     const profiles = await this.#users.profilesOf(knownIds)
+    const deletedPersonName = await this.#deletedPersonName()
     return new Map(knownIds.map(userId => {
       const profile = profiles.get(userId)
-      return [userId, profile ? People.displayName(profile) : '已删除的用户']
+      return [userId, profile ? People.displayName(profile) : deletedPersonName]
     }))
   }
 }

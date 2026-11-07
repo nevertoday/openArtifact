@@ -4,14 +4,14 @@ import { HttpError, RemovedFromWorkspaceError } from '../http-error.ts'
 import { People } from '../people.ts'
 import type { Repositories } from '@open-artifact/core'
 import { INVITE_COOKIE, type Admission } from './admission.ts'
-import type { OpenArtifactAuth } from './open-artifact-auth.ts'
+import type { OpenArtifactAuth, SignedInUser } from './open-artifact-auth.ts'
 
 export const WORKSPACE_COOKIE = 'oa_workspace'
 /** Agent clients name themselves in this header; the MCP Worker fills it from the client's MCP handshake. */
 export const AGENT_CLIENT_HEADER = 'X-Open-Artifact-Client'
 const DIRECT_API_CLIENT = 'API'
 const MAX_AGENT_CLIENT_LENGTH = 40
-const NEW_TOKEN_HINT = 'create a new one in 设置 › Agent 接入'
+const NEW_TOKEN_HINT = 'create a new one in Settings › Agent access (设置 › Agent 接入)'
 
 type TokenRefusal = 'token_invalid' | 'token_revoked' | 'token_expired'
 
@@ -116,10 +116,11 @@ export class RequestIdentity {
   }
 
   // A person joins a workspace on the first visit after sign-in, through the invite link this browser opened if any.
-  async #membershipsOf(signedInUser: { userId: string; email: string }): Promise<Membership[]> {
+  async #membershipsOf(signedInUser: SignedInUser): Promise<Membership[]> {
     const memberships = await this.#repositories.workspaces.membershipsOf(signedInUser.userId)
     if (memberships.length > 0) return memberships
-    const joinedMembership = await this.#admission.join(signedInUser, HttpCookies.read(this.#request, INVITE_COOKIE))
+    const firstWorkspaceName = this.#auth.requestMessages(this.#request.headers, signedInUser.locale).server.firstWorkspaceName
+    const joinedMembership = await this.#admission.join(signedInUser, HttpCookies.read(this.#request, INVITE_COOKIE), firstWorkspaceName)
     if (joinedMembership === null) throw new RemovedFromWorkspaceError()
     return [joinedMembership]
   }

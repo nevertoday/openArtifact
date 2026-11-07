@@ -1,6 +1,7 @@
 import type { Notification } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
+import type { Messages } from '../i18n/messages.ts'
 import { HttpError } from '../http-error.ts'
 import { NotificationText } from '../notifications/notification-text.ts'
 import type { ApiContext } from './api-context.ts'
@@ -21,8 +22,9 @@ export class NotificationApi {
     const openableArtifacts = await this.#openableArtifacts(notifications, identity, request)
     const shownNotifications = notifications.filter(notification => openableArtifacts.has(notification.artifactId))
     const actorNames = await this.#context.people.namesOf(shownNotifications.map(notification => notification.actorId))
+    const m = await this.#context.messages()
     return Response.json({
-      notifications: shownNotifications.map(notification => this.#notificationJson(notification, openableArtifacts, actorNames)),
+      notifications: shownNotifications.map(notification => this.#notificationJson(m, notification, openableArtifacts, actorNames)),
       unreadCount: shownNotifications.filter(notification => notification.readAt === null).length,
     })
   }
@@ -48,17 +50,17 @@ export class NotificationApi {
     return new Map(viewableArtifacts.map(openedArtifact => [openedArtifact.summary.artifactId, openedArtifact]))
   }
 
-  #notificationJson(notification: Notification, openableArtifacts: Map<string, OpenedArtifact>, actorNames: Map<string, string>) {
+  #notificationJson(m: Messages, notification: Notification, openableArtifacts: Map<string, OpenedArtifact>, actorNames: Map<string, string>) {
     const actorName = actorNames.get(notification.actorId) ?? ''
     const artifactTitle = openableArtifacts.get(notification.artifactId)?.summary.title ?? ''
-    const actorLabel = NotificationText.actorLabel(actorName, notification.actorAgentClient)
+    const actorLabel = m.notification.actorLabel({ name: actorName, agentClient: notification.actorAgentClient })
     return {
       notificationId: notification.notificationId,
       kind: notification.kind,
       artifactId: notification.artifactId,
       commentId: notification.commentId,
       actor: { userId: notification.actorId, name: actorName, agentClient: notification.actorAgentClient },
-      text: NotificationText.sentence(notification.kind, actorLabel, artifactTitle),
+      text: m.notification.sentences[notification.kind]({ actor: actorLabel, title: artifactTitle }),
       url: NotificationText.link(this.#context.viewerUrl(notification.artifactId), notification.commentId, notification.kind === 'access_requested' ? notification.actorId : null),
       createdAt: notification.createdAt,
       read: notification.readAt !== null,

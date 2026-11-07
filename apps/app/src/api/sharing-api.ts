@@ -126,6 +126,7 @@ export class SharingApi {
       this.#context.repositories.users.profilesOf(grants.map(grant => grant.userId)),
       this.#context.repositories.profiles.findByUser(summary.authorId),
     ])
+    const deletedPersonName = (await this.#context.messages()).server.deletedPerson
     return {
       visibility: summary.sharing.visibility,
       peopleApplyUnder: VISIBILITIES.filter(visibility => ArtifactAccess.grantsApplyUnder(visibility)),
@@ -141,7 +142,7 @@ export class SharingApi {
       author: { userId: summary.authorId },
       grants: grants.map(grant => {
         const profile = grantedProfiles.get(grant.userId)
-        return { userId: grant.userId, role: grant.role, name: profile ? People.displayName(profile) : '已删除的用户', email: profile?.email ?? null }
+        return { userId: grant.userId, role: grant.role, name: profile ? People.displayName(profile) : deletedPersonName, email: profile?.email ?? null }
       }),
       members: members.map(member => ({ userId: member.userId, name: People.displayName(member), email: member.email })),
     }
