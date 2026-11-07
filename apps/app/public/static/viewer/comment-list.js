@@ -263,22 +263,23 @@ export class CommentList extends EventTarget {
     )
   }
 
-  // Every open comment marked for the agent, ready to paste in one go; shown where those comments are being looked at.
+  // Every comment still open under the filter, ready to paste in one go: what an agent should work through next.
   #handoffBar() {
     const showsWork = this.#filter === 'open' || this.#filter === 'agent'
-    const waiting = this.#threads.all.filter(thread => thread.isOpen && thread.forAgent)
+    const waiting = this.#threads.all.filter(thread => thread.isCountedIn(this.#filter))
     if (!this.#handoff || !showsWork || waiting.length === 0) return null
+    const what = this.#filter === 'agent' ? '给 agent 的评论' : '待处理的评论'
     const copyAll = element('button', {
       type: 'button',
       className: 'xxd-btn agent-handoff__copy',
       'data-variant': 'primary',
       'data-size': 'sm',
       onClick: event => this.#copyToAgent(event.currentTarget, waiting, `已复制 ${waiting.length} 条评论，粘贴给你的 agent`),
-    }, icon('Copy', 14), element('span', { 'data-copy-label': '' }, '复制给 agent'))
+    }, icon('Copy', 14), element('span', { 'data-copy-label': '' }, '全部复制给 agent'))
     return element('section', { className: 'agent-handoff', 'aria-label': '交给 agent' },
-      element('p', { className: 'agent-handoff__title' }, `${waiting.length} 条评论等 agent 处理`),
+      element('p', { className: 'agent-handoff__title' }, `${waiting.length} 条${what}`),
       copyAll,
-      element('p', { className: 'agent-handoff__hint' }, '复制后粘贴给任何 agent 都能用。已接入的 agent，直接说「处理 Open Artifact 上的评论」。', element('a', { className: 'xxd-link', href: '/settings/agents' }, '去 Agent 接入')))
+      element('p', { className: 'agent-handoff__hint' }, '粘贴给任何 agent 都能照着改。已接入的 agent，直接说「处理 Open Artifact 上的评论」。', element('a', { className: 'xxd-link', href: '/settings/agents' }, '去 Agent 接入')))
   }
 
   #excerptOf(thread) {
@@ -291,20 +292,20 @@ export class CommentList extends EventTarget {
   #actionsOrReplyForm(thread) {
     if (this.#replyingTo === thread.id) return this.#replyForm(thread)
     const isResolved = !thread.isOpen
-    const action = (label, onClick, extra = {}) => element('button', { type: 'button', className: 'xxd-link', onClick, ...extra }, label)
+    const action = (label, onClick, extra = {}) => element('button', { type: 'button', className: 'xxd-btn comment-action', 'data-variant': 'ghost', 'data-size': 'xs', onClick, ...extra }, label)
     return element('div', { className: 'comment-thread__actions' },
-      action('回复', () => this.#openReply(thread.id), { className: 'xxd-link comment-thread__reply-toggle', 'aria-label': `回复评论 ${thread.number}` }),
+      action('回复', () => this.#openReply(thread.id), { className: 'xxd-btn comment-action comment-thread__reply-toggle', 'aria-label': `回复评论 ${thread.number}` }),
       this.#handoff && !isResolved ? action('复制给 agent', event => this.#copyToAgent(event.currentTarget, [thread], `已复制评论 ${thread.number}，粘贴给你的 agent`), { 'aria-label': `复制评论 ${thread.number} 给 agent` }) : null,
       isResolved
-        ? action('重新打开', () => this.#reopen(thread), { className: 'xxd-link comment-thread__resolve', 'aria-label': `重新打开评论 ${thread.number}` })
-        : action('解决', () => this.#resolve(thread), { className: 'xxd-link comment-thread__resolve', 'aria-label': `解决评论 ${thread.number}` }),
+        ? action('重新打开', () => this.#reopen(thread), { className: 'xxd-btn comment-action comment-thread__resolve', 'aria-label': `重新打开评论 ${thread.number}` })
+        : action('解决', () => this.#resolve(thread), { className: 'xxd-btn comment-action comment-thread__resolve', 'aria-label': `解决评论 ${thread.number}` }),
       thread.root.canDelete ? CommentList.#deleteButton(() => this.#deleteThread(thread), `删除评论 ${thread.number}`) : null,
     )
   }
 
   // Set apart at the row's end and quiet until pointed at, so it is never pressed on the way to 解决.
   static #deleteButton(onClick, label) {
-    return element('button', { type: 'button', className: 'xxd-link comment-thread__delete', 'aria-label': label, onClick }, '删除')
+    return element('button', { type: 'button', className: 'xxd-btn comment-action comment-thread__delete', 'data-variant': 'ghost', 'data-size': 'xs', 'aria-label': label, onClick }, '删除')
   }
 
   // Deleting cannot be undone, so it always asks; the kit puts 取消 first and the danger action last.
