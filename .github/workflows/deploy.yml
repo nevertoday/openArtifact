@@ -1,0 +1,36 @@
+name: Deploy
+
+# Runs only when someone with write access clicks "Run workflow" on the Actions tab.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # The production environment holds the settings and the Cloudflare token; required reviewers can be added there.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
+      - run: pnpm deploy:config
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+          APP_HOST: ${{ vars.APP_HOST }}
+          APP_ZONE: ${{ vars.APP_ZONE }}
+          USERCONTENT_HOST: ${{ vars.USERCONTENT_HOST }}
+          MAIL_FROM: ${{ vars.MAIL_FROM }}
+      - run: pnpm deploy:production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}

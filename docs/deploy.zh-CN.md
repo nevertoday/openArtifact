@@ -94,6 +94,15 @@ cd ../mcp && npx wrangler deploy
 - `https://artifact.example.com/health` 返回 `"status": "ok"`。
 - 在 设置 › Agent 接入 里创建 token，把 agent 连到 `https://mcp.artifact.example.com/mcp`，发布一个页面，在查看页里能打开。
 
+## 从 GitHub 部署
+
+`.github/workflows/deploy.yml` 会跑检查、执行数据库迁移、部署三个 Worker。它只在你点 **Actions › Deploy › Run workflow** 时运行，不会自动触发。只需要设置一次：在 **Settings › Environments** 里建一个名为 `production` 的环境，填入：
+
+- Secret `CLOUDFLARE_API_TOKEN`：你账户的 API token，需要 Workers Scripts、Workers Routes、D1 和 Workers Custom Domains 的编辑权限；
+- 变量 `CLOUDFLARE_ACCOUNT_ID`、`D1_DATABASE_ID`、`APP_HOST`、`APP_ZONE`、`USERCONTENT_HOST`，需要发登录邮件时再加 `MAIL_FROM`。
+
+在自己电脑上部署用同样两条命令：设好这些变量后运行 `pnpm deploy:config`，生成不进 git 的 `wrangler.production.jsonc`；再运行 `pnpm deploy:production`，执行迁移并部署。第 3 步设置的 Worker 密钥只需设置一次，之后每次部署都会保留。
+
 ## 运营
 
 - **谁能注册。** `ALLOWED_EMAIL_DOMAINS` 只放你自己的域名；设为 `*` 时，互联网上任何人都能加入 workspace，看到团队在里面共享的内容。管理员可以为整个 workspace 关闭公开链接，也可以下架任何 artifact。

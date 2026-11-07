@@ -94,6 +94,15 @@ Check that it works end to end:
 - `https://artifact.example.com/health` answers with `"status": "ok"`.
 - Create a token under 设置 › Agent 接入, connect an agent to `https://mcp.artifact.example.com/mcp` and publish a page; it opens in the viewer.
 
+## Deploy from GitHub
+
+`.github/workflows/deploy.yml` runs the checks, applies the migrations and deploys the three Workers when you click **Actions › Deploy › Run workflow**. It never runs on its own. Once, under **Settings › Environments**, create the environment `production` with:
+
+- the secret `CLOUDFLARE_API_TOKEN`: an API token for your account with Workers Scripts, Workers Routes, D1 and Workers Custom Domains edit permissions;
+- the variables `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`, `APP_HOST`, `APP_ZONE`, `USERCONTENT_HOST` and, for sign-in mail, `MAIL_FROM`.
+
+The same two commands deploy from your own machine: `pnpm deploy:config` with those variables set writes the `wrangler.production.jsonc` files (kept out of git), and `pnpm deploy:production` applies the migrations and deploys. The Workers' secrets from step 3 are set once and kept across deployments.
+
 ## Running it
 
 - **Who can sign up.** Keep `ALLOWED_EMAIL_DOMAINS` to your own domains; `*` lets anyone on the internet join the workspace and read what the team shares inside it. Admins can switch public links off for the whole workspace and take down any artifact.

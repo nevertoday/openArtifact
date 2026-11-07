@@ -8,7 +8,9 @@
     "check:storage-boundary": "node scripts/check-storage-boundary.mjs",
     "check": "pnpm check:storage-boundary && pnpm typecheck && pnpm test",
     "dev:setup": "node scripts/setup-local.mjs",
-    "dev": "node scripts/dev.mjs"
+    "dev": "node scripts/dev.mjs",
+    "deploy:config": "node scripts/production-config.mjs",
+    "deploy:production": "node scripts/deploy-production.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261005.1",
