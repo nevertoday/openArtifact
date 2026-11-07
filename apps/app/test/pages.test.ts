@@ -188,6 +188,20 @@ describe('full-screen view', () => {
   })
 })
 
+describe('addresses no page answers', () => {
+  it('shows a page with the way home for an unknown address and for a method pages do not take', async () => {
+    const unknown = await app.request('/no/such/page', { cookie: authorCookie })
+    const wrongMethod = await app.request('/settings/agents', { method: 'DELETE', cookie: authorCookie })
+
+    expect(unknown.status).toBe(404)
+    expect(unknown.headers.get('Content-Type')).toContain('text/html')
+    expect(await unknown.text()).toMatch(/这个地址不存在[\s\S]*href="\/">回到首页/)
+    expect(wrongMethod.status).toBe(405)
+    expect(wrongMethod.headers.get('Allow')).toBe('GET, HEAD')
+    expect(await wrongMethod.text()).toContain('这个地址不存在')
+  })
+})
+
 describe('content security policy', () => {
   it('runs only our own scripts and lets only pages that show artifacts frame the usercontent origin', async () => {
     const published = await app.publish({ token: agentToken }, 'Policy check')

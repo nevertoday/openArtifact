@@ -39,6 +39,17 @@ export class MessagePages {
     return PageShell.render({ title: '找不到 · Open Artifact', body, status: 404 })
   }
 
+  /** An address no page answers, or a method no page takes; 405 says so in its status, the page reads the same. */
+  static unknownAddress(status: 404 | 405): Response {
+    const body = MessagePages.#centered(html`<section class="xxd-empty">
+  ${PageShell.icon('SearchX', 24)}
+  <h1 class="xxd-empty__title">这个地址不存在</h1>
+  <p class="xxd-empty__text">检查一下链接是否完整，或者从首页找你要的 artifact。</p>
+  <div class="xxd-empty__actions"><a class="xxd-btn" data-variant="primary" href="/">回到首页</a></div>
+</section>`)
+    return PageShell.render({ title: '地址不存在 · Open Artifact', body, status, headers: status === 405 ? { Allow: 'GET, HEAD' } : {} })
+  }
+
   static removedFromWorkspace(): Response {
     const body = MessagePages.#centered(html`<section class="xxd-empty">
   ${PageShell.icon('UserMinus', 24)}

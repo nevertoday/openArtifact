@@ -60,7 +60,7 @@ export class AppRoutes {
     })
     const unlockMatch = UNLOCK.exec(requestUrl)
     if (unlockMatch && request.method === 'POST') return pageRoutes.unlock(request, decodeURIComponent(unlockMatch.pathname.groups.artifactId ?? ''))
-    if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405 })
+    if (request.method !== 'GET' && request.method !== 'HEAD') return MessagePages.unknownAddress(405)
     if (requestUrl.pathname === '/') return pageRoutes.home(request)
     if (requestUrl.pathname === '/login') return pageRoutes.login(request)
     if (requestUrl.pathname === '/llms.txt') return pageRoutes.llmsTxt()
@@ -72,7 +72,7 @@ export class AppRoutes {
     if (inviteMatch) return pageRoutes.invite(request, decodeURIComponent(inviteMatch.pathname.groups.inviteCode ?? ''))
     const settingsMatch = SETTINGS.exec(requestUrl)
     if (settingsMatch) return pageRoutes.settings(request, settingsMatch.pathname.groups.section)
-    return new Response('Not found', { status: 404 })
+    return MessagePages.unknownAddress(404)
   }
 
   #contextFor(request: Request, appOrigin: string): ApiContext {
