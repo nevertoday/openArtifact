@@ -1,3 +1,4 @@
+import type { Messages } from '../i18n/messages.ts'
 import type { ArtifactSharing, ArtifactVisibility, WorkspaceRole } from '@open-artifact/core'
 import { dateText, relativeTimeText } from '../../public/static/time-text.js'
 
@@ -58,7 +59,7 @@ export class ArtifactLabels {
   }
 
   /** Prefer PageShell.relativeTime, which also carries the full time on hover. */
-  static updatedAgo(updatedAt: number, now: number): string {
-    return relativeTimeText(updatedAt, now)
+  static updatedAgo(m: Messages, updatedAt: number, now: number): string {
+    return relativeTimeText(m.time, updatedAt, now)
   }
 }

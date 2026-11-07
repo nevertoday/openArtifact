@@ -1,3 +1,4 @@
+import type { Messages } from '../i18n/messages.ts'
 import type { ArtifactSummary, Profile } from '@open-artifact/core'
 import { dayText } from '../../public/static/time-text.js'
 import { PersonalPages } from '../personal-pages.ts'
@@ -5,6 +6,7 @@ import { html, type SafeHtml } from './html.ts'
 import { PageShell } from './page-shell.ts'
 
 export interface PersonalPageModel {
+  m: Messages
   profile: Profile
   name: string
   /** What the page lists, most recently updated first; the pinned one among them. */
@@ -39,6 +41,7 @@ ${model.entries.length === 0 ? PersonalPage.#empty(model) : ''}
 </div>
 ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner: model.isOwner, pinnedArtifactId: pinned?.artifactId ?? null })}`
     return PageShell.render({
+      m: model.m,
       title: `${model.name} · Open Artifact`,
       description: model.profile.bio || `${model.name} 在 Open Artifact 上公开的 ${model.entries.length} 篇文档`,
       body,
@@ -78,7 +81,7 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
   <a class="personal-cover__link" href="${PersonalPage.#viewerPath(entry)}">
     <h2 class="personal-cover__title">${entry.title}</h2>
     ${entry.summary ? html`<p class="personal-cover__summary" data-summary>${entry.summary}</p>` : ''}
-    <p class="personal-cover__meta"><b>阅读 ${PageShell.icon('ArrowRight', 14)}</b>${PersonalPage.#day(entry)}<span>第 ${entry.version} 版</span></p>
+    <p class="personal-cover__meta"><b>阅读 ${PageShell.icon('ArrowRight', 14)}</b>${PersonalPage.#day(model.m, entry)}<span>第 ${entry.version} 版</span></p>
   </a>
   ${model.isOwner ? PersonalPage.#ownerTools(entry, true) : ''}
 </section>`
@@ -105,7 +108,7 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
     <span class="personal-entry__arrow" aria-hidden="true">${PageShell.icon('ArrowRight', 16)}</span>
     <h3 class="personal-entry__title">${entry.title}${recentlyRevised ? html`<span class="personal-fresh" title="${entry.currentVersionNote ?? ''}">刚更新</span>` : ''}</h3>
     ${entry.summary ? html`<p class="personal-entry__summary" data-summary>${entry.summary}</p>` : ''}
-    <p class="personal-entry__meta">${PersonalPage.#day(entry)}<span>第 ${entry.version} 版</span></p>
+    <p class="personal-entry__meta">${PersonalPage.#day(model.m, entry)}<span>第 ${entry.version} 版</span></p>
   </a>
   ${model.isOwner ? PersonalPage.#ownerTools(entry, false) : ''}
 </li>`
@@ -123,8 +126,8 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
     return html`<div class="xxd-empty personal-empty"><p class="xxd-empty__text">${text}</p></div>`
   }
 
-  static #day(entry: ArtifactSummary): SafeHtml {
-    return html`<time datetime="${new Date(entry.updatedAt).toISOString()}" data-day>${dayText(entry.updatedAt)}</time>`
+  static #day(m: Messages, entry: ArtifactSummary): SafeHtml {
+    return html`<time datetime="${new Date(entry.updatedAt).toISOString()}" data-day>${dayText(m.time, entry.updatedAt)}</time>`
   }
 
   static #viewerPath(entry: ArtifactSummary): string {

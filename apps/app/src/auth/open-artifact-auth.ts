@@ -1,4 +1,4 @@
-import type { Repositories } from '@open-artifact/core'
+import { parseLocale, type Locale, type Repositories } from '@open-artifact/core'
 import { betterAuth } from 'better-auth'
 import { APIError } from 'better-auth/api'
 import { genericOAuth, magicLink } from 'better-auth/plugins'
@@ -11,6 +11,7 @@ export interface SignedInUser {
   userId: string
   name: string
   email: string
+  locale: Locale | null
 }
 
 export interface LoginProvider {
@@ -30,7 +31,7 @@ interface AuthEndpointContext {
 interface BetterAuthInstance {
   handler(request: Request): Promise<Response>
   api: {
-    getSession(context: { headers: Headers }): Promise<{ user: { id: string; name: string; email: string } } | null>
+    getSession(context: { headers: Headers }): Promise<{ user: { id: string; name: string; email: string; locale?: string | null | undefined } } | null>
     updateUser(context: { headers: Headers; body: { name: string } }): Promise<unknown>
   }
 }
@@ -57,6 +58,8 @@ export class OpenArtifactAuth {
       baseURL: appOrigin,
       basePath: '/api/auth',
       session: { expiresIn: SESSION_DAYS * 24 * 60 * 60 },
+      // Read with the session so every page knows the person's language without another query; set only through /locale.
+      user: { additionalFields: { locale: { type: 'string', required: false, input: false } } },
       socialProviders: OpenArtifactAuth.#socialProviders(env),
       plugins: [
         magicLink({ sendMagicLink: ({ email, url }, endpointContext) => this.#sendSignInLink(email, url, endpointContext) }),
@@ -99,7 +102,7 @@ export class OpenArtifactAuth {
   async signedInUser(request: Request): Promise<SignedInUser | null> {
     const session = await this.#auth.api.getSession({ headers: request.headers })
     if (!session) return null
-    return { userId: session.user.id, name: session.user.name, email: session.user.email }
+    return { userId: session.user.id, name: session.user.name, email: session.user.email, locale: parseLocale(session.user.locale) }
   }
 
   async rename(request: Request, name: string): Promise<void> {

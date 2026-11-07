@@ -1,3 +1,4 @@
+import type { Messages } from '../i18n/messages.ts'
 import { ArtifactRemoval } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
@@ -25,6 +26,7 @@ export interface Byline {
 }
 
 export interface ViewerModel {
+  m: Messages
   openedArtifact: OpenedArtifact
   identity: Identity | null
   authorName: string
@@ -68,6 +70,7 @@ ${permissions.canManageSharing ? ViewerPage.#shareDialog() : ''}
 ${ViewerPage.#shortcutSheet(model)}
 ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     return PageShell.render({
+      m: model.m,
       title: `${summary.title} · Open Artifact`,
       description: ViewerPage.#description(model),
       body,
@@ -82,7 +85,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     const { summary } = model.openedArtifact
     return html`<footer class="viewer-byline">
   <a class="viewer-byline__avatar" href="${byline.personalPagePath}" aria-label="${byline.authorName} 的主页">${PageShell.initialOf(byline.authorName)}</a>
-  <p class="viewer-byline__who"><a href="${byline.personalPagePath}">${byline.authorName}</a><span>第 ${summary.version} 版 · ${PageShell.relativeTime(summary.currentVersionAt, model.now)}更新</span></p>
+  <p class="viewer-byline__who"><a href="${byline.personalPagePath}">${byline.authorName}</a><span>第 ${summary.version} 版 · ${PageShell.relativeTime(model.m, summary.currentVersionAt, model.now)}更新</span></p>
   ${byline.next ? html`<p class="viewer-byline__next"><span>下一篇</span><a href="/a/${encodeURIComponent(byline.next.artifactId)}">${byline.next.title} ${PageShell.icon('ArrowRight', 14)}</a></p>` : html`<p class="viewer-byline__next"><a href="${byline.personalPagePath}">更多文章 ${PageShell.icon('ArrowRight', 14)}</a></p>`}
 </footer>`
   }
@@ -100,6 +103,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
 </div>
 ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     return PageShell.render({
+      m: model.m,
       title: `${summary.title} · Open Artifact`,
       description: ViewerPage.#description(model),
       body,
@@ -171,7 +175,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     ${permissions.canComment ? html`<button type="button" class="xxd-btn viewer-comment-mode" data-variant="ghost" data-size="sm" aria-pressed="false" aria-keyshortcuts="C" data-tooltip="评论模式（C）" data-comment-mode>${PageShell.icon('Plus')}<span class="viewer-bar__label">评论</span></button>` : ''}
     ${permissions.canManageSharing ? html`<button type="button" class="xxd-btn" data-variant="primary" data-size="sm" data-open-share>分享</button>` : ''}
     ${isVisitor ? '' : ViewerPage.#moreMenu(model)}
-    ${model.identity ? PageShell.accountControls(model.identity) : ViewerPage.#signInLink(model)}
+    ${model.identity ? PageShell.accountControls(model.m, model.identity) : ViewerPage.#signInLink(model)}
   </div>
 </header>`
   }

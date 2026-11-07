@@ -2,6 +2,9 @@
 // Toasts, copy buttons, menus, tabs and dialogs come from the UI kit's global `Xxd`.
 import { dateText, dayText, fullTimeText, relativeTimeText } from './time-text.js'
 
+/** The page language's messages, which PageShell preloads; every page script words itself with them. */
+export const m = (await import(`./i18n/${document.documentElement.lang}.js`)).default
+
 export { dateText }
 
 export class ApiError extends Error {
@@ -113,7 +116,7 @@ export function readJsonData(elementId) {
 
 /** The words alone; prefer timeElement, which also carries the full time on hover. */
 export function timeAgo(timestamp) {
-  return relativeTimeText(timestamp, Date.now())
+  return relativeTimeText(m.time, timestamp, Date.now())
 }
 
 /** <time> reading 「3 分钟前」, with the full time on hover. */
@@ -125,7 +128,7 @@ export function timeElement(timestamp) {
 export function renderServerTimes(root = document) {
   for (const timeTag of root.querySelectorAll('time[data-relative], time[data-day]')) {
     const timestamp = Date.parse(timeTag.dateTime)
-    timeTag.textContent = timeTag.hasAttribute('data-day') ? dayText(timestamp) : timeAgo(timestamp)
+    timeTag.textContent = timeTag.hasAttribute('data-day') ? dayText(m.time, timestamp) : timeAgo(timestamp)
     timeTag.title = fullTimeText(timestamp)
   }
 }

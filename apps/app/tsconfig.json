@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"] },
-  "include": ["src", "test"]
+  "compilerOptions": { "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"], "allowJs": true, "checkJs": false },
+  "include": ["src", "test", "public/static/i18n"]
 }

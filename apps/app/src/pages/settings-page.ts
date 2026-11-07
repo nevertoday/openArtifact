@@ -1,3 +1,4 @@
+import type { Messages } from '../i18n/messages.ts'
 import { ArtifactRemoval, type AccessToken, type AuditEvent, type WorkspaceMember } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
@@ -8,7 +9,7 @@ import { People } from '../people.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
 import { html, SafeHtml } from './html.ts'
 import { PageShell } from './page-shell.ts'
-import { SETTINGS_SECTION_ICONS, SETTINGS_SECTION_LABELS, THEME_CHOICES, type SettingsSection } from './settings-sections.ts'
+import { SETTINGS_SECTION_ICONS, THEME_CHOICES, type SettingsSection } from './settings-sections.ts'
 
 
 /** What only an admin sees: every artifact of the workspace as metadata, and the latest audit events. */
@@ -20,6 +21,7 @@ export interface WorkspaceAdministration {
 }
 
 export interface SettingsModel {
+  m: Messages
   identity: Identity
   section: SettingsSection
   mcpUrl: string
@@ -35,15 +37,15 @@ export interface SettingsModel {
 export class SettingsPage {
   static render(model: SettingsModel): Response {
     const body = html`
-${PageShell.topBar(model.identity, html`<span class="xxd-text app-topbar__context" data-variant="secondary">/ 设置</span>`)}
+${PageShell.topBar(model.m, model.identity, html`<span class="xxd-text app-topbar__context" data-variant="secondary">/ 设置</span>`)}
 ${PageShell.withSidebar(SettingsPage.#sidebar(model), html`<div class="xxd-read settings-flow">${SettingsPage.#section(model)}</div>`)}
 ${PageShell.jsonData('settings-config', { userId: model.identity.userId, accessTokens: model.accessTokens })}`
-    return PageShell.render({ title: `${SETTINGS_SECTION_LABELS[model.section]} · Open Artifact`, body, scripts: ['common.js', 'settings.js'] })
+    return PageShell.render({ m: model.m, title: `${model.m.settings.sections[model.section]} · Open Artifact`, body, scripts: ['common.js', 'settings.js'] })
   }
 
   static #sidebar(model: SettingsModel): SafeHtml {
     const sectionLink = (section: SettingsSection) =>
-      html`<a class="xxd-sidebar__item" href="/settings/${section}" ${model.section === section ? html`aria-current="page"` : ''}>${PageShell.icon(SETTINGS_SECTION_ICONS[section], 18)}<span>${SETTINGS_SECTION_LABELS[section]}</span></a>`
+      html`<a class="xxd-sidebar__item" href="/settings/${section}" ${model.section === section ? html`aria-current="page"` : ''}>${PageShell.icon(SETTINGS_SECTION_ICONS[section], 18)}<span>${model.m.settings.sections[section]}</span></a>`
     return html`<nav class="xxd-sidebar app-sidebar" aria-label="设置分类"><div class="xxd-sidebar__body">
   <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">个人</div>${sectionLink('profile')}${sectionLink('agents')}</div>
   <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">${model.identity.membership.workspace.name}</div>${sectionLink('members')}${sectionLink('workspace')}</div>
@@ -174,7 +176,7 @@ ${isAdmin ? SettingsPage.#inviteSection() : ''}
 
   static #workspaceSection(model: SettingsModel): SafeHtml {
     const { identity, administration } = model
-    return html`${SettingsPage.#pageHeader(SETTINGS_SECTION_LABELS.workspace)}
+    return html`${SettingsPage.#pageHeader(model.m.settings.sections.workspace)}
 ${administration ? SettingsPage.#workspaceNameForm(identity) : ''}
 <section class="xxd-group" aria-labelledby="public-links-title">
   <h2 class="xxd-group__title" id="public-links-title">公开链接</h2>
@@ -185,8 +187,8 @@ ${administration ? SettingsPage.#workspaceNameForm(identity) : ''}
     </div>
   </div>
 </section>
-${administration ? SettingsPage.#contentSection(administration, identity, model.now) : ''}
-${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
+${administration ? SettingsPage.#contentSection(model.m, administration, identity, model.now) : ''}
+${administration ? SettingsPage.#auditSection(model.m, administration, model.now) : ''}`
   }
 
   static #workspaceNameForm(identity: Identity): SafeHtml {
@@ -213,7 +215,7 @@ ${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
   }
 
   // Metadata only: a private artifact shows its title but no link, since an admin may not open it.
-  static #contentSection(administration: WorkspaceAdministration, identity: Identity, now: number): SafeHtml {
+  static #contentSection(m: Messages, administration: WorkspaceAdministration, identity: Identity, now: number): SafeHtml {
     const row = (openedArtifact: OpenedArtifact) => {
       const { summary, permissions } = openedArtifact
       const titleCell = permissions.canView ? html`<a class="xxd-link" href="/a/${encodeURIComponent(summary.artifactId)}">${summary.title}</a>` : summary.title
@@ -221,7 +223,7 @@ ${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
     <td>${titleCell}</td>
     <td><span class="xxd-text" data-variant="secondary">${administration.names.get(summary.authorId)}</span></td>
     <td>${SettingsPage.#contentState(summary, administration.names, now)}</td>
-    <td><span class="xxd-text" data-variant="secondary">${PageShell.relativeTime(summary.updatedAt, now)}</span></td>
+    <td><span class="xxd-text" data-variant="secondary">${PageShell.relativeTime(m, summary.updatedAt, now)}</span></td>
     <td class="xxd-table__actions">${SettingsPage.#contentAction(openedArtifact, identity)}</td>
   </tr>`
     }
@@ -253,11 +255,11 @@ ${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
     return html`<button type="button" class="xxd-btn" data-variant="danger-outline" data-size="xs" data-remove-artifact="${summary.artifactId}" data-title="${summary.title}" ${takesDown ? new SafeHtml('data-takes-down') : ''}>${ArtifactLabels.removal(takesDown)}</button>`
   }
 
-  static #auditSection(administration: WorkspaceAdministration, now: number): SafeHtml {
+  static #auditSection(m: Messages, administration: WorkspaceAdministration, now: number): SafeHtml {
     const { auditEvents, names } = administration
     const eventItem = (auditEvent: AuditEvent) => html`<li class="xxd-list__item"><span class="xxd-list__main">
     <span class="xxd-list__title">${SettingsPage.#auditSentence(auditEvent, names)}</span>
-    <span class="xxd-list__meta">${PageShell.relativeTime(auditEvent.createdAt, now)}</span>
+    <span class="xxd-list__meta">${PageShell.relativeTime(m, auditEvent.createdAt, now)}</span>
   </span></li>`
     return html`<section class="xxd-stack" aria-labelledby="audit-title">
   <div class="xxd-text-pair">

@@ -4,8 +4,6 @@ import type { IconName } from './page-shell.ts'
 export const SETTINGS_SECTIONS = ['profile', 'agents', 'members', 'workspace'] as const
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
 
-export const SETTINGS_SECTION_LABELS: Record<SettingsSection, string> = { profile: '个人资料', agents: 'Agent 接入', members: '成员', workspace: 'workspace 设置' }
-
 export const SETTINGS_SECTION_ICONS: Record<SettingsSection, IconName> = { profile: 'UserRound', agents: 'Bot', members: 'Users', workspace: 'Settings' }
 
 /** The colour schemes a person can pick; the vendored kit stores the choice per browser and follows the OS for 'system'. */

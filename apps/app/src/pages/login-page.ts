@@ -1,3 +1,4 @@
+import type { Messages } from '../i18n/messages.ts'
 import { Admission } from '../auth/admission.ts'
 import type { LoginProvider } from '../auth/open-artifact-auth.ts'
 import { html, type SafeHtml } from './html.ts'
@@ -15,7 +16,7 @@ export interface LoginInvitation {
 
 export class LoginPage {
   /** `nextPath` is where to land after sign-in; only same-site paths are accepted. */
-  static render(providers: LoginProvider[], nextPath: string, invitation: LoginInvitation | null = null): Response {
+  static render(m: Messages, providers: LoginProvider[], nextPath: string, invitation: LoginInvitation | null = null): Response {
     const providerButtons = providers.map((provider, index) =>
       html`<button type="button" class="xxd-btn" data-block ${index === 0 ? html`data-variant="primary"` : ''} data-provider-id="${provider.providerId}" data-provider-kind="${provider.kind}">用 ${provider.label} 登录</button>`)
     const body = html`<div class="login-page">
@@ -29,6 +30,7 @@ export class LoginPage {
     <footer class="xxd-text" data-variant="caption">页面和数据都存在团队自己的 Cloudflare 账号里。</footer>
   </section>
   <main class="login-panel" id="main" tabindex="-1">
+    <div class="login-panel__locale">${PageShell.localeSwitch(m)}</div>
     <div class="xxd-auth login-card" data-next-path="${nextPath}">
       <h2 class="xxd-auth__name">登录</h2>
       ${invitation ? LoginPage.#invitationBanner(invitation) : html`<p class="xxd-auth__line">输入邮箱，我们发一个登录链接，不用密码。</p>`}
@@ -46,7 +48,7 @@ export class LoginPage {
     </div>
   </main>
 </div>`
-    return PageShell.render({ title: '登录 · Open Artifact', body, scripts: ['login.js'] })
+    return PageShell.render({ m, title: '登录 · Open Artifact', body, scripts: ['login.js'] })
   }
 
   static #invitationBanner(invitation: LoginInvitation): SafeHtml {

@@ -33,3 +33,5 @@ export type { JoinResult, Membership, MembershipChange, UserDirectory, UserProfi
 export type { Repositories } from './repositories.ts'
 export type { Profile, ProfileChange, ProfileRepository } from './profile-repository.ts'
 export { ProfileHandle } from './profile-handle.ts'
+export { DEFAULT_LOCALE, LOCALES, parseLocale } from './locale.ts'
+export type { Locale } from './locale.ts'

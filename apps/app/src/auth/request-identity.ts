@@ -1,4 +1,4 @@
-import { AccessTokenSecret, type AccessToken, type AccessTokenScope, type Membership } from '@open-artifact/core'
+import { AccessTokenSecret, type AccessToken, type AccessTokenScope, type Locale, type Membership } from '@open-artifact/core'
 import { HttpCookies } from '../http-cookies.ts'
 import { HttpError, RemovedFromWorkspaceError } from '../http-error.ts'
 import { People } from '../people.ts'
@@ -34,6 +34,8 @@ export interface Identity {
   agentClient: string | null
   /** What the token behind the request may do; null for a person in the browser, who may do everything. */
   tokenScope: AccessTokenScope | null
+  /** The interface language the person chose; null until they choose one. */
+  locale: Locale | null
 }
 
 /** Who is behind a request: a browser session, a personal API token, or nobody. */
@@ -95,7 +97,7 @@ export class RequestIdentity {
     const tokenMembership = memberships.find(membership => membership.workspace.workspaceId === accessToken.workspaceId)
     if (!profile || !tokenMembership) return this.#refuseToken('token_invalid')
     // A token acts only in the workspace it was created for, even when its owner belongs to others.
-    return { userId: profile.userId, name: People.displayName(profile), hasChosenName: People.hasChosenName(profile), email: profile.email, membership: tokenMembership, memberships: [tokenMembership], agentClient: this.#agentClient(), tokenScope: accessToken.scope }
+    return { userId: profile.userId, name: People.displayName(profile), hasChosenName: People.hasChosenName(profile), email: profile.email, membership: tokenMembership, memberships: [tokenMembership], agentClient: this.#agentClient(), tokenScope: accessToken.scope, locale: profile.locale }
   }
 
   #refuseToken(refusal: TokenRefusal): null {
@@ -110,7 +112,7 @@ export class RequestIdentity {
     const chosenWorkspaceId = HttpCookies.read(this.#request, WORKSPACE_COOKIE)
     const membership = memberships.find(candidate => candidate.workspace.workspaceId === chosenWorkspaceId) ?? memberships[0]
     if (!membership) throw new Error(`User ${signedInUser.userId} has no workspace`)
-    return { userId: signedInUser.userId, name: People.displayName(signedInUser), hasChosenName: People.hasChosenName(signedInUser), email: signedInUser.email, membership, memberships, agentClient: null, tokenScope: null }
+    return { userId: signedInUser.userId, name: People.displayName(signedInUser), hasChosenName: People.hasChosenName(signedInUser), email: signedInUser.email, membership, memberships, agentClient: null, tokenScope: null, locale: signedInUser.locale }
   }
 
   // A person joins a workspace on the first visit after sign-in, through the invite link this browser opened if any.

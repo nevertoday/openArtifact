@@ -1,7 +1,9 @@
+import { LOCALES } from '@open-artifact/core'
 import type { Identity } from '../auth/request-identity.ts'
+import { messagesFor, type Messages } from '../i18n/messages.ts'
 import { fullTimeText, relativeTimeText } from '../../public/static/time-text.js'
 import { html, SafeHtml } from './html.ts'
-import { SETTINGS_SECTION_ICONS, SETTINGS_SECTION_LABELS, SETTINGS_SECTIONS } from './settings-sections.ts'
+import { SETTINGS_SECTION_ICONS, SETTINGS_SECTIONS } from './settings-sections.ts'
 
 /** Kit icon names the pages use; the union keeps a misspelt name from reaching the browser. */
 export type IconName =
@@ -52,6 +54,8 @@ export type IconName =
 type IconSize = 14 | 16 | 18 | 20 | 24
 
 export interface PageOptions {
+  /** The page language's messages; the page is marked up in that language. */
+  m: Messages
   title: string
   body: SafeHtml
   /** Scripts under /static, loaded as modules after the body. */
@@ -80,7 +84,7 @@ export interface PublicCard {
 export class PageShell {
   static render(options: PageOptions): Response {
     const page = html`<!doctype html>
-<html lang="zh-CN">
+<html lang="${options.m.meta.lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -95,9 +99,10 @@ ${PageShell.#publicCardMeta(options)}
 <script src="/static/vendor/xxd/icons.js"></script>
 <script src="/static/vendor/xxd/xxd.js"></script>
 <link rel="stylesheet" href="/static/app.css">
+${PageShell.#messagePreloads(options)}
 ${(options.styles ?? []).map(style => html`<link rel="stylesheet" href="/static/${style}">`)}
 </head>
-<body class="xxd-page"><a class="xxd-sr-only-focusable" href="#main">跳到内容</a>${options.body}${(options.scripts ?? []).map(script => html`<script type="module" src="/static/${script}"></script>`)}</body>
+<body class="xxd-page"><a class="xxd-sr-only-focusable" href="#main">${options.m.shell.skipToContent}</a>${options.body}${(options.scripts ?? []).map(script => html`<script type="module" src="/static/${script}"></script>`)}</body>
 </html>`
     return new Response(page.markup, {
       status: options.status ?? 200,
@@ -119,9 +124,18 @@ ${(options.styles ?? []).map(style => html`<link rel="stylesheet" href="/static/
     return html`<link rel="canonical" href="${url}">
 <meta property="og:url" content="${url}">
 <meta property="og:type" content="${kind}">
+<meta property="og:locale" content="${options.m.meta.ogLocale}">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="${options.title}">
 ${options.description ? html`<meta name="twitter:description" content="${options.description}">` : ''}`
+  }
+
+  // Page scripts load the page language's messages (common.js loadMessages); preloading them saves a round trip.
+  static #messagePreloads(options: PageOptions): SafeHtml | string {
+    if (!options.scripts?.length) return ''
+    const { lang } = options.m.meta
+    const files = [`${lang}.js`, ...Object.keys(options.m).map(namespace => `${lang}/${namespace}.js`)]
+    return html`${files.map(file => html`<link rel="modulepreload" href="/static/i18n/${file}">`)}`
   }
 
   // Only our own scripts run on app pages, so text from agents or people can never execute here even if escaping slipped.
@@ -149,38 +163,52 @@ ${options.description ? html`<meta name="twitter:description" content="${options
   }
 
   /** The page's top bar; `middle` sits between the brand and the account menu. */
-  static topBar(identity: Identity | null, middle: SafeHtml | string = ''): SafeHtml {
-    const account = identity ? PageShell.accountControls(identity) : html`<a class="xxd-btn" data-size="sm" href="/login">登录</a>`
+  static topBar(m: Messages, identity: Identity | null, middle: SafeHtml | string = ''): SafeHtml {
+    const account = identity ? PageShell.accountControls(m, identity) : html`${PageShell.localeSwitch(m)}<a class="xxd-btn" data-size="sm" href="/login">${m.shell.signIn}</a>`
     return html`<header class="xxd-topbar app-topbar">${PageShell.brandLink()}${middle}<span class="app-topbar__end">${account}</span></header>`
   }
 
   /** The notification bell and the account menu, for a top bar of the page's own. */
-  static accountControls(identity: Identity): SafeHtml {
-    return html`${PageShell.#notificationBell()}${PageShell.#accountMenu(identity)}`
+  static accountControls(m: Messages, identity: Identity): SafeHtml {
+    return html`${PageShell.#notificationBell(m)}${PageShell.#accountMenu(m, identity)}`
   }
 
   /** The top bar of standalone pages that offer nothing but the way home. */
-  static brandBar(): SafeHtml {
-    return html`<header class="xxd-topbar app-topbar">${PageShell.brandLink()}</header>`
+  static brandBar(m: Messages): SafeHtml {
+    return html`<header class="xxd-topbar app-topbar">${PageShell.brandLink()}<span class="app-topbar__end">${PageShell.localeSwitch(m)}</span></header>`
   }
 
-  /** Home and settings: side navigation beside one content column. Every page's main region is #main, where 跳到内容 leads. */
+  /** Home and settings: side navigation beside one content column. Every page's main region is #main, where the skip link leads. */
   static withSidebar(sidebar: SafeHtml, main: SafeHtml): SafeHtml {
     return html`<div class="app-frame">${sidebar}<main class="app-main" id="main" tabindex="-1">${main}</main></div>`
   }
 
-  static workspaceSwitcher(identity: Identity): SafeHtml {
+  static workspaceSwitcher(m: Messages, identity: Identity): SafeHtml {
     if (identity.memberships.length < 2) return html`<span class="xxd-text app-workspace-name" data-variant="secondary">${identity.membership.workspace.name}</span>`
     const currentWorkspaceId = identity.membership.workspace.workspaceId
-    return html`<label class="xxd-select app-workspace-switcher" data-size="sm"><span class="xxd-sr-only">切换 workspace</span>
+    return html`<label class="xxd-select app-workspace-switcher" data-size="sm"><span class="xxd-sr-only">${m.shell.switchWorkspace}</span>
 <select id="workspace-switcher" data-switch-workspace>
   ${identity.memberships.map(membership => html`<option value="${membership.workspace.workspaceId}" ${membership.workspace.workspaceId === currentWorkspaceId ? new SafeHtml('selected') : ''}>${membership.workspace.name}</option>`)}
 </select></label>`
   }
 
-  /** 「3 分钟前」 with the full time on hover; common.js re-renders it in the reader's time zone. */
-  static relativeTime(timestamp: number, now: number): SafeHtml {
-    return html`<time datetime="${new Date(timestamp).toISOString()}" title="${fullTimeText(timestamp)}" data-relative>${relativeTimeText(timestamp, now)}</time>`
+  /** How long ago, with the full time on hover; common.js re-renders it in the reader's time zone. */
+  static relativeTime(m: Messages, timestamp: number, now: number): SafeHtml {
+    return html`<time datetime="${new Date(timestamp).toISOString()}" title="${fullTimeText(timestamp)}" data-relative>${relativeTimeText(m.time, timestamp, now)}</time>`
+  }
+
+  /**
+   * Picks the interface language without any script: the form posts to /locale, which remembers the choice and
+   * comes back to this page. Each language is named in itself, so a reader who cannot read the page still finds theirs.
+   */
+  static localeSwitch(m: Messages, role: 'menu' | 'bar' = 'bar'): SafeHtml {
+    const choice = (locale: (typeof LOCALES)[number]) => {
+      const current = locale === m.meta.lang
+      return role === 'menu'
+        ? html`<button type="submit" class="xxd-menu__item" role="menuitemradio" aria-checked="${String(current)}" name="locale" value="${locale}" lang="${locale}">${PageShell.icon(current ? 'Check' : 'Globe', 14)}${messagesFor(locale).meta.name}</button>`
+        : html`<button type="submit" class="xxd-btn" data-variant="ghost" data-size="xs" name="locale" value="${locale}" lang="${locale}" aria-pressed="${String(current)}">${messagesFor(locale).meta.name}</button>`
+    }
+    return html`<form method="post" action="/locale" class="${role === 'bar' ? 'xxd-btn-group app-locale-switch' : 'app-locale-switch'}" aria-label="${m.shell.language}">${LOCALES.map(choice)}</form>`
   }
 
   static initialOf(name: string): string {
@@ -194,25 +222,28 @@ ${options.description ? html`<meta name="twitter:description" content="${options
   }
 
   // common.js fills the count and the list; the list refreshes each time the panel opens. Small, like every other control in a top bar.
-  static #notificationBell(): SafeHtml {
-    return html`<button type="button" class="xxd-btn app-bell" data-variant="ghost" data-size="sm" data-icon-only data-xxd-popover="notification-panel" aria-label="通知" data-notification-bell>${PageShell.icon('Bell', 18)}<span class="xxd-badge app-bell__count" data-variant="solid" data-tone="action" aria-hidden="true" data-unread-count hidden></span></button>
-<div class="xxd-popover app-notifications" id="notification-panel" popover data-placement="bottom-end" aria-label="通知">
-  <div class="app-notifications__head"><p class="xxd-popover__title">通知</p><button type="button" class="xxd-btn" data-variant="ghost" data-size="xs" data-mark-all-read hidden>全部标为已读</button></div>
+  static #notificationBell(m: Messages): SafeHtml {
+    return html`<button type="button" class="xxd-btn app-bell" data-variant="ghost" data-size="sm" data-icon-only data-xxd-popover="notification-panel" aria-label="${m.shell.notifications}" data-notification-bell>${PageShell.icon('Bell', 18)}<span class="xxd-badge app-bell__count" data-variant="solid" data-tone="action" aria-hidden="true" data-unread-count hidden></span></button>
+<div class="xxd-popover app-notifications" id="notification-panel" popover data-placement="bottom-end" aria-label="${m.shell.notifications}">
+  <div class="app-notifications__head"><p class="xxd-popover__title">${m.shell.notifications}</p><button type="button" class="xxd-btn" data-variant="ghost" data-size="xs" data-mark-all-read hidden>${m.shell.markAllRead}</button></div>
   <div class="app-notifications__body" data-notification-list></div>
 </div>`
   }
 
-  static #accountMenu(identity: Identity): SafeHtml {
+  static #accountMenu(m: Messages, identity: Identity): SafeHtml {
     const menuLink = (section: (typeof SETTINGS_SECTIONS)[number]) =>
-      html`<a class="xxd-menu__item" role="menuitem" href="/settings/${section}">${PageShell.icon(SETTINGS_SECTION_ICONS[section], 14)}${SETTINGS_SECTION_LABELS[section]}</a>`
-    return html`<button type="button" class="xxd-btn app-account-button" data-variant="ghost" data-size="sm" data-icon-only data-xxd-menu="account-menu" aria-label="账户菜单：${identity.name}" data-account-button><span class="xxd-avatar" data-account-initial>${identity.hasChosenName ? PageShell.initialOf(identity.name) : PageShell.icon('UserRound', 16)}</span></button>
+      html`<a class="xxd-menu__item" role="menuitem" href="/settings/${section}">${PageShell.icon(SETTINGS_SECTION_ICONS[section], 14)}${m.settings.sections[section]}</a>`
+    return html`<button type="button" class="xxd-btn app-account-button" data-variant="ghost" data-size="sm" data-icon-only data-xxd-menu="account-menu" aria-label="${m.shell.accountMenu(identity.name)}" data-account-button><span class="xxd-avatar" data-account-initial>${identity.hasChosenName ? PageShell.initialOf(identity.name) : PageShell.icon('UserRound', 16)}</span></button>
 <div class="xxd-menu" id="account-menu" role="menu" popover>
   <div class="xxd-menu__label xxd-text-pair app-account-head"><span class="xxd-text" data-account-name>${identity.name}</span><span class="xxd-text" data-variant="caption">${identity.email}</span></div>
   <div class="xxd-menu__sep" role="separator"></div>
-  <a class="xxd-menu__item" role="menuitem" href="/@me">${PageShell.icon('UserRound', 14)}我的主页</a>
+  <a class="xxd-menu__item" role="menuitem" href="/@me">${PageShell.icon('UserRound', 14)}${m.shell.myPage}</a>
   ${SETTINGS_SECTIONS.map(menuLink)}
   <div class="xxd-menu__sep" role="separator"></div>
-  <button type="button" class="xxd-menu__item" role="menuitem" data-sign-out>${PageShell.icon('LogOut', 14)}退出登录</button>
+  <div class="xxd-menu__label">${m.shell.language}</div>
+  ${PageShell.localeSwitch(m, 'menu')}
+  <div class="xxd-menu__sep" role="separator"></div>
+  <button type="button" class="xxd-menu__item" role="menuitem" data-sign-out>${PageShell.icon('LogOut', 14)}${m.shell.signOut}</button>
 </div>`
   }
 }

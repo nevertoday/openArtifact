@@ -1,4 +1,4 @@
-import type { JoinResult, Membership, MembershipChange, UserDirectory, UserProfile, Workspace, WorkspaceMember, WorkspaceRepository, WorkspaceRole } from '@open-artifact/core'
+import { parseLocale, type JoinResult, type Locale, type Membership, type MembershipChange, type UserDirectory, type UserProfile, type Workspace, type WorkspaceMember, type WorkspaceRepository, type WorkspaceRole } from '@open-artifact/core'
 
 // Checked in the same statement that changes the membership, so two admins stepping down at once cannot both succeed.
 const ANOTHER_ADMIN_REMAINS = `(memberships.role = 'member' OR EXISTS (
@@ -18,6 +18,7 @@ interface UserRow {
   name: string
   email: string
   image: string | null
+  locale: string | null
 }
 
 export class CloudflareWorkspaceRepository implements WorkspaceRepository {
@@ -86,7 +87,7 @@ export class CloudflareWorkspaceRepository implements WorkspaceRepository {
   async listMembers(workspaceId: string): Promise<WorkspaceMember[]> {
     const { results: memberRows } = await this.#db
       .prepare(
-        `SELECT "user".id, "user".name, "user".email, "user".image, memberships.role
+        `SELECT "user".id, "user".name, "user".email, "user".image, "user".locale, memberships.role
          FROM memberships JOIN "user" ON "user".id = memberships.user_id
          WHERE memberships.workspace_id = ? AND memberships.removed_at IS NULL ORDER BY "user".name`,
       )
@@ -165,18 +166,22 @@ export class CloudflareUserDirectory implements UserDirectory {
     if (distinctUserIds.length === 0) return new Map()
     const placeholders = distinctUserIds.map(() => '?').join(', ')
     const { results: userRows } = await this.#db
-      .prepare(`SELECT id, name, email, image FROM "user" WHERE id IN (${placeholders})`)
+      .prepare(`SELECT id, name, email, image, locale FROM "user" WHERE id IN (${placeholders})`)
       .bind(...distinctUserIds)
       .all<UserRow>()
     return new Map(userRows.map(userRow => [userRow.id, CloudflareUserDirectory.profileOf(userRow)]))
   }
 
   async findByEmail(email: string): Promise<UserProfile | null> {
-    const userRow = await this.#db.prepare('SELECT id, name, email, image FROM "user" WHERE lower(email) = lower(?)').bind(email.trim()).first<UserRow>()
+    const userRow = await this.#db.prepare('SELECT id, name, email, image, locale FROM "user" WHERE lower(email) = lower(?)').bind(email.trim()).first<UserRow>()
     return userRow ? CloudflareUserDirectory.profileOf(userRow) : null
   }
 
+  async setLocale(userId: string, locale: Locale): Promise<void> {
+    await this.#db.prepare('UPDATE "user" SET locale = ? WHERE id = ?').bind(locale, userId).run()
+  }
+
   static profileOf(userRow: UserRow): UserProfile {
-    return { userId: userRow.id, name: userRow.name, email: userRow.email, image: userRow.image }
+    return { userId: userRow.id, name: userRow.name, email: userRow.email, image: userRow.image, locale: parseLocale(userRow.locale) }
   }
 }

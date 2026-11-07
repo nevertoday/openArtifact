@@ -41,6 +41,7 @@ export interface RequestOptions extends Caller {
   method?: string
   body?: unknown
   form?: Record<string, string>
+  headers?: Record<string, string>
 }
 
 export class TestApp {
@@ -70,7 +71,7 @@ export class TestApp {
 
   async request(path: string, options: RequestOptions = {}): Promise<Response> {
     const method = options.method ?? 'GET'
-    const headers = new Headers()
+    const headers = new Headers(options.headers)
     if (options.cookie) headers.set('Cookie', options.cookie)
     if (options.token) headers.set('Authorization', `Bearer ${options.token}`)
     if (options.agentClient) headers.set('X-Open-Artifact-Client', options.agentClient)

@@ -1,3 +1,4 @@
+import type { Messages } from '../i18n/messages.ts'
 import type { CommentThread } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
@@ -116,6 +117,7 @@ export class HomeListing {
 }
 
 export interface HomeModel {
+  m: Messages
   identity: Identity
   listing: HomeListing
   query: HomeQuery
@@ -157,11 +159,11 @@ interface EmptyState {
 export class HomePage {
   static render(model: HomeModel): Response {
     const shownArtifacts = model.listing.matching(model.query, model.authorNames)
-    const topBarMiddle = html`${PageShell.workspaceSwitcher(model.identity)}${HomePage.#searchBox(model.query)}<a class="xxd-btn app-topbar__action" data-variant="ghost" data-size="sm" href="/settings/agents">${PageShell.icon('Bot')}Agent 接入</a>`
+    const topBarMiddle = html`${PageShell.workspaceSwitcher(model.m, model.identity)}${HomePage.#searchBox(model.query)}<a class="xxd-btn app-topbar__action" data-variant="ghost" data-size="sm" href="/settings/agents">${PageShell.icon('Bot')}Agent 接入</a>`
     const main = model.query.filter === 'removed' ? HomePage.#removedSection(shownArtifacts, model) : HomePage.#artifactsSection(shownArtifacts, model)
-    const body = html`${PageShell.topBar(model.identity, topBarMiddle)}${PageShell.withSidebar(HomePage.#sidebar(model), main)}
+    const body = html`${PageShell.topBar(model.m, model.identity, topBarMiddle)}${PageShell.withSidebar(HomePage.#sidebar(model), main)}
 ${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(model.justRemoved) })}`
-    return PageShell.render({ title: 'Open Artifact', body, scripts: ['common.js', 'home.js'], frameOrigin: model.usercontentOrigin })
+    return PageShell.render({ m: model.m, title: 'Open Artifact', body, scripts: ['common.js', 'home.js'], frameOrigin: model.usercontentOrigin })
   }
 
   static #artifactsSection(shownArtifacts: OpenedArtifact[], model: HomeModel): SafeHtml {
@@ -212,7 +214,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
       if (removal === null) throw new Error(`Artifact ${summary.artifactId} is listed as removed but has no removal`)
       return html`<tr data-removed-row="${summary.artifactId}">
     <td>${summary.title}</td>
-    <td><span class="xxd-text" data-variant="secondary">${model.authorNames.get(removal.removedBy)} ${ArtifactLabels.removal(removal.removedAsAdmin)} · ${PageShell.relativeTime(removal.removedAt, model.now)}</span></td>
+    <td><span class="xxd-text" data-variant="secondary">${model.authorNames.get(removal.removedBy)} ${ArtifactLabels.removal(removal.removedAsAdmin)} · ${PageShell.relativeTime(model.m, removal.removedAt, model.now)}</span></td>
     <td><span class="xxd-text" data-variant="secondary">${ArtifactLabels.purgeIn(removal.purgeAt, model.now)}</span></td>
     <td class="xxd-table__actions"><button type="button" class="xxd-btn" data-size="xs" data-restore-artifact="${summary.artifactId}" data-title="${summary.title}">${PageShell.icon('RotateCcw', 14)}恢复</button></td>
   </tr>`
@@ -308,7 +310,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
   </div>
   <div class="xxd-card__body">
     <p class="xxd-card__title artifact-card__title" title="${summary.title}">${summary.title}</p>
-    <p class="xxd-card__meta artifact-meta" title="${publishedBy} · ${ArtifactLabels.updatedAgo(summary.updatedAt, model.now)}${summary.version > 1 ? ` · v${summary.version}` : ''}"><span>${publishedBy}</span>${PageShell.relativeTime(summary.updatedAt, model.now)}${summary.version > 1 ? html`<span class="xxd-mono">v${summary.version}</span>` : ''}</p>
+    <p class="xxd-card__meta artifact-meta" title="${publishedBy} · ${ArtifactLabels.updatedAgo(model.m, summary.updatedAt, model.now)}${summary.version > 1 ? ` · v${summary.version}` : ''}"><span>${publishedBy}</span>${PageShell.relativeTime(model.m, summary.updatedAt, model.now)}${summary.version > 1 ? html`<span class="xxd-mono">v${summary.version}</span>` : ''}</p>
     ${sharingBadge || commentBadge ? html`<div class="xxd-cluster artifact-card__badges">${sharingBadge}${commentBadge}</div>` : ''}
   </div>
 </a>`

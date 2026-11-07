@@ -1,3 +1,4 @@
+import type { Messages } from '../i18n/messages.ts'
 import type { GuideFile } from '../guide/agent-guide.ts'
 import { html, SafeHtml } from './html.ts'
 import { PageShell } from './page-shell.ts'
@@ -17,6 +18,7 @@ interface ClientSetup {
 }
 
 export interface AgentConnectModel {
+  m: Messages
   mcpUrl: string
   appOrigin: string
   guideFiles: GuideFile[]

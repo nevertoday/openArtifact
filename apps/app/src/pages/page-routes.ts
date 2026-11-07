@@ -1,4 +1,4 @@
-import { CommentThread, PublicLinkPassword, type Invite } from '@open-artifact/core'
+import { CommentThread, parseLocale, PublicLinkPassword, type Invite } from '@open-artifact/core'
 import { ArtifactGate, type OpenedArtifact } from '../access/artifact-gate.ts'
 import type { ApiContext } from '../api/api-context.ts'
 import { INVITE_COOKIE } from '../auth/admission.ts'
@@ -6,6 +6,8 @@ import { WORKSPACE_COOKIE, type Identity } from '../auth/request-identity.ts'
 import { AgentGuide } from '../guide/agent-guide.ts'
 import { PersonalPages } from '../personal-pages.ts'
 import { HttpCookies } from '../http-cookies.ts'
+import { HttpError } from '../http-error.ts'
+import { LOCALE_COOKIE } from '../i18n/resolve-locale.ts'
 import { HOME_FILTERS, HomeListing, HomePage, type HomeFilter } from './home-page.ts'
 import { LoginPage } from './login-page.ts'
 import { MessagePages, type PasswordPrompt } from './message-pages.ts'
@@ -38,7 +40,7 @@ export class PageRoutes {
   async login(request: Request): Promise<Response> {
     const nextPath = PageRoutes.#safeNextPath(new URL(request.url).searchParams.get('next'), this.#context.appOrigin)
     if (await this.#context.identity()) return Response.redirect(new URL(nextPath, this.#context.appOrigin).toString(), 302)
-    return LoginPage.render(this.#context.auth.loginProviders, nextPath)
+    return LoginPage.render(await this.#context.messages(), this.#context.auth.loginProviders, nextPath)
   }
 
   /**
@@ -47,7 +49,7 @@ export class PageRoutes {
    */
   async invite(request: Request, inviteCode: string): Promise<Response> {
     const invite = await this.#context.repositories.invites.findPendingByCode(inviteCode, Date.now())
-    if (!invite) return MessagePages.inviteUnusable()
+    if (!invite) return MessagePages.inviteUnusable(await this.#context.messages())
     const identity = await this.#context.identity()
     if (!identity) return this.#inviteLogin(request, invite)
     const acceptance = await this.#context.admission.accept(invite, identity)
@@ -56,9 +58,9 @@ export class PageRoutes {
       case 'already_member':
         return this.#homeIn(request, invite.workspaceId)
       case 'removed':
-        return MessagePages.removedFromWorkspace()
+        return MessagePages.removedFromWorkspace(await this.#context.messages())
       case 'other_address':
-        return MessagePages.inviteForOtherAddress(acceptance.invitedEmail)
+        return MessagePages.inviteForOtherAddress(await this.#context.messages(), acceptance.invitedEmail)
     }
   }
 
@@ -67,7 +69,7 @@ export class PageRoutes {
     if (!workspace) throw new Error(`Invite ${invite.inviteId} names workspace ${invite.workspaceId}, which does not exist`)
     const invitation = { inviterName: inviterNames.get(invite.invitedBy) ?? '', workspaceName: workspace.name, email: invite.email }
     const invitePath = new URL(request.url).pathname
-    const loginPage = LoginPage.render(this.#context.auth.loginProviders, invitePath, invitation)
+    const loginPage = LoginPage.render(await this.#context.messages(), this.#context.auth.loginProviders, invitePath, invitation)
     const secondsLeft = Math.ceil((invite.expiresAt - Date.now()) / 1000)
     loginPage.headers.append('Set-Cookie', HttpCookies.serialize(INVITE_COOKIE, invite.code, { maxAgeSeconds: secondsLeft }, this.#isSecure(request)))
     return loginPage
@@ -80,6 +82,21 @@ export class PageRoutes {
 
   #isSecure(request: Request): boolean {
     return new URL(request.url).protocol === 'https:'
+  }
+
+  /**
+   * The language switch's form. The choice is kept in this browser, and on the account of a person signed in here so
+   * it follows them to other devices and into their mail; then the page they switched on opens again.
+   */
+  async chooseLocale(request: Request): Promise<Response> {
+    const locale = parseLocale(String((await request.formData()).get('locale') ?? ''))
+    if (!locale) return HttpError.fieldInvalid('locale', 'choose one of the offered languages').toResponse()
+    const identity = this.#context.requestIdentity.usesAccessToken ? null : await this.#context.identity()
+    if (identity) await this.#context.repositories.users.setLocale(identity.userId, locale)
+    const referer = URL.parse(request.headers.get('Referer') ?? '')
+    const backPath = PageRoutes.#safeNextPath(referer?.origin === this.#context.appOrigin ? `${referer.pathname}${referer.search}` : null, this.#context.appOrigin)
+    const localeCookie = HttpCookies.serialize(LOCALE_COOKIE, locale, { maxAgeSeconds: YEAR_SECONDS }, this.#isSecure(request))
+    return new Response(null, { status: 303, headers: { Location: new URL(backPath, this.#context.appOrigin).toString(), 'Set-Cookie': localeCookie } })
   }
 
   async home(request: Request): Promise<Response> {
@@ -101,7 +118,7 @@ export class PageRoutes {
     const authorNames = await this.#context.people.namesOf(listing.peopleIds())
     const previewUrls = await this.#previewUrls(listing.matching(query, authorNames))
     const justRemoved = listing.restorable(searchParams.get('removed'))
-    return HomePage.render({ identity, listing, query, authorNames, previewUrls, justRemoved, usercontentOrigin: this.#settings.usercontentOrigin, now: Date.now() })
+    return HomePage.render({ m: await this.#context.messages(), identity, listing, query, authorNames, previewUrls, justRemoved, usercontentOrigin: this.#settings.usercontentOrigin, now: Date.now() })
   }
 
   /** Anyone may read a personal page; `/@me` takes a signed-in person to their own, making it the first time. */
@@ -109,13 +126,14 @@ export class PageRoutes {
     const identity = await this.#context.identity()
     if (handle === 'me') return identity ? this.#redirectToOwnPersonalPage(identity) : this.#redirectToLogin(request)
     const profile = await this.#context.personalPages.findByHandle(handle)
-    if (!profile) return MessagePages.unknownAddress(404)
+    if (!profile) return MessagePages.unknownAddress(await this.#context.messages(), 404)
     const now = Date.now()
     const [entries, names] = await Promise.all([this.#context.personalPages.entriesOf(profile.userId, now), this.#context.people.namesOf([profile.userId])])
     const previewUrls = new Map(
       await Promise.all(entries.map(async entry => [entry.artifactId, `${await this.#context.artifactPages.entryPageUrl(entry.artifactId, entry.version, now)}?preview`] as const)),
     )
     return PersonalPage.render({
+      m: await this.#context.messages(),
       profile,
       name: names.get(profile.userId) ?? profile.handle,
       entries,
@@ -146,7 +164,7 @@ export class PageRoutes {
   async #viewing(request: Request, artifactId: string): Promise<ViewerModel | Response> {
     const identity = await this.#context.identity()
     const openedArtifact = await this.#context.gate.open(artifactId, identity, request)
-    if (!openedArtifact) return MessagePages.notFound(identity ? null : PageRoutes.#pathOf(request))
+    if (!openedArtifact) return MessagePages.notFound(await this.#context.messages(), identity ? null : PageRoutes.#pathOf(request))
     if (!openedArtifact.permissions.canView) return this.#refusal(request, openedArtifact, identity)
     const versionParameter = new URL(request.url).searchParams.get('v')
     const requestedVersion = Number(versionParameter ?? openedArtifact.summary.version)
@@ -154,11 +172,12 @@ export class PageRoutes {
     const shownVersion = versionExists ? requestedVersion : openedArtifact.summary.version
     const asksForMissingVersion = versionParameter !== null && Number.isInteger(requestedVersion) && !versionExists
     const showsOlderVersion = shownVersion !== openedArtifact.summary.version
-    if (showsOlderVersion && !openedArtifact.permissions.canSeeVersions) return identity ? MessagePages.notFound(null) : this.#redirectToLogin(request)
+    if (showsOlderVersion && !openedArtifact.permissions.canSeeVersions) return identity ? MessagePages.notFound(await this.#context.messages(), null) : this.#redirectToLogin(request)
     const now = Date.now()
     const authorNames = await this.#context.people.namesOf([openedArtifact.summary.authorId])
     const authorName = authorNames.get(openedArtifact.summary.authorId) ?? ''
     return {
+      m: await this.#context.messages(),
       openedArtifact,
       identity,
       authorName,
@@ -198,7 +217,7 @@ export class PageRoutes {
   async unlock(request: Request, artifactId: string): Promise<Response> {
     const summary = await this.#context.repositories.artifacts.findSummary(artifactId)
     const passwordHash = summary?.sharing.publicLinkPasswordHash ?? null
-    if (!summary || passwordHash === null) return MessagePages.notFound(`/a/${encodeURIComponent(artifactId)}`)
+    if (!summary || passwordHash === null) return MessagePages.notFound(await this.#context.messages(), `/a/${encodeURIComponent(artifactId)}`)
     // Each guess costs a PBKDF2 run, so guessing is limited per visitor and artifact.
     const visitorAddress = request.headers.get('CF-Connecting-IP') ?? 'unknown'
     const { success: withinAttemptLimit } = await this.#settings.unlockRateLimiter.limit({ key: `${artifactId}:${visitorAddress}` })
@@ -253,7 +272,7 @@ export class PageRoutes {
       section === 'workspace' ? this.#workspaceAdministration(identity) : null,
     ])
     const guideFiles = new AgentGuide(this.#context.appOrigin, this.#settings.mcpUrl).files()
-    return SettingsPage.render({ identity, section, mcpUrl: this.#settings.mcpUrl, appOrigin: this.#context.appOrigin, accessTokens, guideFiles, members, administration, now: Date.now() })
+    return SettingsPage.render({ m: await this.#context.messages(), identity, section, mcpUrl: this.#settings.mcpUrl, appOrigin: this.#context.appOrigin, accessTokens, guideFiles, members, administration, now: Date.now() })
   }
 
   // Only an admin sees every artifact's metadata and the audit log; a member gets null.
@@ -270,11 +289,11 @@ export class PageRoutes {
 
   async #refusal(request: Request, openedArtifact: OpenedArtifact, identity: Identity | null): Promise<Response> {
     const { summary, permissions } = openedArtifact
-    if (permissions.needsPublicLinkPassword) return MessagePages.publicLinkPassword(summary.artifactId, PageRoutes.#passwordPromptOf(request))
+    if (permissions.needsPublicLinkPassword) return MessagePages.publicLinkPassword(await this.#context.messages(), summary.artifactId, PageRoutes.#passwordPromptOf(request))
     if (!identity) return this.#redirectToLogin(request)
-    if (!ArtifactGate.mayAskForAccess(openedArtifact, identity)) return MessagePages.notFound(null)
+    if (!ArtifactGate.mayAskForAccess(openedArtifact, identity)) return MessagePages.notFound(await this.#context.messages(), null)
     const authorNames = await this.#context.people.namesOf([summary.authorId])
-    return MessagePages.noAccess(summary.artifactId, authorNames.get(summary.authorId) ?? '')
+    return MessagePages.noAccess(await this.#context.messages(), summary.artifactId, authorNames.get(summary.authorId) ?? '')
   }
 
   static #passwordPromptOf(request: Request): PasswordPrompt {
