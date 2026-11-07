@@ -224,6 +224,7 @@ describe('asking the author for access', () => {
     expect(noAccessMarkup).not.toContain('Private draft')
     expect([firstAsk.status, secondAsk.status]).toEqual([204, 204])
     expect(authorHears.map(notification => notification.text)).toEqual(['zhou 想查看「Private draft」，请你分享给 TA'])
+    expect(authorHears[0]?.url).toMatch(new RegExp(`/a/${draft.artifactId}#share=${authorHears[0]?.actor.userId}$`))
     expect(app.mailer.lastTo('lin@example.com')?.text).toContain('zhou@example.com')
   })
 

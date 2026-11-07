@@ -59,7 +59,7 @@ export class NotificationApi {
       commentId: notification.commentId,
       actor: { userId: notification.actorId, name: actorName, agentClient: notification.actorAgentClient },
       text: NotificationText.sentence(notification.kind, actorLabel, artifactTitle),
-      url: NotificationText.link(this.#context.viewerUrl(notification.artifactId), notification.commentId),
+      url: NotificationText.link(this.#context.viewerUrl(notification.artifactId), notification.commentId, notification.kind === 'access_requested' ? notification.actorId : null),
       createdAt: notification.createdAt,
       read: notification.readAt !== null,
     }

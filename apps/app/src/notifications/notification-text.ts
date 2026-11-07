@@ -29,8 +29,13 @@ export class NotificationText {
     }
   }
 
-  /** Where a notification leads: the comment's thread in the viewer, or the artifact itself. */
-  static link(viewerUrl: string, commentId: string | null): string {
-    return commentId === null ? viewerUrl : `${viewerUrl}#comment-${encodeURIComponent(commentId)}`
+  /**
+   * Where a notification leads: the comment's thread in the viewer; for a request for access, the share dialog with
+   * the person who asked already filled in; otherwise the artifact itself.
+   */
+  static link(viewerUrl: string, commentId: string | null, accessRequesterId: string | null = null): string {
+    if (commentId !== null) return `${viewerUrl}#comment-${encodeURIComponent(commentId)}`
+    if (accessRequesterId !== null) return `${viewerUrl}#share=${encodeURIComponent(accessRequesterId)}`
+    return viewerUrl
   }
 }

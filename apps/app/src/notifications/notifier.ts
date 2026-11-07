@@ -108,7 +108,7 @@ export class Notifier {
   async #mail(actor: Actor, artifact: NotifiedArtifact, event: ArtifactEvent, newNotifications: NewNotification[]): Promise<void> {
     const recipients = await this.#repositories.users.profilesOf(newNotifications.map(newNotification => newNotification.recipientId))
     const actorLabel = NotificationText.actorLabel(actor.name, actor.agentClient)
-    const link = NotificationText.link(this.#viewerUrl(artifact.artifactId), Notifier.#commentIdOf(event))
+    const link = NotificationText.link(this.#viewerUrl(artifact.artifactId), Notifier.#commentIdOf(event), event.kind === 'access_requested' ? actor.userId : null)
     const mails = newNotifications.flatMap(newNotification => {
       const recipient = recipients.get(newNotification.recipientId)
       const mailContent = Notifier.#mailContentOf(newNotification.kind, event, actorLabel, artifact.title)
@@ -140,7 +140,7 @@ export class Notifier {
         const daysLeft = Math.round((event.expiresAt - Date.now()) / DAY_MS)
         const expiryDate = dateText(event.expiresAt)
         const subject = `${NotificationText.sentence(kind, actorLabel, artifactTitle)}，${daysLeft} 天后过期`
-        return { subject, body: `${subject}（${expiryDate}）。拿到链接的人不用登录就能打开。要改过期时间或取消公开，打开页面后点「分享」。` }
+        return { subject, body: `${subject}（${expiryDate}）。拿到链接的人不用登录就能打开。要改有效期或取消公开，打开页面后点「分享」。` }
       }
       case 'access_requested': {
         if (event.kind !== 'access_requested') return null
