@@ -1,46 +1,107 @@
-/** An error the caller can fix; its message is shown to them as is. */
+/**
+ * Stable names for what went wrong. Agents read the English `error`; the web pages map `code` to Chinese in
+ * one table (ERROR_MESSAGES in public/static/common.js), so a code is renamed in both places or neither.
+ */
+export type ErrorCode =
+  | 'unauthenticated'
+  | 'token_invalid'
+  | 'token_revoked'
+  | 'token_expired'
+  | 'forbidden'
+  | 'admin_required'
+  | 'browser_session_required'
+  | 'outside_token_scope'
+  | 'cross_site_request'
+  | 'removed_from_workspace'
+  | 'not_found'
+  | 'person_not_found'
+  | 'method_not_allowed'
+  | 'invalid_request'
+  | 'field_required'
+  | 'field_too_long'
+  | 'field_invalid'
+  | 'too_large'
+  | 'last_admin'
+  | 'cannot_remove_self'
+  | 'author_always_sees'
+  | 'public_links_off'
+  | 'version_conflict'
+
+/** Which request field an error is about, so a page can show it under that field. */
+export interface FieldDetail {
+  field: string
+  maxLength?: number
+}
+
+/** An error the caller can fix; its message is shown to agents as is. */
 export class HttpError extends Error {
   readonly status: number
+  readonly code: ErrorCode
+  readonly fieldDetail: FieldDetail | null
 
-  constructor(status: number, message: string, options?: ErrorOptions) {
+  constructor(status: number, code: ErrorCode, message: string, fieldDetail: FieldDetail | null = null, options?: ErrorOptions) {
     super(message, options)
     this.status = status
+    this.code = code
+    this.fieldDetail = fieldDetail
   }
 
   static badRequest(message: string, options?: ErrorOptions): HttpError {
-    return new HttpError(400, message, options)
+    return new HttpError(400, 'invalid_request', message, null, options)
+  }
+
+  /** `maxLength` is null for a field that has no length limit. */
+  static fieldRequired(field: string, maxLength: number | null): HttpError {
+    if (maxLength === null) return new HttpError(400, 'field_required', `${field} is required`, { field })
+    return new HttpError(400, 'field_required', `${field} must be 1 to ${maxLength} characters`, { field, maxLength })
+  }
+
+  static fieldTooLong(field: string, maxLength: number): HttpError {
+    return new HttpError(400, 'field_too_long', `${field} must be 1 to ${maxLength} characters`, { field, maxLength })
+  }
+
+  static fieldInvalid(field: string, message: string, options?: ErrorOptions): HttpError {
+    return new HttpError(400, 'field_invalid', message, { field }, options)
   }
 
   static unauthorized(): HttpError {
-    return new HttpError(401, 'sign in, or send a personal API token as "Authorization: Bearer oa_pat_…"')
+    return new HttpError(401, 'unauthenticated', 'sign in, or send a personal API token as "Authorization: Bearer oa_pat_…"')
   }
 
   static forbidden(action: string): HttpError {
-    return new HttpError(403, `you do not have permission to ${action}`)
+    return new HttpError(403, 'forbidden', `you do not have permission to ${action}`)
+  }
+
+  static adminRequired(action: string): HttpError {
+    return new HttpError(403, 'admin_required', `you do not have permission to ${action}; ask a workspace admin`)
   }
 
   /** The person may do this, but the API token they sent was made for publishing only. */
   static outsideTokenScope(action: string): HttpError {
-    return new HttpError(403, `this token may only publish; to ${action}, create a token with full access in 设置 › Agent 接入, or use the web page`)
+    return new HttpError(403, 'outside_token_scope', `this token may only publish; to ${action}, create a token with full access in 设置 › Agent 接入, or use the web page`)
   }
 
   /** Also used when the caller may not know the thing exists, so its existence is not revealed. */
   static notFound(what: string): HttpError {
-    return new HttpError(404, `${what} not found`)
+    return new HttpError(404, 'not_found', `${what} not found`)
   }
 
   static methodNotAllowed(method: string): HttpError {
-    return new HttpError(405, `${method} is not supported here`)
+    return new HttpError(405, 'method_not_allowed', `${method} is not supported here`)
+  }
+
+  static tooLarge(message: string): HttpError {
+    return new HttpError(413, 'too_large', message)
   }
 
   toResponse(): Response {
-    return Response.json({ error: this.message }, { status: this.status })
+    return Response.json({ error: this.message, code: this.code, ...this.fieldDetail }, { status: this.status })
   }
 }
 
 /** The person signed in, but an admin removed them from every workspace they belonged to. */
 export class RemovedFromWorkspaceError extends HttpError {
   constructor() {
-    super(403, 'you were removed from this workspace; ask a workspace admin')
+    super(403, 'removed_from_workspace', 'you were removed from this workspace; ask a workspace admin')
   }
 }

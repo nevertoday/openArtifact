@@ -70,7 +70,7 @@ export class WorkspaceApi {
   /** The person loses access at once; their artifacts stay in the workspace. */
   async removeMember(userId: string): Promise<Response> {
     const identity = await this.#context.requireWorkspaceAdmin('remove members')
-    if (userId === identity.userId) throw HttpError.badRequest('you cannot remove yourself; ask another admin')
+    if (userId === identity.userId) throw new HttpError(400, 'cannot_remove_self', 'you cannot remove yourself; ask another admin')
     const workspaceId = identity.membership.workspace.workspaceId
     const removal = await this.#context.repositories.workspaces.removeMember(workspaceId, userId, Date.now())
     WorkspaceApi.#refuseUnless(removal, userId)
@@ -105,7 +105,7 @@ export class WorkspaceApi {
       case 'changed':
         return
       case 'last_admin':
-        throw HttpError.badRequest('a workspace needs at least one admin; make someone else admin first')
+        throw new HttpError(400, 'last_admin', 'a workspace needs at least one admin; make someone else admin first')
       case 'not_member':
         throw HttpError.notFound(`member ${userId}`)
     }

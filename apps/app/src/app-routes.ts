@@ -41,7 +41,7 @@ export class AppRoutes {
     if (requestUrl.pathname === '/health') return Response.json({ service: 'open-artifact-app', status: 'ok' })
     const context = this.#contextFor(request, requestUrl.origin)
     if (requestUrl.pathname.startsWith('/api/auth/')) return context.auth.handle(request)
-    if (this.#isCrossSiteWrite(request, context)) return HttpError.forbidden('send this request from the Open Artifact page').toResponse()
+    if (this.#isCrossSiteWrite(request, context)) return new HttpError(403, 'cross_site_request', 'send this request from the Open Artifact page').toResponse()
     if (requestUrl.pathname.startsWith('/api/')) return ApiRoutes.respond(request, context)
     try {
       return await this.#page(request, requestUrl, context)

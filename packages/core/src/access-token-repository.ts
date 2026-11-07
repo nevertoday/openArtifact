@@ -24,12 +24,15 @@ export interface NewAccessToken {
   expiresAt: number | null
 }
 
+/** What presenting a token amounts to: a working token, or why it no longer works. */
+export type TokenUse = { status: 'active'; accessToken: AccessToken } | { status: 'revoked' } | { status: 'expired' } | { status: 'unknown' }
+
 /** Personal API tokens; only their hash is stored. */
 export interface AccessTokenRepository {
   create(newAccessToken: NewAccessToken): Promise<AccessToken>
   listForUser(userId: string): Promise<AccessToken[]>
   /** Revokes only a token that belongs to `userId`; returns whether one was revoked. */
   revoke(tokenId: string, userId: string): Promise<boolean>
-  /** Returns the token when it is neither revoked nor expired at `now`, and records that it was used. */
-  useActiveToken(tokenHash: string, now: number): Promise<AccessToken | null>
+  /** Records the use of a token that is neither revoked nor expired at `now`; otherwise says why it was refused. */
+  useToken(tokenHash: string, now: number): Promise<TokenUse>
 }

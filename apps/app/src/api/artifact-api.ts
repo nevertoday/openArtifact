@@ -1,7 +1,7 @@
 import { ArtifactRemoval, type ArtifactFile, type ArtifactSummary, type ArtifactVisibility, type PublishResult, type VersionOrigin } from '@open-artifact/core'
 import { ArtifactGate, type OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
-import { HttpError } from '../http-error.ts'
+import { HttpError, type ErrorCode } from '../http-error.ts'
 import type { ApiContext } from './api-context.ts'
 import { ArtifactFileJson } from './artifact-file-json.ts'
 import { JsonBody } from './json-body.ts'
@@ -196,6 +196,7 @@ export class ArtifactApi {
     const latestVersion = await this.#context.repositories.artifacts.readVersion(artifactId, currentVersion)
     const latestFiles: ArtifactFile[] = latestVersion?.files ?? []
     const conflictBody = {
+      code: 'version_conflict' satisfies ErrorCode,
       error: `artifact is at version ${currentVersion}; merge your change into latestFiles and publish again with baseVersion ${currentVersion}`,
       currentVersion,
       latestFiles: latestFiles.map(file => ArtifactFileJson.toJson(file)),

@@ -1,4 +1,4 @@
-import { readJsonData, removalWord, restoreArtifact } from './common.js'
+import { readJsonData, removalWord, restoreArtifact, userMessageOf } from './common.js'
 
 const homeConfig = readJsonData('home-config')
 
@@ -18,7 +18,7 @@ async function undoRemoval(justRemoved) {
     const { url } = await restoreArtifact(justRemoved.artifactId)
     location.href = url
   } catch (error) {
-    Xxd.toast(`撤销失败：${error.message}`, { tone: 'danger' })
+    Xxd.toast(`撤销失败：${userMessageOf(error)}`, { tone: 'danger' })
   }
 }
 
@@ -30,7 +30,7 @@ async function restoreFromList(restoreButton) {
     showOneFewerRemoved()
     Xxd.toast(`已恢复「${restoreButton.dataset.title}」`, { tone: 'success', action: { label: '打开', onClick: () => { location.href = url } } })
   } catch (error) {
-    Xxd.toast(`恢复失败：${error.message}`, { tone: 'danger' })
+    Xxd.toast(`恢复失败：${userMessageOf(error)}`, { tone: 'danger' })
   } finally {
     restoreButton.removeAttribute('aria-busy')
   }

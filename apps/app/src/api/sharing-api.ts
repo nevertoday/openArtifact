@@ -39,10 +39,10 @@ export class SharingApi {
     const identity = await this.#context.requireIdentity()
     const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canManageSharing', MANAGE_SHARING)
     const email = new URL(request.url).searchParams.get('email')?.trim() ?? ''
-    if (email.length === 0) throw HttpError.badRequest('email is required')
+    if (email.length === 0) throw HttpError.fieldRequired('email', null)
     const person = await this.#context.repositories.users.findByEmail(email)
-    if (!person) throw HttpError.notFound('a person with this email; they need to sign in once before you can add them')
-    if (person.userId === summary.authorId) throw HttpError.badRequest('the author can always see their own artifact')
+    if (!person) throw new HttpError(404, 'person_not_found', 'no person with this email; they need to sign in once before you can add them', { field: 'email' })
+    if (person.userId === summary.authorId) throw new HttpError(400, 'author_always_sees', 'the author can always see their own artifact', { field: 'email' })
     return Response.json({ userId: person.userId, name: People.displayName(person), email: person.email })
   }
 
@@ -66,7 +66,7 @@ export class SharingApi {
   async #sharingFrom(requestBody: JsonBody, summary: ArtifactSummary, visibility: ArtifactVisibility, publicLinkExpiresAt: number | null): Promise<ArtifactSharing> {
     const workspace = await this.#context.repositories.workspaces.findWorkspace(summary.workspaceId)
     const publicLinkForbidden = visibility === 'public_link' && !workspace?.publicLinksEnabled
-    if (publicLinkForbidden) throw HttpError.badRequest('the workspace admin has switched public links off')
+    if (publicLinkForbidden) throw new HttpError(400, 'public_links_off', 'the workspace admin has switched public links off')
     return {
       visibility,
       publicLinkExpiresAt,
@@ -83,7 +83,7 @@ export class SharingApi {
     const grants = grantsJson.map(grantJson => SharingApi.#personGrantOf(grantJson))
     const userIds = grants.map(grant => grant.userId)
     if (new Set(userIds).size !== userIds.length) throw HttpError.badRequest('each person may appear only once in grants')
-    if (userIds.includes(summary.authorId)) throw HttpError.badRequest('the author can always see their own artifact')
+    if (userIds.includes(summary.authorId)) throw new HttpError(400, 'author_always_sees', 'the author can always see their own artifact')
     const savedUserIds = new Set(savedGrants.map(grant => grant.userId))
     const addedUserIds = userIds.filter(userId => !savedUserIds.has(userId))
     const addedProfiles = await this.#context.repositories.users.profilesOf(addedUserIds)

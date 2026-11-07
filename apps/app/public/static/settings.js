@@ -1,4 +1,4 @@
-import { api, confirmArtifactRemoval, element, readJsonData, removalWord, removeArtifact, restoreArtifact, dateText, timeElement } from './common.js'
+import { api, confirmArtifactRemoval, element, readJsonData, removalWord, removeArtifact, restoreArtifact, dateText, timeElement, userMessageOf } from './common.js'
 
 const settingsConfig = readJsonData('settings-config')
 const TOKEN_SCOPE_LABELS = { publish: '仅发布', full: '完全权限' }
@@ -93,7 +93,7 @@ class TokenTable {
       await this.refresh()
       this.container.focus()
     } catch (error) {
-      Xxd.toast(error.message, { tone: 'danger' })
+      Xxd.toast(userMessageOf(error), { tone: 'danger' })
     }
   }
 }
@@ -220,7 +220,7 @@ function wireAgentConnection() {
       agentConnection.show(createdToken)
       await tokenTable.refresh(createdToken.tokenId)
     } catch (error) {
-      Xxd.toast(`新建失败：${error.message}`, { tone: 'danger' })
+      Xxd.toast(`新建失败：${userMessageOf(error)}`, { tone: 'danger' })
     } finally {
       createButton.disabled = false
     }
@@ -237,7 +237,7 @@ function wireProfileForm() {
       await api('/api/me', { method: 'PATCH', body: { name: new FormData(profileForm).get('name') } })
       Xxd.toast('已保存', { tone: 'success' })
     } catch (error) {
-      Xxd.toast(`保存失败：${error.message}`, { tone: 'danger' })
+      Xxd.toast(`保存失败：${userMessageOf(error)}`, { tone: 'danger' })
     } finally {
       saveButton.removeAttribute('aria-busy')
     }
@@ -255,7 +255,7 @@ function wireWorkspaceNameForm() {
       await api('/api/workspace', { method: 'PATCH', body: { name: new FormData(workspaceNameForm).get('name') } })
       location.reload()
     } catch (error) {
-      Xxd.setFieldError(document.getElementById('workspace-name'), error.message)
+      Xxd.setFieldError(document.getElementById('workspace-name'), userMessageOf(error))
       saveButton.disabled = false
       saveButton.removeAttribute('aria-busy')
     }
@@ -289,7 +289,7 @@ function wirePublicLinksSwitch() {
       Xxd.toast(publicLinksSwitch.checked ? '已允许公开链接' : '已关闭公开链接', { tone: 'success' })
     } catch (error) {
       publicLinksSwitch.checked = !publicLinksSwitch.checked
-      Xxd.toast(error.message, { tone: 'danger' })
+      Xxd.toast(userMessageOf(error), { tone: 'danger' })
     }
   })
 }
@@ -305,7 +305,7 @@ function wireMemberAdministration() {
         Xxd.toast(`已把 ${memberName} 设为${roleSelect.selectedOptions[0].textContent}`, { tone: 'success' })
       } catch (error) {
         roleSelect.value = savedRole
-        Xxd.toast(`修改角色失败：${error.message}`, { tone: 'danger' })
+        Xxd.toast(`修改角色失败：${userMessageOf(error)}`, { tone: 'danger' })
       }
     })
   }
@@ -330,7 +330,7 @@ async function removeMember(removeButton) {
     removeButton.closest('tr')?.remove()
     Xxd.toast(`已移除 ${memberName}`, { tone: 'success' })
   } catch (error) {
-    Xxd.toast(`移除失败：${error.message}`, { tone: 'danger' })
+    Xxd.toast(`移除失败：${userMessageOf(error)}`, { tone: 'danger' })
   }
 }
 
@@ -379,7 +379,7 @@ class PendingInvites {
       Xxd.toast(`已撤销「${subject}」`, { tone: 'success' })
       await this.refresh()
     } catch (error) {
-      Xxd.toast(`撤销失败：${error.message}`, { tone: 'danger' })
+      Xxd.toast(`撤销失败：${userMessageOf(error)}`, { tone: 'danger' })
     }
   }
 }
@@ -392,7 +392,7 @@ function wireInvites() {
   const pendingContainer = document.getElementById('pending-invites')
   if (!pendingContainer) return
   const pendingInvites = new PendingInvites(pendingContainer)
-  pendingInvites.refresh().catch(error => Xxd.toast(`读取邀请失败：${error.message}`, { tone: 'danger' }))
+  pendingInvites.refresh().catch(error => Xxd.toast(`读取邀请失败：${userMessageOf(error)}`, { tone: 'danger' }))
 
   const linkButton = document.getElementById('create-invite-link')
   linkButton.addEventListener('click', async () => {
@@ -402,7 +402,7 @@ function wireInvites() {
       Xxd.toast('已生成邀请链接。点「复制链接」发给同事。', { tone: 'success' })
       await pendingInvites.refresh()
     } catch (error) {
-      Xxd.toast(`生成失败：${error.message}`, { tone: 'danger' })
+      Xxd.toast(`生成失败：${userMessageOf(error)}`, { tone: 'danger' })
     } finally {
       linkButton.disabled = false
     }
@@ -425,7 +425,7 @@ function wireInvites() {
       Xxd.toast(invitationSummary(invites.length, alreadyMembers), { tone: 'success' })
       await pendingInvites.refresh()
     } catch (error) {
-      Xxd.setFieldError(emailsInput, error.message)
+      Xxd.setFieldError(emailsInput, userMessageOf(error))
     } finally {
       sendButton.disabled = false
     }
@@ -449,7 +449,7 @@ function wireContentAdministration() {
         await removeArtifact(removeButton.dataset.removeArtifact)
         location.reload()
       } catch (error) {
-        Xxd.toast(`${removalWord(takesDown)}失败：${error.message}`, { tone: 'danger' })
+        Xxd.toast(`${removalWord(takesDown)}失败：${userMessageOf(error)}`, { tone: 'danger' })
       }
     })
   }
@@ -459,7 +459,7 @@ function wireContentAdministration() {
         await restoreArtifact(restoreButton.dataset.restoreArtifact)
         location.reload()
       } catch (error) {
-        Xxd.toast(`恢复失败：${error.message}`, { tone: 'danger' })
+        Xxd.toast(`恢复失败：${userMessageOf(error)}`, { tone: 'danger' })
       }
     })
   }

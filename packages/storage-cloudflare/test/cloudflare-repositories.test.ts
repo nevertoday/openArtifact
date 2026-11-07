@@ -211,22 +211,23 @@ describe('artifact access, comments and shared data', () => {
     expect(await sharedDataRepository.listDocuments(artifactId, 'votes')).toEqual([])
   })
 
-  it('accepts a token only while it is neither revoked nor expired', async () => {
+  it('accepts a token only while it is neither revoked nor expired, and says which it is', async () => {
     const tokenRepository = new CloudflareAccessTokenRepository(env.DB)
     const now = Date.now()
     const activeToken = await tokenRepository.create({ userId: authorId, workspaceId, name: 'Claude Code', tokenHash: 'hash-active', expiresAt: now + 60_000, scope: 'publish' })
     await tokenRepository.create({ userId: authorId, workspaceId, name: 'Old CI', tokenHash: 'hash-expired', expiresAt: now - 1, scope: 'full' })
 
-    const usedToken = await tokenRepository.useActiveToken('hash-active', now)
-    const expiredToken = await tokenRepository.useActiveToken('hash-expired', now)
+    const usedToken = await tokenRepository.useToken('hash-active', now)
+    const expiredToken = await tokenRepository.useToken('hash-expired', now)
     const revokedByStranger = await tokenRepository.revoke(activeToken.tokenId, reviewerId)
     const revokedByOwner = await tokenRepository.revoke(activeToken.tokenId, authorId)
 
-    expect(usedToken).toMatchObject({ tokenId: activeToken.tokenId, lastUsedAt: now })
-    expect(expiredToken).toBeNull()
+    expect(usedToken).toMatchObject({ status: 'active', accessToken: { tokenId: activeToken.tokenId, lastUsedAt: now } })
+    expect(expiredToken).toEqual({ status: 'expired' })
     expect(revokedByStranger).toBe(false)
     expect(revokedByOwner).toBe(true)
-    expect(await tokenRepository.useActiveToken('hash-active', now)).toBeNull()
+    expect(await tokenRepository.useToken('hash-active', now)).toEqual({ status: 'revoked' })
+    expect(await tokenRepository.useToken('hash-never-issued', now)).toEqual({ status: 'unknown' })
     expect((await tokenRepository.listForUser(authorId)).map(token => token.name)).toEqual(expect.arrayContaining(['Claude Code', 'Old CI']))
   })
 
@@ -238,7 +239,7 @@ describe('artifact access, comments and shared data', () => {
       .bind('token-before-scopes', authorId, workspaceId, 'Older laptop', 'hash-before-scopes', now)
       .run()
 
-    expect(await tokenRepository.useActiveToken('hash-publish', now)).toMatchObject({ name: 'Publisher', scope: 'publish' })
-    expect(await tokenRepository.useActiveToken('hash-before-scopes', now)).toMatchObject({ name: 'Older laptop', scope: 'full' })
+    expect(await tokenRepository.useToken('hash-publish', now)).toMatchObject({ accessToken: { name: 'Publisher', scope: 'publish' } })
+    expect(await tokenRepository.useToken('hash-before-scopes', now)).toMatchObject({ accessToken: { name: 'Older laptop', scope: 'full' } })
   })
 })

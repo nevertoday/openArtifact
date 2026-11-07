@@ -1,6 +1,6 @@
-import { AccessTokenSecret, type AccessTokenScope, type Membership } from '@open-artifact/core'
+import { AccessTokenSecret, type AccessToken, type AccessTokenScope, type Membership } from '@open-artifact/core'
 import { HttpCookies } from '../http-cookies.ts'
-import { RemovedFromWorkspaceError } from '../http-error.ts'
+import { HttpError, RemovedFromWorkspaceError } from '../http-error.ts'
 import { People } from '../people.ts'
 import type { Repositories } from '@open-artifact/core'
 import { INVITE_COOKIE, type Admission } from './admission.ts'
@@ -11,6 +11,15 @@ export const WORKSPACE_COOKIE = 'oa_workspace'
 export const AGENT_CLIENT_HEADER = 'X-Open-Artifact-Client'
 const DIRECT_API_CLIENT = 'API'
 const MAX_AGENT_CLIENT_LENGTH = 40
+const NEW_TOKEN_HINT = 'create a new one in 设置 › Agent 接入'
+
+type TokenRefusal = 'token_invalid' | 'token_revoked' | 'token_expired'
+
+const TOKEN_REFUSAL_MESSAGES: Record<TokenRefusal, string> = {
+  token_invalid: `this API token is not valid; ${NEW_TOKEN_HINT} and send it as "Authorization: Bearer oa_pat_…"`,
+  token_revoked: `this API token was revoked; ${NEW_TOKEN_HINT}`,
+  token_expired: `this API token has expired; ${NEW_TOKEN_HINT}`,
+}
 
 export interface Identity {
   userId: string
@@ -32,6 +41,7 @@ export class RequestIdentity {
   readonly #admission: Admission
   readonly #request: Request
   #resolvedIdentity: Promise<Identity | null> | null = null
+  #tokenRefusal: TokenRefusal | null = null
 
   constructor(auth: OpenArtifactAuth, repositories: Repositories, admission: Admission, request: Request) {
     this.#auth = auth
@@ -49,18 +59,46 @@ export class RequestIdentity {
     return this.#resolvedIdentity
   }
 
+  /** The 401 for a request that identifies nobody: why its token was refused, or that it needs to sign in. */
+  async unauthorized(): Promise<HttpError> {
+    await this.resolve()
+    return this.#tokenRefusal === null ? HttpError.unauthorized() : new HttpError(401, this.#tokenRefusal, TOKEN_REFUSAL_MESSAGES[this.#tokenRefusal])
+  }
+
+  /** A token that no longer works is refused outright, so an agent never mistakes it for anonymous access. */
+  async rejectRefusedToken(): Promise<void> {
+    if (this.usesAccessToken && (await this.resolve()) === null) throw await this.unauthorized()
+  }
+
   async #tokenIdentity(): Promise<Identity | null> {
     const bearerToken = RequestIdentity.#bearerToken(this.#request) ?? ''
-    if (!AccessTokenSecret.looksLikeToken(bearerToken)) return null
-    const accessToken = await this.#repositories.accessTokens.useActiveToken(await AccessTokenSecret.hashOf(bearerToken), Date.now())
-    if (!accessToken) return null
+    if (!AccessTokenSecret.looksLikeToken(bearerToken)) return this.#refuseToken('token_invalid')
+    const tokenUse = await this.#repositories.accessTokens.useToken(await AccessTokenSecret.hashOf(bearerToken), Date.now())
+    switch (tokenUse.status) {
+      case 'unknown':
+        return this.#refuseToken('token_invalid')
+      case 'revoked':
+        return this.#refuseToken('token_revoked')
+      case 'expired':
+        return this.#refuseToken('token_expired')
+      case 'active':
+        return this.#identityOfToken(tokenUse.accessToken)
+    }
+  }
+
+  async #identityOfToken(accessToken: AccessToken): Promise<Identity | null> {
     const profile = (await this.#repositories.users.profilesOf([accessToken.userId])).get(accessToken.userId)
     const memberships = await this.#repositories.workspaces.membershipsOf(accessToken.userId)
     // A token stops working in a workspace its owner has left.
     const tokenMembership = memberships.find(membership => membership.workspace.workspaceId === accessToken.workspaceId)
-    if (!profile || !tokenMembership) return null
+    if (!profile || !tokenMembership) return this.#refuseToken('token_invalid')
     // A token acts only in the workspace it was created for, even when its owner belongs to others.
     return { userId: profile.userId, name: People.displayName(profile), email: profile.email, membership: tokenMembership, memberships: [tokenMembership], agentClient: this.#agentClient(), tokenScope: accessToken.scope }
+  }
+
+  #refuseToken(refusal: TokenRefusal): null {
+    this.#tokenRefusal = refusal
+    return null
   }
 
   async #sessionIdentity(): Promise<Identity | null> {

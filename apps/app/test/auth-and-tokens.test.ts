@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { AccessTokenSecret } from '@open-artifact/core'
 import { MailerConfigError, Mailers } from '../src/auth/mailer.ts'
 import { APP_ORIGIN, TestApp } from './test-app.ts'
 
@@ -34,6 +35,20 @@ describe('signing in', () => {
     expect(apiResponse.status).toBe(401)
     expect(homeResponse.status).toBe(302)
     expect(homeResponse.headers.get('Location')).toBe(`${APP_ORIGIN}/login?next=%2F`)
+  })
+
+  it('names what went wrong with a stable code and the field it concerns, beside the English message', async () => {
+    const cookie = await app.signIn('lin@example.com')
+
+    const blankName = await app.json<{ code: string; field: string; error: string }>('/api/me', { method: 'PATCH', cookie, body: { name: '   ' } })
+    const longName = await app.json<{ code: string; field: string; maxLength: number }>('/api/me', { method: 'PATCH', cookie, body: { name: 'x'.repeat(61) } })
+    const signedOut = await app.json<{ code: string }>('/api/me')
+    const unknownRoute = await app.json<{ code: string }>('/api/nothing-here', { cookie })
+
+    expect(blankName).toMatchObject({ status: 400, body: { code: 'field_required', field: 'name', error: 'name must be 1 to 60 characters' } })
+    expect(longName).toMatchObject({ status: 400, body: { code: 'field_too_long', field: 'name', maxLength: 60 } })
+    expect(signedOut).toMatchObject({ status: 401, body: { code: 'unauthenticated' } })
+    expect(unknownRoute).toMatchObject({ status: 404, body: { code: 'not_found' } })
   })
 
   it('refuses a write that carries the session cookie but comes from another site', async () => {
@@ -92,6 +107,32 @@ describe('personal API tokens', () => {
     const afterRevoke = await app.request('/api/artifacts', { token: created.body.token })
 
     expect([strangerRevoke.status, ownerRevoke.status, afterRevoke.status]).toEqual([404, 204, 401])
+  })
+
+  it('tells an agent whether its token was revoked, has expired or was never valid', async () => {
+    const cookie = await app.signIn('lin@example.com')
+    const revoked = await app.json<{ tokenId: string; token: string; userId: string; workspaceId: string }>('/api/tokens', { method: 'POST', cookie, body: { name: 'old laptop', expiresInDays: 30 } })
+    await app.request(`/api/tokens/${revoked.body.tokenId}`, { method: 'DELETE', cookie })
+    const me = await app.json<{ user: { userId: string }; workspace: { workspaceId: string } }>('/api/me', { cookie })
+    const expiredToken = AccessTokenSecret.generate()
+    await app.repositories.accessTokens.create({ userId: me.body.user.userId, workspaceId: me.body.workspace.workspaceId, name: 'expired', tokenHash: await AccessTokenSecret.hashOf(expiredToken), scope: 'publish', expiresAt: Date.now() - 1 })
+
+    const answers = await Promise.all([revoked.body.token, expiredToken, 'oa_pat_neverissued', 'garbage'].map(token => app.json<{ code: string; error: string }>('/api/artifacts', { token })))
+
+    expect(answers.map(answer => answer.status)).toEqual([401, 401, 401, 401])
+    expect(answers.map(answer => answer.body.code)).toEqual(['token_revoked', 'token_expired', 'token_invalid', 'token_invalid'])
+    expect(answers[0]?.body.error).toContain('revoked')
+  })
+
+  it('refuses a revoked token even where anyone may read, instead of treating it as anonymous', async () => {
+    const cookie = await app.signIn('lin@example.com')
+    const created = await app.json<{ tokenId: string; token: string }>('/api/tokens', { method: 'POST', cookie, body: { name: 'gone', expiresInDays: 30 } })
+    const published = await app.publish({ cookie }, 'Open to anyone', '<h1>x</h1>', 'public_link')
+    await app.request(`/api/tokens/${created.body.tokenId}`, { method: 'DELETE', cookie })
+
+    const read = await app.json<{ code: string }>(`/api/artifacts/${published.artifactId}`, { token: created.body.token })
+
+    expect(read).toMatchObject({ status: 401, body: { code: 'token_revoked' } })
   })
 
   it('gives a new token the publish scope unless full access is chosen', async () => {

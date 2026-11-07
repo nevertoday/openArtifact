@@ -105,6 +105,7 @@ export class ApiRoutes {
     const requestUrl = new URL(request.url)
     const pathMatches = API_ROUTES.map(apiRoute => ({ apiRoute, match: apiRoute.pattern.exec(requestUrl) })).filter(candidate => candidate.match !== null)
     try {
+      await context.requestIdentity.rejectRefusedToken()
       if (pathMatches.length === 0) throw HttpError.notFound(`API route ${requestUrl.pathname}`)
       const methodMatch = pathMatches.find(candidate => candidate.apiRoute.method === request.method)
       if (!methodMatch) throw HttpError.methodNotAllowed(request.method)

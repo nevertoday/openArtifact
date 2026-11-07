@@ -1,4 +1,4 @@
-import type { AccessToken, AccessTokenRepository, AccessTokenScope, NewAccessToken } from '@open-artifact/core'
+import type { AccessToken, AccessTokenRepository, AccessTokenScope, NewAccessToken, TokenUse } from '@open-artifact/core'
 
 const TOKEN_COLUMNS = 'id, user_id, workspace_id, name, scope, expires_at, revoked_at, last_used_at, created_at'
 
@@ -49,8 +49,8 @@ export class CloudflareAccessTokenRepository implements AccessTokenRepository {
     return revocation.meta.changes === 1
   }
 
-  async useActiveToken(tokenHash: string, now: number): Promise<AccessToken | null> {
-    const tokenRow = await this.#db
+  async useToken(tokenHash: string, now: number): Promise<TokenUse> {
+    const activeRow = await this.#db
       .prepare(
         `UPDATE personal_access_tokens SET last_used_at = ?
          WHERE token_hash = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)
@@ -58,7 +58,10 @@ export class CloudflareAccessTokenRepository implements AccessTokenRepository {
       )
       .bind(now, tokenHash, now)
       .first<TokenRow>()
-    return tokenRow ? CloudflareAccessTokenRepository.#tokenOf(tokenRow) : null
+    if (activeRow) return { status: 'active', accessToken: CloudflareAccessTokenRepository.#tokenOf(activeRow) }
+    const refusedRow = await this.#db.prepare('SELECT revoked_at FROM personal_access_tokens WHERE token_hash = ?').bind(tokenHash).first<Pick<TokenRow, 'revoked_at'>>()
+    if (!refusedRow) return { status: 'unknown' }
+    return refusedRow.revoked_at === null ? { status: 'expired' } : { status: 'revoked' }
   }
 
   static #tokenOf(tokenRow: TokenRow): AccessToken {

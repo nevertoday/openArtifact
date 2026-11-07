@@ -5,23 +5,66 @@ import { dateText, fullTimeText, relativeTimeText } from './time-text.js'
 export { dateText }
 
 export class ApiError extends Error {
-  constructor(status, message) {
-    super(message)
+  /** `code`, `field` and `maxLength` come from the server's error body; see ErrorCode in src/http-error.ts. */
+  constructor(status, message, { code = null, field = null, maxLength = null, cause } = {}) {
+    super(message, { cause })
     this.status = status
+    this.code = code
+    this.field = field
+    this.maxLength = maxLength
   }
 }
 
-/** Calls the app's JSON API with the session cookie; throws ApiError with the server's message. */
+const FALLBACK_MESSAGE = '操作没有成功，请重试。'
+const NEW_TOKEN_HINT = '请在「Agent 接入」里新建一个。'
+
+// The one place an error code becomes Chinese. Keys follow ErrorCode in src/http-error.ts; `network` is the browser's own.
+const ERROR_MESSAGES = {
+  network: () => '连不上 Open Artifact，请检查网络后重试。',
+  unauthenticated: () => '登录已失效，请刷新页面重新登录。',
+  token_invalid: () => `这个 token 无效，${NEW_TOKEN_HINT}`,
+  token_revoked: () => `这个 token 已撤销，${NEW_TOKEN_HINT}`,
+  token_expired: () => `这个 token 已过期，${NEW_TOKEN_HINT}`,
+  forbidden: () => '你没有权限做这件事。',
+  admin_required: () => '只有 workspace 管理员可以做这件事。',
+  browser_session_required: () => '这件事要在网页上登录后做。',
+  outside_token_scope: () => '这个 token 只能发布。要做这件事，请新建一个完全权限的 token，或者在网页上操作。',
+  cross_site_request: () => '请在 Open Artifact 的页面上操作。',
+  removed_from_workspace: () => '你已被移出这个 workspace，请联系管理员。',
+  not_found: () => '找不到了，它可能已被删除。刷新页面看看。',
+  person_not_found: () => '这个邮箱还没登录过 Open Artifact。请对方先登录一次，再添加。',
+  field_required: () => '这一项不能为空。',
+  field_too_long: error => `最多 ${error.maxLength} 个字。`,
+  too_large: () => '内容太大，请减小后再试。',
+  last_admin: () => 'workspace 至少要有一位管理员。先把别人设为管理员。',
+  cannot_remove_self: () => '不能移除自己，请另一位管理员操作。',
+  author_always_sees: () => '作者自己一直能看到，不用添加。',
+  public_links_off: () => '管理员已关闭公开链接。',
+  version_conflict: () => '刚有人发布了新版本。刷新页面后再试。',
+}
+
+/**
+ * What to tell a person about a failed call, in Chinese; use it for every toast, banner and field error, since
+ * `error.message` stays in English for agents. When `error.field` names a field on the page, show it under that field.
+ */
+export function userMessageOf(error) {
+  const message = error instanceof ApiError ? ERROR_MESSAGES[error.code] : undefined
+  return message ? message(error) : FALLBACK_MESSAGE
+}
+
+/** Calls the app's JSON API with the session cookie; throws ApiError with the server's English message and its code. */
 export async function api(path, { method = 'GET', body } = {}) {
   const init = { method, credentials: 'same-origin', headers: {} }
   if (body !== undefined) {
     init.headers['Content-Type'] = 'application/json'
     init.body = JSON.stringify(body)
   }
-  const response = await fetch(path, init)
+  const response = await fetch(path, init).catch(error => {
+    throw new ApiError(0, `could not reach ${path}`, { code: 'network', cause: error })
+  })
   if (response.status === 204) return null
   const responseBody = await response.json().catch(() => ({}))
-  if (!response.ok) throw new ApiError(response.status, responseBody.error ?? `请求失败（${response.status}）`)
+  if (!response.ok) throw new ApiError(response.status, responseBody.error ?? `request failed with ${response.status}`, responseBody)
   return responseBody
 }
 
@@ -135,7 +178,7 @@ class NotificationBell {
       this.notifications = notifications
       this.render()
     } catch (error) {
-      this.list.replaceChildren(element('p', { className: 'app-notifications__status xxd-text', 'data-variant': 'secondary' }, `通知加载失败：${error.message}`))
+      this.list.replaceChildren(element('p', { className: 'app-notifications__status xxd-text', 'data-variant': 'secondary' }, `通知加载失败：${userMessageOf(error)}`))
     }
   }
 
@@ -179,7 +222,7 @@ class NotificationBell {
       for (const notification of this.notifications) notification.read = true
       this.render()
     } catch (error) {
-      Xxd.toast(error.message, { tone: 'danger', within: this.panel })
+      Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.panel })
     }
   }
 }

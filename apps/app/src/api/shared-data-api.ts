@@ -33,7 +33,7 @@ export class SharedDataApi {
     const documentData = requestBody.raw('data')
     if (documentData === undefined) throw HttpError.badRequest('data is required')
     const documentBytes = new TextEncoder().encode(JSON.stringify(documentData)).byteLength
-    if (documentBytes > MAX_DOCUMENT_BYTES) throw new HttpError(413, `a document must be at most ${MAX_DOCUMENT_BYTES / 1024} KB`)
+    if (documentBytes > MAX_DOCUMENT_BYTES) throw HttpError.tooLarge(`a document must be at most ${MAX_DOCUMENT_BYTES / 1024} KB`)
     const savedDocument = await this.#context.repositories.sharedData.putDocument(
       artifactId,
       SharedDataApi.#validName('collection', collection),

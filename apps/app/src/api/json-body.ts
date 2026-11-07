@@ -12,7 +12,7 @@ export class JsonBody {
 
   static async of(request: Request): Promise<JsonBody> {
     const declaredLength = Number(request.headers.get('Content-Length') ?? 0)
-    if (declaredLength > MAX_BODY_BYTES) throw new HttpError(413, `request body must be at most ${MAX_BODY_BYTES / 1024 / 1024} MB`)
+    if (declaredLength > MAX_BODY_BYTES) throw HttpError.tooLarge(`request body must be at most ${MAX_BODY_BYTES / 1024 / 1024} MB`)
     let parsedBody: unknown
     try {
       parsedBody = await request.json()
@@ -35,8 +35,8 @@ export class JsonBody {
   text(field: string, maxLength: number): string {
     const value = this.#fields[field]
     const trimmedValue = typeof value === 'string' ? value.trim() : ''
-    const isValidLength = trimmedValue.length > 0 && trimmedValue.length <= maxLength
-    if (!isValidLength) throw HttpError.badRequest(`${field} must be 1 to ${maxLength} characters`)
+    if (trimmedValue.length === 0) throw HttpError.fieldRequired(field, maxLength)
+    if (trimmedValue.length > maxLength) throw HttpError.fieldTooLong(field, maxLength)
     return trimmedValue
   }
 
@@ -53,14 +53,14 @@ export class JsonBody {
   boolean(field: string, defaultValue: boolean): boolean {
     const value = this.#fields[field]
     if (value === undefined) return defaultValue
-    if (typeof value !== 'boolean') throw HttpError.badRequest(`${field} must be true or false`)
+    if (typeof value !== 'boolean') throw HttpError.fieldInvalid(field, `${field} must be true or false`)
     return value
   }
 
   positiveInteger(field: string, hint: string): number {
     const value = this.#fields[field]
     const isPositiveInteger = Number.isInteger(value) && (value as number) >= 1
-    if (!isPositiveInteger) throw HttpError.badRequest(`${field} must be a positive integer; ${hint}`)
+    if (!isPositiveInteger) throw HttpError.fieldInvalid(field, `${field} must be a positive integer; ${hint}`)
     return value as number
   }
 
@@ -68,7 +68,7 @@ export class JsonBody {
     const value = this.#fields[field]
     if (value === undefined && defaultValue !== undefined) return defaultValue
     const choice = choices.find(candidate => candidate === value)
-    if (!choice) throw HttpError.badRequest(`${field} must be one of ${choices.join(', ')}`)
+    if (!choice) throw HttpError.fieldInvalid(field, `${field} must be one of ${choices.join(', ')}`)
     return choice
   }
 }

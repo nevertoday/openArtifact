@@ -50,20 +50,20 @@ export class ApiContext {
 
   async requireIdentity(): Promise<Identity> {
     const identity = await this.identity()
-    if (!identity) throw HttpError.unauthorized()
+    if (!identity) throw await this.requestIdentity.unauthorized()
     return identity
   }
 
   /** Token management and account settings stay out of reach of a leaked API token. */
   async requireBrowserSession(): Promise<Identity> {
-    if (this.requestIdentity.usesAccessToken) throw HttpError.forbidden('manage this with an API token; sign in on the web page instead')
+    if (this.requestIdentity.usesAccessToken) throw new HttpError(403, 'browser_session_required', 'you cannot manage this with an API token; sign in on the web page instead')
     return this.requireIdentity()
   }
 
   /** Workspace administration happens in the browser, by an admin of the current workspace. */
   async requireWorkspaceAdmin(action: string): Promise<Identity> {
     const identity = await this.requireBrowserSession()
-    if (identity.membership.role !== 'admin') throw HttpError.forbidden(`${action}; ask a workspace admin`)
+    if (identity.membership.role !== 'admin') throw HttpError.adminRequired(action)
     return identity
   }
 

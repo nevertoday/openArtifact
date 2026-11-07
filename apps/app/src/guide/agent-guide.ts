@@ -108,6 +108,7 @@ Collection names and ids: letters, digits, \`-\`, \`_\`; at most 64 characters. 
 - \`PATCH ${api}/comments/{commentId}\` \`{ resolved: true }\` resolves without a reply; \`false\` reopens.
 - \`GET ${api}/artifacts/{id}/data\`: the page's shared data collections, each \`{ collection, documentCount }\`.
 - \`GET ${api}/artifacts/{id}/data/{collection}\`: its documents, each \`{ id, data, createdBy, updatedBy, createdAt, updatedAt }\`. Read these to answer questions about sign-ups, votes or other data people entered.
+- Errors answer \`{ error, code }\`: \`error\` says in English what to do, \`code\` is stable (\`token_revoked\`, \`token_expired\`, \`token_invalid\`, \`outside_token_scope\`, \`version_conflict\`, \`not_found\`, \`field_required\`…); a field error also names its \`field\`. On \`token_revoked\` or \`token_expired\`, ask the person for a new token from 设置 › Agent 接入.
 `
   }
 }

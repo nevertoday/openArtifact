@@ -57,7 +57,7 @@ export class ArtifactFileJson {
     const validPath = ArtifactFileJson.#validPath(path)
     if (typeof content !== 'string') throw HttpError.badRequest(`${validPath}: content must be a string`)
     const body = ArtifactFileJson.#bodyOf(validPath, content, encoding)
-    if (body.byteLength > MAX_FILE_BYTES) throw new HttpError(413, `${validPath}: a file may be at most ${MAX_FILE_BYTES / 1024 / 1024} MB`)
+    if (body.byteLength > MAX_FILE_BYTES) throw HttpError.tooLarge(`${validPath}: a file may be at most ${MAX_FILE_BYTES / 1024 / 1024} MB`)
     return { path: validPath, contentType: ArtifactFileJson.#contentTypeOf(validPath, contentType), body }
   }
 
