@@ -202,7 +202,7 @@ ${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
     <td>${titleCell}</td>
     <td><span class="xxd-text" data-variant="secondary">${administration.names.get(summary.authorId)}</span></td>
     <td>${SettingsPage.#contentState(summary, administration.names, now)}</td>
-    <td><span class="xxd-text" data-variant="secondary">${ArtifactLabels.updatedAgo(summary.updatedAt, now)}</span></td>
+    <td><span class="xxd-text" data-variant="secondary">${PageShell.relativeTime(summary.updatedAt, now)}</span></td>
     <td class="xxd-table__actions">${SettingsPage.#contentAction(openedArtifact, identity)}</td>
   </tr>`
     }
@@ -238,7 +238,7 @@ ${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
     const { auditEvents, names } = administration
     const eventItem = (auditEvent: AuditEvent) => html`<li class="xxd-list__item"><span class="xxd-list__main">
     <span class="xxd-list__title">${SettingsPage.#auditSentence(auditEvent, names)}</span>
-    <span class="xxd-list__meta">${ArtifactLabels.updatedAgo(auditEvent.createdAt, now)}</span>
+    <span class="xxd-list__meta">${PageShell.relativeTime(auditEvent.createdAt, now)}</span>
   </span></li>`
     return html`<section class="xxd-stack" aria-labelledby="audit-title">
   <div class="xxd-text-pair">

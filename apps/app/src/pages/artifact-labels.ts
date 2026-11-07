@@ -1,4 +1,5 @@
 import type { ArtifactVisibility, WorkspaceRole } from '@open-artifact/core'
+import { relativeTimeText } from '../../public/static/time-text.js'
 
 const VISIBILITY_LABELS: Record<ArtifactVisibility, string> = {
   private: '私有',
@@ -11,9 +12,7 @@ const WEB_PAGE_LABEL = '网页'
 
 const ROLE_LABELS: Record<WorkspaceRole, string> = { admin: '管理员', member: '成员' }
 
-const MINUTE = 60_000
-const HOUR = 60 * MINUTE
-const DAY = 24 * HOUR
+const DAY = 24 * 60 * 60 * 1000
 
 /** Wording shared by every page that shows an artifact. */
 export class ArtifactLabels {
@@ -39,13 +38,8 @@ export class ArtifactLabels {
     return publishedVia ?? WEB_PAGE_LABEL
   }
 
+  /** Prefer PageShell.relativeTime, which also carries the full time on hover. */
   static updatedAgo(updatedAt: number, now: number): string {
-    const elapsed = Math.max(0, now - updatedAt)
-    if (elapsed < MINUTE) return '刚刚'
-    if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)} 分钟前`
-    if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)} 小时前`
-    if (elapsed < 2 * DAY) return '昨天'
-    if (elapsed < 7 * DAY) return `${Math.floor(elapsed / DAY)} 天前`
-    return new Date(updatedAt).toISOString().slice(0, 10)
+    return relativeTimeText(updatedAt, now)
   }
 }

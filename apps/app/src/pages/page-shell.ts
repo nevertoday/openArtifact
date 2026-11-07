@@ -1,4 +1,5 @@
 import type { Identity } from '../auth/request-identity.ts'
+import { fullTimeText, relativeTimeText } from '../../public/static/time-text.js'
 import { html, SafeHtml } from './html.ts'
 
 /** Kit icon names the pages use; the union keeps a misspelt name from reaching the browser. */
@@ -131,6 +132,11 @@ ${options.description ? html`<meta name="description" content="${options.descrip
 <select id="workspace-switcher" data-switch-workspace>
   ${identity.memberships.map(membership => html`<option value="${membership.workspace.workspaceId}" ${membership.workspace.workspaceId === currentWorkspaceId ? new SafeHtml('selected') : ''}>${membership.workspace.name}</option>`)}
 </select></label>`
+  }
+
+  /** 「3 分钟前」 with the full time on hover; common.js re-renders it in the reader's time zone. */
+  static relativeTime(timestamp: number, now: number): SafeHtml {
+    return html`<time datetime="${new Date(timestamp).toISOString()}" title="${fullTimeText(timestamp)}" data-relative>${relativeTimeText(timestamp, now)}</time>`
   }
 
   static initialOf(name: string): string {

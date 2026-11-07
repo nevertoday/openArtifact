@@ -1,5 +1,8 @@
 // Helpers shared by the page scripts. Text from people and agents is only ever set through textContent.
 // Toasts, copy buttons, menus, tabs and dialogs come from the UI kit's global `Xxd`.
+import { dateText, fullTimeText, relativeTimeText } from './time-text.js'
+
+export { dateText }
 
 export class ApiError extends Error {
   constructor(status, message) {
@@ -43,18 +46,23 @@ export function readJsonData(elementId) {
   return dataElement ? JSON.parse(dataElement.textContent) : null
 }
 
-const MINUTE = 60_000
-const HOUR = 60 * MINUTE
-const DAY = 24 * HOUR
-
+/** The words alone; prefer timeElement, which also carries the full time on hover. */
 export function timeAgo(timestamp) {
-  const elapsed = Math.max(0, Date.now() - timestamp)
-  if (elapsed < MINUTE) return '刚刚'
-  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)} 分钟前`
-  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)} 小时前`
-  if (elapsed < 2 * DAY) return '昨天'
-  if (elapsed < 7 * DAY) return `${Math.floor(elapsed / DAY)} 天前`
-  return new Date(timestamp).toLocaleDateString('zh-CN')
+  return relativeTimeText(timestamp, Date.now())
+}
+
+/** <time> reading 「3 分钟前」, with the full time on hover. */
+export function timeElement(timestamp) {
+  return element('time', { datetime: new Date(timestamp).toISOString(), title: fullTimeText(timestamp), 'data-relative': true }, timeAgo(timestamp))
+}
+
+// The server writes these in its own time zone; the reader's zone decides 昨天 and the date.
+function rerenderServerTimes() {
+  for (const timeTag of document.querySelectorAll('time[data-relative]')) {
+    const timestamp = Date.parse(timeTag.dateTime)
+    timeTag.textContent = timeAgo(timestamp)
+    timeTag.title = fullTimeText(timestamp)
+  }
 }
 
 /** 下架 is an admin removing someone else's artifact; 删除 is the author removing their own. */
@@ -182,6 +190,7 @@ function wireNotificationBell() {
   if (bell && panel) new NotificationBell(bell, panel).refresh()
 }
 
+rerenderServerTimes()
 wireSignOut()
 wireWorkspaceSwitcher()
 wireNotificationBell()

@@ -168,7 +168,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
       if (removal === null) throw new Error(`Artifact ${summary.artifactId} is listed as removed but has no removal`)
       return html`<tr data-removed-row="${summary.artifactId}">
     <td>${summary.title}</td>
-    <td><span class="xxd-text" data-variant="secondary">${model.authorNames.get(removal.removedBy)} ${ArtifactLabels.removal(removal.removedAsAdmin)} · ${ArtifactLabels.updatedAgo(removal.removedAt, model.now)}</span></td>
+    <td><span class="xxd-text" data-variant="secondary">${model.authorNames.get(removal.removedBy)} ${ArtifactLabels.removal(removal.removedAsAdmin)} · ${PageShell.relativeTime(removal.removedAt, model.now)}</span></td>
     <td><span class="xxd-text" data-variant="secondary">${ArtifactLabels.purgeIn(removal.purgeAt, model.now)}</span></td>
     <td class="xxd-table__actions"><button type="button" class="xxd-btn" data-size="xs" data-restore-artifact="${summary.artifactId}" data-title="${summary.title}">${PageShell.icon('RotateCcw', 14)}恢复</button></td>
   </tr>`
@@ -234,7 +234,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
       <span>${model.authorNames.get(summary.authorId)}</span>
       <span>${ArtifactLabels.publishedVia(summary.publishedVia)}</span>
       <span class="xxd-mono">v${summary.version}</span>
-      <span>${ArtifactLabels.updatedAgo(summary.updatedAt, model.now)}</span>
+      <span>${PageShell.relativeTime(summary.updatedAt, model.now)}</span>
     </p>
     <div class="xxd-cluster artifact-card__badges">
       <span class="xxd-badge">${ArtifactLabels.visibility(summary.sharing.visibility)}</span>

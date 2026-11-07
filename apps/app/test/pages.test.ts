@@ -100,6 +100,14 @@ describe('home page', () => {
     expect(reviewerForMeMarkup).not.toContain('Answered me')
   })
 
+  it('says when each artifact changed as a relative time with the full time on hover', async () => {
+    await app.publish({ token: agentToken }, 'Timed page')
+
+    const homeMarkup = await pageText('/', authorCookie)
+
+    expect(homeMarkup).toMatch(/<time datetime="\d{4}-\d{2}-\d{2}T[^"]+" title="\d{4}-\d{2}-\d{2} \d{2}:\d{2}" data-relative>刚刚<\/time>/)
+  })
+
   it('shows live previews from the usercontent origin, isolated from the app', async () => {
     const homeResponse = await app.request('/', { cookie: authorCookie })
     const homeMarkup = await homeResponse.text()

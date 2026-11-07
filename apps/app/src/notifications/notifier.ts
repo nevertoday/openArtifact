@@ -1,4 +1,5 @@
 import { CommentThread, type ArtifactComment, type ArtifactSummary, type GrantRole, type NewNotification, type NotificationKind, type Repositories } from '@open-artifact/core'
+import { dateText } from '../../public/static/time-text.js'
 import type { Mailer } from '../auth/mailer.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { NotificationText } from './notification-text.ts'
@@ -127,7 +128,7 @@ export class Notifier {
       case 'public_link_opened': {
         if (event.kind !== 'public_link_opened_by_agent') return null
         const daysLeft = Math.round((event.expiresAt - Date.now()) / DAY_MS)
-        const expiryDate = new Date(event.expiresAt).toISOString().slice(0, 10)
+        const expiryDate = dateText(event.expiresAt)
         const subject = `${NotificationText.sentence(kind, actorLabel, artifactTitle)}，${daysLeft} 天后过期`
         return { subject, body: `${subject}（${expiryDate}）。拿到链接的人不用登录就能打开。要改过期时间或取消公开，打开页面后点「分享」。` }
       }

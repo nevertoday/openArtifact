@@ -1,4 +1,4 @@
-import { api, confirmArtifactRemoval, element, readJsonData, removalWord, removeArtifact, restoreArtifact, timeAgo } from './common.js'
+import { api, confirmArtifactRemoval, element, readJsonData, removalWord, removeArtifact, restoreArtifact, dateText, timeElement } from './common.js'
 
 const settingsConfig = readJsonData('settings-config')
 const TOKEN_SCOPE_LABELS = { publish: '仅发布', full: '完全权限' }
@@ -20,8 +20,8 @@ function tokenStateOf(accessToken) {
 const TOKEN_COLUMNS = [
   { label: '名称', cell: accessToken => accessToken.name },
   { label: '权限', cell: accessToken => secondaryText(TOKEN_SCOPE_LABELS[accessToken.scope]) },
-  { label: '最近使用', cell: accessToken => secondaryText(accessToken.lastUsedAt ? timeAgo(accessToken.lastUsedAt) : '还没用过') },
-  { label: '到期', cell: accessToken => secondaryText(accessToken.expiresAt ? new Date(accessToken.expiresAt).toLocaleDateString('zh-CN') : '永不过期') },
+  { label: '最近使用', cell: accessToken => secondaryText(accessToken.lastUsedAt ? timeElement(accessToken.lastUsedAt) : '还没用过') },
+  { label: '到期', cell: accessToken => secondaryText(accessToken.expiresAt ? dateText(accessToken.expiresAt) : '永不过期') },
   {
     label: '状态',
     cell: accessToken => {
@@ -360,7 +360,7 @@ class PendingInvites {
 
   #item(invite) {
     const subject = invite.email ?? '邀请链接 · 任何人可用'
-    const expiry = new Date(invite.expiresAt).toLocaleDateString('zh-CN')
+    const expiry = dateText(invite.expiresAt)
     return element('li', { className: 'xxd-list__item' },
       element('span', { className: 'xxd-list__main' },
         element('span', { className: 'xxd-list__title' }, subject),
