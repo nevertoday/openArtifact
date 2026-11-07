@@ -127,7 +127,7 @@ describe('an email invite', () => {
 
     expect(invited.status).toBe(201)
     expect(invited.body.invites.map(invite => invite.email)).toEqual(['wu@partner.org', 'chen@partner.org'])
-    expect(mail?.subject).toBe('admin 邀请你加入 设计组')
+    expect(mail?.subject).toBe('admin 邀请你加入 设计组 / admin invited you to join 设计组')
     expect(mail?.text).toContain(invited.body.invites[0]?.url)
     expect(wu.body.workspace.name).toBe('设计组')
     expect(stillPending.map(invite => invite.email)).not.toContain('wu@partner.org')

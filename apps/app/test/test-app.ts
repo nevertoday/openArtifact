@@ -65,6 +65,8 @@ export class TestApp {
       MCP_ORIGIN: 'http://mcp.test',
       BETTER_AUTH_SECRET: 'test-better-auth-secret-of-enough-length',
       USERCONTENT_SIGNING_KEY: SIGNING_KEY,
+      // Tests assert Chinese wording, so they hold the default language fixed whatever a deployment sets.
+      DEFAULT_LOCALE: 'zh-CN',
     }
     this.routes = new AppRoutes({ env: appEnv, repositories: this.repositories, mailer: this.mailer, mcpUrl: 'http://mcp.test/mcp' })
   }

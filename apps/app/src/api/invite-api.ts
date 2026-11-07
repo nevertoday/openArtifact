@@ -73,7 +73,7 @@ export class InviteApi {
       invites.map(invite =>
         this.#context.mailer.send({
           to: InviteApi.#addressOf(invite),
-          subject: messagesFor(inviterLocale).mail.invite.subject(details),
+          subject: inviteWords.map(words => words.subject(details)).join(' / '),
           text: inviteWords.map(words => words.body({ ...details, url: this.#context.inviteUrl(invite.code) })).join('\n\n---\n\n'),
         }),
       ),

@@ -76,7 +76,7 @@ describe('server text in the reader’s language', () => {
     const [english = '', chinese = ''] = mail?.text.split('\n\n---\n\n') ?? []
 
     expect(invited.status).toBe(201)
-    expect(mail?.subject).toBe('lin invited you to join My team')
+    expect(mail?.subject).toMatch(/^lin invited you to join My team \/ lin 邀请你加入 My team$/)
     expect(english).toContain('lin invited you to join My team on Open Artifact.')
     expect(english).toContain('It works for 7 days')
     expect(english).toContain(invited.body.invites[0]?.url)
