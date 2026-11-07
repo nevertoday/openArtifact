@@ -255,7 +255,8 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
       const isCurrent = model.query.filter === filter && model.query.agent === null
       const count = model.listing.countFor(filter)
       const somethingWaits = WAITING_FILTERS.some(waitingFilter => waitingFilter === filter) && count > 0
-      return html`<a class="xxd-sidebar__item" ${filter === 'removed' ? html`data-removed-count` : ''} href="${HomePage.#homePath({ filter, agent: null, search })}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(FILTER_ICONS[filter], 18)}<span>${FILTER_LABELS[filter]}</span><span class="xxd-badge" ${somethingWaits ? html`data-tone="warning"` : ''} title="${count} 个 artifact">${count}</span></a>`
+      // An empty badge is hidden: a column of zeros says nothing, so only a filter holding something shows its count.
+      return html`<a class="xxd-sidebar__item" ${filter === 'removed' ? html`data-removed-count` : ''} href="${HomePage.#homePath({ filter, agent: null, search })}" ${isCurrent ? html`aria-current="page"` : ''}>${PageShell.icon(FILTER_ICONS[filter], 18)}<span>${FILTER_LABELS[filter]}</span><span class="xxd-badge" ${somethingWaits ? html`data-tone="warning"` : ''} title="${count} 个 artifact">${count > 0 ? count : ''}</span></a>`
     }
     const agentLink = ({ agent, count }: { agent: string; count: number }) => {
       const isCurrent = model.query.agent === agent

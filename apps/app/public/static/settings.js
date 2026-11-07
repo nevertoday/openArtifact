@@ -52,9 +52,10 @@ class TokenTable {
     const inactiveTokens = accessTokens.filter(accessToken => !tokenStateOf(accessToken).isActive)
     const inactiveFold = element('details', { className: 'xxd-collapse token-fold', open: showInactive },
       element('summary', {}, `显示已失效的 token（${inactiveTokens.length}）`), this.#table(inactiveTokens, null))
+    // replaceChildren writes a null child out as the text "null", so the fold is left out rather than passed as null.
     this.container.replaceChildren(
       activeTokens.length > 0 ? this.#table(activeTokens, justCreatedTokenId) : secondaryText('没有有效的 token。'),
-      inactiveTokens.length > 0 ? inactiveFold : null,
+      ...(inactiveTokens.length > 0 ? [inactiveFold] : []),
     )
   }
 

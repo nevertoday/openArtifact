@@ -1,4 +1,14 @@
-/* Only what the UI kit has no component for: the app frame, artifact covers, settings, login. The viewer has viewer.css. Kit tokens only. */
+/* Only what the UI kit has no component for: the app frame, artifact covers, settings, login. The viewer has viewer.css. Kit tokens only,
+   except the page-title size below, which the kit's scale has no step for. */
+
+/* Type scale of the app's own pages. The kit sets 13px everywhere, which suits menus and toolbars; the pages people
+   read get one step more, and the page title a clear jump above the section headings, so what matters is seen first. */
+:root { --app-title-size: 32px; --app-title-leading: 40px; }
+.app-main .xxd-page-header__title { font-size: var(--app-title-size); line-height: var(--app-title-leading); letter-spacing: -0.01em; }
+.app-main .xxd-page-header__desc { font-size: var(--text-base); line-height: var(--leading-md); }
+.app-main :is(.xxd-text:not([data-variant]), .xxd-text[data-variant="secondary"], .xxd-help, .xxd-empty__text) { font-size: var(--text-base); line-height: var(--leading-md); }
+.app-sidebar .xxd-sidebar__item { font-size: var(--text-base); }
+@media (max-width: 640px) { :root { --app-title-size: 26px; --app-title-leading: 32px; } }
 
 /* App frame: top bar, side navigation, one content column. */
 .app-topbar { position: sticky; top: 0; z-index: var(--z-dock); gap: var(--space-3); }
@@ -49,7 +59,8 @@
 .artifact-grid { --grid-min: 240px; grid-auto-rows: 1fr; }
 /* Every card in a row is as tall as the tallest; a long title stops at two lines and shows in full on hover. */
 .artifact-card .xxd-card__body { grid-template-rows: auto auto auto 1fr; }
-.artifact-card__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.artifact-card__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--text-md); line-height: var(--leading-md); }
+.artifact-card .xxd-card__meta { font-size: var(--text-sm); }
 .artifact-cover { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--inset-md); --ratio: 16 / 9; }
 .artifact-cover__title { width: 55%; height: 10px; background: var(--line-strong); }
 .artifact-cover__line { width: 80%; height: 6px; background: var(--line); }
@@ -67,6 +78,9 @@
 
 /* Home: the count under the heading, and the filters. Below 1024px the side navigation becomes rows above the cards. */
 .home-result-line { margin: 0 0 var(--space-3); }
+/* Counts are quiet figures beside the label; only a count that asks for action (data-tone) keeps the badge's fill. */
+.home-sidebar .xxd-badge:empty { display: none; }
+.home-sidebar .xxd-badge:not([data-tone]) { border-color: transparent; background: transparent; color: var(--muted); font-variant-numeric: tabular-nums; }
 .home-sidebar__sources { margin-top: var(--space-4); }
 .home-source-picker { display: none; }
 @media (max-width: 1024px) {

@@ -17,8 +17,8 @@ button.viewer-visibility { cursor: pointer; }
 @media (hover: hover) { button.viewer-visibility:hover { border-color: var(--line-control-hover); color: var(--ink); } }
 .viewer-count-button { gap: var(--space-1-5); }
 .viewer-count { min-width: 18px; height: 18px; padding: 0 5px; background: var(--ink); color: var(--paper); font: var(--weight-medium) 11px / 18px var(--font-body); text-align: center; font-variant-numeric: tabular-nums; }
-.viewer-count:empty { display: none; }
-.viewer-count[data-zero] { background: var(--wash-strong); color: var(--muted); }
+/* No open comments shows the icon alone; the button's label still says the count to a screen reader. */
+.viewer-count:empty, .viewer-count[data-zero] { display: none; }
 .viewer-comment-mode[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
 .viewer-sign-in { padding-inline: var(--space-2); white-space: nowrap; }
 .viewer-more-menu__visibility { display: none; }
