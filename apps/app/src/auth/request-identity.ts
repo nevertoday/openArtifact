@@ -123,8 +123,16 @@ export class RequestIdentity {
   }
 
   #agentClient(): string {
-    const declaredClient = this.#request.headers.get(AGENT_CLIENT_HEADER)?.trim().slice(0, MAX_AGENT_CLIENT_LENGTH)
-    return declaredClient && declaredClient.length > 0 ? declaredClient : DIRECT_API_CLIENT
+    const declaredClient = this.#request.headers.get(AGENT_CLIENT_HEADER)?.trim() ?? ''
+    return declaredClient.length > 0 ? RequestIdentity.#shortClientName(declaredClient) : DIRECT_API_CLIENT
+  }
+
+  // A long name is cut at the last word that fits, never inside a word, and says it was cut.
+  static #shortClientName(clientName: string): string {
+    if (clientName.length <= MAX_AGENT_CLIENT_LENGTH) return clientName
+    const fitting = clientName.slice(0, MAX_AGENT_CLIENT_LENGTH - 1)
+    const lastSpace = fitting.lastIndexOf(' ')
+    return `${(lastSpace > 0 ? fitting.slice(0, lastSpace) : fitting).trimEnd()}…`
   }
 
   static #bearerToken(request: Request): string | null {

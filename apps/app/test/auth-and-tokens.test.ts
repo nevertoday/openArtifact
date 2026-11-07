@@ -62,6 +62,17 @@ describe('signing in', () => {
 })
 
 describe('personal API tokens', () => {
+  it('names a long agent client without cutting a word in half', async () => {
+    const cookie = await app.signIn('lin@example.com')
+    const { body } = await app.json<{ token: string }>('/api/tokens', { method: 'POST', cookie, body: { name: 'long client', expiresInDays: 30 } })
+
+    const published = await app.publish({ token: body.token, agentClient: 'Acme Research Assistant for Quarterly Planning Reviews' }, 'Long client name')
+    const read = await app.json<{ publishedVia: string }>(`/api/artifacts/${published.artifactId}`, { cookie })
+
+    expect(read.body.publishedVia).toBe('Acme Research Assistant for Quarterly…')
+  })
+
+
   it('shows the token once, stores only what it needs, and lets an agent act as its person', async () => {
     const cookie = await app.signIn('lin@example.com')
     const created = await app.json<{ token: string; name: string; expiresAt: number }>('/api/tokens', { method: 'POST', cookie, body: { name: 'Claude Code · laptop', expiresInDays: 30 } })
