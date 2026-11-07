@@ -11,6 +11,15 @@ export interface CommentAnchor {
   selector: string | null
   /** The start of the clicked element's text. */
   textQuote: string | null
+  /** The words the person selected when the comment is about a passage rather than a whole element. */
+  quote: CommentQuote | null
+}
+
+/** Selected words with a little of the text around them, so the same words are found again if they occur twice. */
+export interface CommentQuote {
+  exact: string
+  prefix: string
+  suffix: string
 }
 
 export interface ArtifactComment {

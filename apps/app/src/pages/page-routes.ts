@@ -1,4 +1,4 @@
-import { CommentThread, PublicLinkPassword, UsercontentSignature, type Invite } from '@open-artifact/core'
+import { CommentThread, PublicLinkPassword, type Invite } from '@open-artifact/core'
 import { ArtifactGate, type OpenedArtifact } from '../access/artifact-gate.ts'
 import type { ApiContext } from '../api/api-context.ts'
 import { INVITE_COOKIE } from '../auth/admission.ts'
@@ -12,7 +12,6 @@ import { SettingsPage, type WorkspaceAdministration } from './settings-page.ts'
 import { SETTINGS_SECTIONS, type SettingsSection } from './settings-sections.ts'
 import { ViewerPage, type OlderVersion, type ViewerModel } from './viewer-page.ts'
 
-const SIGNED_URL_LIFETIME_MS = 6 * 60 * 60 * 1000
 const UNLOCK_COOKIE_SECONDS = 30 * 24 * 60 * 60
 const MAX_LIVE_PREVIEWS = 12
 const AUDIT_EVENTS_SHOWN = 50
@@ -21,7 +20,6 @@ const YEAR_SECONDS = 365 * 24 * 60 * 60
 export interface PageRouteSettings {
   usercontentOrigin: string
   mcpUrl: string
-  usercontentSignature: UsercontentSignature
   unlockRateLimiter: RateLimit
 }
 
@@ -126,7 +124,6 @@ export class PageRoutes {
     const showsOlderVersion = shownVersion !== openedArtifact.summary.version
     if (showsOlderVersion && !openedArtifact.permissions.canSeeVersions) return identity ? MessagePages.notFound(null) : this.#redirectToLogin(request)
     const now = Date.now()
-    const signedPrefix = await this.#settings.usercontentSignature.signedPrefix(artifactId, shownVersion, now + SIGNED_URL_LIFETIME_MS)
     const authorNames = await this.#context.people.namesOf([openedArtifact.summary.authorId])
     return {
       openedArtifact,
@@ -134,7 +131,7 @@ export class PageRoutes {
       authorName: authorNames.get(openedArtifact.summary.authorId) ?? '',
       shownVersion,
       olderVersion: shownVersion === openedArtifact.summary.version ? null : await this.#olderVersion(artifactId, shownVersion),
-      artifactUrl: `${this.#settings.usercontentOrigin}${signedPrefix}index.html`,
+      artifactUrl: await this.#context.artifactPages.entryPageUrl(artifactId, shownVersion, now),
       usercontentOrigin: this.#settings.usercontentOrigin,
       now,
     }
@@ -183,12 +180,12 @@ export class PageRoutes {
 
   // Live previews of the first cards stand in for screenshots; the rest keep their colour cover.
   async #previewUrls(shownArtifacts: OpenedArtifact[]): Promise<Map<string, string>> {
-    const expiresAt = Date.now() + SIGNED_URL_LIFETIME_MS
+    const now = Date.now()
     const previewedArtifacts = shownArtifacts.filter(openedArtifact => openedArtifact.permissions.canView).slice(0, MAX_LIVE_PREVIEWS)
     const previewUrls = await Promise.all(
       previewedArtifacts.map(async ({ summary }) => {
-        const signedPrefix = await this.#settings.usercontentSignature.signedPrefix(summary.artifactId, summary.version, expiresAt)
-        return [summary.artifactId, `${this.#settings.usercontentOrigin}${signedPrefix}index.html?preview`] as const
+        const entryPageUrl = await this.#context.artifactPages.entryPageUrl(summary.artifactId, summary.version, now)
+        return [summary.artifactId, `${entryPageUrl}?preview`] as const
       }),
     )
     return new Map(previewUrls)

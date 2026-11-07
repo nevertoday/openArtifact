@@ -1,4 +1,4 @@
-import { CommentThread, type ArtifactComment, type CommentAnchor } from '@open-artifact/core'
+import { CommentThread, type ArtifactComment, type CommentAnchor, type CommentQuote } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import { NotificationText } from '../notifications/notification-text.ts'
 import { HttpError } from '../http-error.ts'
@@ -8,6 +8,8 @@ import { JsonBody } from './json-body.ts'
 const MAX_COMMENT_LENGTH = 5000
 const MAX_ANCHOR_SELECTOR_LENGTH = 512
 const MAX_ANCHOR_QUOTE_LENGTH = 120
+const MAX_SELECTED_TEXT_LENGTH = 500
+const MAX_SELECTION_CONTEXT_LENGTH = 64
 const COMMENT_FILTERS = ['all', 'unresolved', 'for_agent'] as const
 type CommentFilter = (typeof COMMENT_FILTERS)[number]
 
@@ -93,7 +95,8 @@ export class CommentApi {
   }
 
   // Only a top-level comment points at the page. x and y are fractions of the page's width and height; the
-  // element's CSS path and text let the pin find its spot again after the page changes.
+  // element's CSS path and text let the pin find its spot again after the page changes, and the selected words
+  // say which passage of the element the comment is about.
   static #anchorOf(requestBody: JsonBody, currentVersion: number): CommentAnchor | null {
     const anchor = requestBody.raw('anchor')
     if (anchor === undefined || anchor === null) return null
@@ -107,7 +110,18 @@ export class CommentApi {
       version: CommentApi.#anchorVersionOf(anchorFields.version, currentVersion),
       selector: CommentApi.#anchorTextOf(anchorFields, 'selector', MAX_ANCHOR_SELECTOR_LENGTH),
       textQuote: CommentApi.#anchorTextOf(anchorFields, 'textQuote', MAX_ANCHOR_QUOTE_LENGTH),
+      quote: CommentApi.#quoteOf(anchorFields.quote),
     }
+  }
+
+  static #quoteOf(quote: unknown): CommentQuote | null {
+    if (quote === undefined || quote === null) return null
+    const quoteFields = (typeof quote === 'object' ? quote : {}) as Record<string, unknown>
+    const isText = (value: unknown, minLength: number, maxLength: number): value is string => typeof value === 'string' && value.length >= minLength && value.length <= maxLength
+    const { exact, prefix = '', suffix = '' } = quoteFields
+    const isValidQuote = isText(exact, 1, MAX_SELECTED_TEXT_LENGTH) && isText(prefix, 0, MAX_SELECTION_CONTEXT_LENGTH) && isText(suffix, 0, MAX_SELECTION_CONTEXT_LENGTH)
+    if (!isValidQuote) throw HttpError.badRequest(`anchor.quote must be { exact, prefix, suffix }: the selected text, 1 to ${MAX_SELECTED_TEXT_LENGTH} characters, and up to ${MAX_SELECTION_CONTEXT_LENGTH} characters around it`)
+    return { exact, prefix, suffix }
   }
 
   /** A pin placed without a version was placed on the current one. */
@@ -188,6 +202,7 @@ export class CommentApi {
       postedVia: comment.postedVia,
       anchor: comment.anchor,
       resolved: comment.resolvedAt !== null,
+      resolvedAt: comment.resolvedAt,
       resolvedBy: comment.resolvedBy === null ? null : { userId: comment.resolvedBy, name: names.get(comment.resolvedBy) },
       createdAt: comment.createdAt,
     }

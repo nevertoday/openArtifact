@@ -1,5 +1,6 @@
 import { SigningKey, UsercontentSignature } from '@open-artifact/core'
 import { ArtifactGate } from './access/artifact-gate.ts'
+import { ArtifactPageAddress } from './access/artifact-page-address.ts'
 import { ApiContext } from './api/api-context.ts'
 import { ApiRoutes } from './api/api-routes.ts'
 import { Admission } from './auth/admission.ts'
@@ -30,10 +31,12 @@ export interface AppDependencies {
 export class AppRoutes {
   readonly #dependencies: AppDependencies
   readonly #signingKey: SigningKey
+  readonly #artifactPages: ArtifactPageAddress
 
   constructor(dependencies: AppDependencies) {
     this.#dependencies = dependencies
     this.#signingKey = new SigningKey(dependencies.env.USERCONTENT_SIGNING_KEY)
+    this.#artifactPages = new ArtifactPageAddress(dependencies.env.USERCONTENT_ORIGIN, new UsercontentSignature(this.#signingKey))
   }
 
   async respond(request: Request): Promise<Response> {
@@ -55,7 +58,6 @@ export class AppRoutes {
     const pageRoutes = new PageRoutes(context, {
       usercontentOrigin: this.#dependencies.env.USERCONTENT_ORIGIN,
       mcpUrl: this.#dependencies.mcpUrl,
-      usercontentSignature: new UsercontentSignature(this.#signingKey),
       unlockRateLimiter: this.#dependencies.env.UNLOCK_RATE_LIMITER,
     })
     const unlockMatch = UNLOCK.exec(requestUrl)
@@ -90,6 +92,7 @@ export class AppRoutes {
       auth,
       admission,
       appOrigin,
+      artifactPages: this.#artifactPages,
     })
   }
 

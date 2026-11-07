@@ -79,7 +79,7 @@ export class AgentGuide {
 ### Comments addressed to you
 People mark comments 给 agent when they want an agent to act. When you start a session, or the person asks you to check:
 1. \`list_my_comments\` returns the unresolved comments addressed to an agent on every artifact you can edit, oldest first. Each names the artifact, its current \`version\`, the comment's \`anchor\` and any replies.
-2. \`read\` the artifact and find the spot: \`anchor.selector\` is a CSS path to the element the person clicked and \`anchor.textQuote\` the start of its text, both as of \`anchor.version\`. Older comments only have \`x\` and \`y\`, fractions of the page's width and height.
+2. \`read\` the artifact and find the spot: \`anchor.selector\` is a CSS path to the element the person clicked and \`anchor.textQuote\` the start of its text, both as of \`anchor.version\`. When the person selected words, \`anchor.quote.exact\` holds them, with \`prefix\` and \`suffix\` from the text around them. Older comments only have \`x\` and \`y\`, fractions of the page's width and height.
 3. Make the change and publish it with \`update\`, with a \`note\` that says which comment it answers.
 4. \`reply_comment\` with \`resolve: true\`, saying what you changed and in which version. Leave \`resolve\` false only when you need the person to answer first.
 To look at one artifact only, \`list_comments\` with \`filter: "for_agent"\`.

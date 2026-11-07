@@ -20,7 +20,7 @@ export type {
 } from './artifact-repository.ts'
 export { ArtifactRemoval } from './artifact-removal.ts'
 export type { AuditAction, AuditChange, AuditEvent, AuditLog, NewAuditEvent } from './audit-log.ts'
-export type { ArtifactComment, CommentAnchor, CommentRepository, NewComment } from './comment-repository.ts'
+export type { ArtifactComment, CommentAnchor, CommentQuote, CommentRepository, NewComment } from './comment-repository.ts'
 export { CommentThread } from './comment-thread.ts'
 export { NOTIFICATION_KINDS } from './notification-repository.ts'
 export type { NewNotification, Notification, NotificationKind, NotificationRepository } from './notification-repository.ts'

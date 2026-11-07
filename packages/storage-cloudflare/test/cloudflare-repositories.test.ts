@@ -164,7 +164,7 @@ describe('artifact access, comments and shared data', () => {
     const commentRepository = new CloudflareCommentRepository(env.DB)
     const { artifactId } = await createArtifactIn(workspaceId, authorId)
 
-    const agentRequest = await commentRepository.add({ artifactId, parentId: null, authorId: reviewerId, body: 'Add the R2 write to the diagram', forAgent: true, postedVia: null, anchor: { x: 0.25, y: 0.5, version: 1, selector: 'main > h2', textQuote: 'Storage' } })
+    const agentRequest = await commentRepository.add({ artifactId, parentId: null, authorId: reviewerId, body: 'Add the R2 write to the diagram', forAgent: true, postedVia: null, anchor: { x: 0.25, y: 0.5, version: 1, selector: 'main > h2', textQuote: 'Storage', quote: { exact: 'R2', prefix: 'the ', suffix: ' write' } } })
     await commentRepository.add({ artifactId, parentId: agentRequest.commentId, authorId, body: 'Done in v2', forAgent: false, postedVia: 'Claude Code', anchor: null })
     const openBefore = await commentRepository.listInOpenThreads(workspaceId)
     await commentRepository.setResolved(agentRequest.commentId, authorId)
@@ -177,7 +177,7 @@ describe('artifact access, comments and shared data', () => {
     ])
     expect(openBefore.filter(comment => comment.artifactId === artifactId).map(comment => comment.body)).toEqual(['Add the R2 write to the diagram', 'Done in v2'])
     expect(openAfter.filter(comment => comment.artifactId === artifactId)).toEqual([])
-    expect(await commentRepository.find(agentRequest.commentId)).toMatchObject({ resolvedBy: authorId, forAgent: true, anchor: { x: 0.25, y: 0.5, version: 1, selector: 'main > h2', textQuote: 'Storage' } })
+    expect(await commentRepository.find(agentRequest.commentId)).toMatchObject({ resolvedBy: authorId, forAgent: true, anchor: { x: 0.25, y: 0.5, version: 1, selector: 'main > h2', textQuote: 'Storage', quote: { exact: 'R2', prefix: 'the ', suffix: ' write' } } })
 
     await commentRepository.setResolved(agentRequest.commentId, null)
     expect(await commentRepository.find(agentRequest.commentId)).toMatchObject({ resolvedAt: null, resolvedBy: null })
@@ -190,7 +190,7 @@ describe('artifact access, comments and shared data', () => {
       .bind('old-pinned-comment', artifactId, reviewerId, 'old pin', JSON.stringify({ x: 0.1, y: 0.2 }), Date.now())
       .run()
 
-    expect((await commentRepository.find('old-pinned-comment'))?.anchor).toEqual({ x: 0.1, y: 0.2, version: null, selector: null, textQuote: null })
+    expect((await commentRepository.find('old-pinned-comment'))?.anchor).toEqual({ x: 0.1, y: 0.2, version: null, selector: null, textQuote: null, quote: null })
   })
 
   it('keeps shared documents per collection with who created and last changed them', async () => {

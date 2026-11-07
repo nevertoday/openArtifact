@@ -148,6 +148,17 @@ export class ArtifactApi {
     return Response.json({ versions })
   }
 
+  /** The signed address of a version's page, so the viewer can show another version without reloading itself. */
+  async versionPage(request: Request, artifactId: string, version: number): Promise<Response> {
+    const identity = await this.#context.identity()
+    const openedArtifact = await this.#context.gate.require(artifactId, identity, request, 'canView', 'view this artifact')
+    const isCurrentVersion = version === openedArtifact.summary.version
+    if (!isCurrentVersion) ArtifactGate.demand(openedArtifact, identity, 'canSeeVersions', 'see older versions of this artifact')
+    const versionExists = version >= 1 && version <= openedArtifact.summary.version
+    if (!versionExists) throw HttpError.notFound(`version ${version} of artifact ${artifactId}`)
+    return Response.json({ version, url: await this.#context.artifactPages.entryPageUrl(artifactId, version, Date.now()) })
+  }
+
   /**
    * Publishes the files of an older version as a new version; history is never rewritten. Undoing a restore
    * is one more restore, of the version it replaced.

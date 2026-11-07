@@ -27,6 +27,8 @@ interface CommentJson {
   forAgent: boolean
   postedVia: string | null
   resolved: boolean
+  resolvedAt: number | null
+  resolvedBy: { name: string } | null
   author: { name: string }
 }
 
@@ -181,11 +183,12 @@ describe('the comment loop with an agent', () => {
     expect(reply.body.comment).toMatchObject({ postedVia: 'Claude Code', parentId: request.body.comment.commentId, forAgent: false })
     expect(resolve.status).toBe(200)
     expect(forAgentAfter.body.comments).toEqual([])
-    expect(everything.body.comments.map(comment => [comment.body, comment.resolved])).toEqual([
-      ['第 3 节少了一条线', true],
-      ['整体不错', false],
-      ['已在 v2 补上', false],
+    expect(everything.body.comments.map(comment => [comment.body, comment.resolved, comment.resolvedBy?.name ?? null])).toEqual([
+      ['第 3 节少了一条线', true, 'lin'],
+      ['整体不错', false, null],
+      ['已在 v2 补上', false, null],
     ])
+    expect(everything.body.comments[0]?.resolvedAt).toBeGreaterThan(0)
     expect(app.mailer.lastTo('lin@example.com')?.subject).toBe('zhou 在「Design doc」发表了评论')
     expect(app.mailer.sent.filter(email => email.to === 'zhou@example.com').map(email => email.subject)).toContain('Claude Code（代 lin）在「Design doc」回复了评论')
   })
@@ -228,7 +231,7 @@ describe('the comment loop with an agent', () => {
     const offPage = await app.request(commentsPath, { method: 'POST', cookie: reviewerCookie, body: { body: 'x', anchor: { x: 1.5, y: 0.2 } } })
     const reply = await app.json<{ comment: CommentJson & { anchor: unknown } }>(commentsPath, { method: 'POST', cookie: authorCookie, body: { body: '改了', parentId: pinned.body.comment.commentId, anchor: { x: 0.1, y: 0.1 } } })
 
-    expect(pinned.body.comment.anchor).toEqual({ x: 0.1235, y: 0.5, version: 1, selector: null, textQuote: null })
+    expect(pinned.body.comment.anchor).toEqual({ x: 0.1235, y: 0.5, version: 1, selector: null, textQuote: null, quote: null })
     expect(offPage.status).toBe(400)
     expect(reply.body.comment.anchor).toBeNull()
   })
@@ -245,10 +248,25 @@ describe('the comment loop with an agent', () => {
     const longQuote = await pin({ x: 0.2, y: 0.3, textQuote: 'x'.repeat(121) })
     const selectorNumber = await pin({ x: 0.2, y: 0.3, selector: 42 })
 
-    expect(onElement.body.comment.anchor).toEqual({ x: 0.2, y: 0.3, version: 1, selector: '#pricing > table > tr:nth-of-type(2)', textQuote: '专业版 ¥99' })
-    expect(onCurrentVersion.body.comment.anchor).toEqual({ x: 0.2, y: 0.3, version: 2, selector: null, textQuote: null })
+    expect(onElement.body.comment.anchor).toEqual({ x: 0.2, y: 0.3, version: 1, selector: '#pricing > table > tr:nth-of-type(2)', textQuote: '专业版 ¥99', quote: null })
+    expect(onCurrentVersion.body.comment.anchor).toEqual({ x: 0.2, y: 0.3, version: 2, selector: null, textQuote: null, quote: null })
     expect([futureVersion.status, longQuote.status, selectorNumber.status]).toEqual([400, 400, 400])
     expect(futureVersion.body.error).toContain('version')
+  })
+
+  it('remembers the words a person selected, with the text around them', async () => {
+    const published = await app.publish({ token: agentToken }, 'Selected words')
+    const commentsPath = `/api/artifacts/${published.artifactId}/comments`
+    const pin = (anchor: Record<string, unknown>) => app.json<{ comment: { anchor: unknown } }>(commentsPath, { method: 'POST', cookie: reviewerCookie, body: { body: '换个说法', anchor } })
+
+    const onWords = await pin({ x: 0.2, y: 0.3, selector: 'body > p:nth-of-type(2)', textQuote: '产品有五类使用者。', quote: { exact: '五类使用者', prefix: '产品有', suffix: '。前两类' } })
+    const withoutContext = await pin({ x: 0.2, y: 0.3, quote: { exact: '五类' } })
+    const emptySelection = await pin({ x: 0.2, y: 0.3, quote: { exact: '' } })
+    const longSelection = await pin({ x: 0.2, y: 0.3, quote: { exact: 'x'.repeat(501) } })
+
+    expect(onWords.body.comment.anchor).toMatchObject({ selector: 'body > p:nth-of-type(2)', quote: { exact: '五类使用者', prefix: '产品有', suffix: '。前两类' } })
+    expect(withoutContext.body.comment.anchor).toMatchObject({ quote: { exact: '五类', prefix: '', suffix: '' } })
+    expect([emptySelection.status, longSelection.status]).toEqual([400, 400])
   })
 
   it('refuses a reply to a comment on another artifact', async () => {

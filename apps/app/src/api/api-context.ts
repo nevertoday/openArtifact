@@ -1,4 +1,5 @@
 import type { ArtifactGate } from '../access/artifact-gate.ts'
+import type { ArtifactPageAddress } from '../access/artifact-page-address.ts'
 import type { Admission } from '../auth/admission.ts'
 import type { Mailer } from '../auth/mailer.ts'
 import type { OpenArtifactAuth } from '../auth/open-artifact-auth.ts'
@@ -17,6 +18,7 @@ export interface ApiContextFields {
   auth: OpenArtifactAuth
   admission: Admission
   appOrigin: string
+  artifactPages: ArtifactPageAddress
 }
 
 /** What every API handler of one request shares. */
@@ -31,6 +33,7 @@ export class ApiContext {
   readonly auth: OpenArtifactAuth
   readonly admission: Admission
   readonly appOrigin: string
+  readonly artifactPages: ArtifactPageAddress
 
   constructor(fields: ApiContextFields) {
     this.repositories = fields.repositories
@@ -42,6 +45,7 @@ export class ApiContext {
     this.auth = fields.auth
     this.admission = fields.admission
     this.appOrigin = fields.appOrigin
+    this.artifactPages = fields.artifactPages
   }
 
   identity(): Promise<Identity | null> {

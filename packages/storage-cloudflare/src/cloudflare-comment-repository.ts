@@ -95,9 +95,16 @@ export class CloudflareCommentRepository implements CommentRepository {
     }
   }
 
-  // Anchors saved before the version and element were recorded hold only x and y.
+  // Anchors saved before the version, the element and the selected words were recorded hold only what existed then.
   static #anchorOf(anchorJson: string): CommentAnchor {
     const storedAnchor = JSON.parse(anchorJson) as Partial<CommentAnchor> & Pick<CommentAnchor, 'x' | 'y'>
-    return { x: storedAnchor.x, y: storedAnchor.y, version: storedAnchor.version ?? null, selector: storedAnchor.selector ?? null, textQuote: storedAnchor.textQuote ?? null }
+    return {
+      x: storedAnchor.x,
+      y: storedAnchor.y,
+      version: storedAnchor.version ?? null,
+      selector: storedAnchor.selector ?? null,
+      textQuote: storedAnchor.textQuote ?? null,
+      quote: storedAnchor.quote ?? null,
+    }
   }
 }

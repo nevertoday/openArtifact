@@ -504,6 +504,26 @@ describe('the viewer page', () => {
     expect(viewerMarkup).not.toContain('allow-same-origin')
   })
 
+  it('hands the page a signed address for each version it may show, so it can switch versions in place', async () => {
+    const published = await app.publish({ token: authorToken }, 'Switch in place', '<h1>v1</h1>')
+    const artifactPath = `/api/artifacts/${published.artifactId}`
+    await app.request(artifactPath, { method: 'PUT', token: authorToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+    const signature = new UsercontentSignature(new SigningKey(SIGNING_KEY))
+    const pageOf = async (version: number, cookie?: string) => app.json<{ version: number; url: string }>(`${artifactPath}/versions/${version}/page`, cookie ? { cookie } : {})
+
+    const olderForMember = await pageOf(1, memberCookie)
+    const missingForMember = await pageOf(3, memberCookie)
+    await setSharing(published.artifactId, { visibility: 'public_link', publicLinkExpiresAt: null })
+    const currentForVisitor = await pageOf(2)
+    const olderForVisitor = await pageOf(1)
+
+    expect(await signature.verifiedRequest(new URL(olderForMember.body.url).pathname, Date.now())).toEqual({ artifactId: published.artifactId, version: 1, filePath: 'index.html' })
+    expect(olderForMember.body.url.startsWith(`${USERCONTENT_ORIGIN}/s/`)).toBe(true)
+    expect(missingForMember.status).toBe(404)
+    expect(await signature.verifiedRequest(new URL(currentForVisitor.body.url).pathname, Date.now())).toMatchObject({ version: 2 })
+    expect(olderForVisitor.status).toBe(401)
+  })
+
   it('offers sharing only to the author', async () => {
     const published = await app.publish({ token: authorToken }, 'Share button')
 
