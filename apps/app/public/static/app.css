@@ -37,7 +37,7 @@
   .app-search { order: 1; flex-basis: 100%; }
   .app-frame { flex-direction: column; }
   .app-sidebar { width: auto; border-right: 0; border-bottom: 1px solid var(--line); }
-  .app-sidebar .xxd-sidebar__body { position: static; display: flex; overflow-x: auto; }
+  .app-sidebar .xxd-sidebar__body { position: static; display: flex; overflow-x: auto; scrollbar-width: none; mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent); }
   .app-sidebar .xxd-sidebar__group { display: flex; flex: none; }
   .app-sidebar .xxd-sidebar__group + .xxd-sidebar__group { margin-top: 0; }
   .app-sidebar .xxd-sidebar__label { display: none; }
@@ -112,7 +112,10 @@
   .token-table td.xxd-table__actions > * { grid-column: 1 / -1; justify-self: start; margin-top: var(--space-1); }
 }
 .profile-form { max-width: 400px; }
-.invite-section + .member-list { margin-top: var(--space-6); }
+/* Settings sections stand apart from each other the same way on every settings page. */
+.settings-flow > * + * { margin-top: var(--space-6); }
+.settings-flow > .xxd-page-header + * { margin-top: 0; }
+.content-table td:first-child { min-width: 12em; white-space: normal; overflow-wrap: anywhere; }
 .profile-email { margin: 0; }
 .home-name-nudge { margin-top: var(--space-5); }
 .member-reason { margin: var(--space-1) 0 0; }

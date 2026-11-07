@@ -36,7 +36,7 @@ export class SettingsPage {
   static render(model: SettingsModel): Response {
     const body = html`
 ${PageShell.topBar(model.identity, html`<span class="xxd-text app-topbar__context" data-variant="secondary">/ 设置</span>`)}
-${PageShell.withSidebar(SettingsPage.#sidebar(model), html`<div class="xxd-read">${SettingsPage.#section(model)}</div>`)}
+${PageShell.withSidebar(SettingsPage.#sidebar(model), html`<div class="xxd-read settings-flow">${SettingsPage.#section(model)}</div>`)}
 ${PageShell.jsonData('settings-config', { userId: model.identity.userId, accessTokens: model.accessTokens })}`
     return PageShell.render({ title: `${SETTINGS_SECTION_LABELS[model.section]} · Open Artifact`, body, scripts: ['common.js', 'settings.js'] })
   }
@@ -218,7 +218,7 @@ ${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
     <h2 class="xxd-text" data-variant="heading3" id="content-title">内容管理</h2>
     <p class="xxd-text" data-variant="secondary">workspace 里的全部 artifact。下架后所有人都看不到，作者也不能自己恢复；30 天内管理员可以恢复。私有 artifact 只显示标题，管理员也不能打开。</p>
   </div>
-  <div class="xxd-table-wrap"><table class="xxd-table">
+  <div class="xxd-table-wrap"><table class="xxd-table content-table">
     <thead><tr><th>标题</th><th>作者</th><th>状态</th><th>更新</th><th class="xxd-table__actions"><span class="xxd-sr-only">操作</span></th></tr></thead>
     <tbody>${administration.artifacts.map(row)}</tbody>
   </table></div>
@@ -227,7 +227,7 @@ ${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
 
   static #contentState(summary: OpenedArtifact['summary'], names: Map<string, string>, now: number): SafeHtml {
     const removal = summary.removal
-    if (removal === null) return html`<span class="xxd-badge">${ArtifactLabels.visibility(summary.sharing.visibility)}</span>`
+    if (removal === null) return html`<span class="xxd-badge">${ArtifactLabels.sharingBadge(summary.sharing, now)}</span>`
     const removalWord = ArtifactLabels.removal(removal.removedAsAdmin)
     return html`<span class="xxd-badge" data-tone="danger">已${removalWord}</span> <span class="xxd-text" data-variant="caption">${names.get(removal.removedBy)} ${removalWord} · ${ArtifactLabels.purgeIn(removal.purgeAt, now)}</span>`
   }
@@ -250,7 +250,7 @@ ${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
     return html`<section class="xxd-stack" aria-labelledby="audit-title">
   <div class="xxd-text-pair">
     <h2 class="xxd-text" data-variant="heading3" id="audit-title">管理记录</h2>
-    <p class="xxd-text" data-variant="secondary">最近 ${auditEvents.length} 条删除、下架、恢复、重命名、邀请和成员变动。</p>
+    <p class="xxd-text" data-variant="secondary">${auditEvents.length > 0 ? `最近 ${auditEvents.length} 条` : '这里会记下'}删除、下架、恢复、重命名、邀请和成员变动。</p>
   </div>
   ${auditEvents.length > 0 ? html`<ul class="xxd-list">${auditEvents.map(eventItem)}</ul>` : html`<p class="xxd-text" data-variant="secondary">还没有管理记录。</p>`}
 </section>`
