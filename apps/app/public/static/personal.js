@@ -1,4 +1,4 @@
-import { api, element, readJsonData, renderServerTimes, userMessageOf } from './common.js'
+import { api, element, m, readJsonData, renderServerTimes, userMessageOf } from './common.js'
 
 const PREVIEW_DELAY_MS = 260
 const PREVIEW_WIDTH = 320
@@ -65,15 +65,15 @@ class OwnerControls {
 
   #editBio(bioButton) {
     const savedBio = bioButton.dataset.empty === 'true' ? '' : bioButton.textContent
-    const bioInput = element('input', { className: 'xxd-input personal-head__bio-input', value: savedBio, maxlength: String(MAX_BIO_LENGTH), placeholder: '一句话介绍自己', 'aria-label': '一句话介绍自己' })
+    const bioInput = element('input', { className: 'xxd-input personal-head__bio-input', value: savedBio, maxlength: String(MAX_BIO_LENGTH), placeholder: m.client.personal.bioLabel, 'aria-label': m.client.personal.bioLabel })
     const finish = async save => {
       bioInput.replaceWith(bioButton)
       if (!save || bioInput.value.trim() === savedBio) return bioButton.focus()
       try {
         const { bio } = await api('/api/me/profile', { method: 'PATCH', body: { bio: bioInput.value.trim() } })
-        bioButton.textContent = bio || '写一句话介绍自己…'
+        bioButton.textContent = bio || m.client.personal.bioEmpty
         bioButton.dataset.empty = String(bio === '')
-        Xxd.toast('已保存介绍')
+        Xxd.toast(m.client.personal.bioSaved)
       } catch (error) {
         Xxd.toast(userMessageOf(error), { tone: 'danger' })
       }
@@ -106,7 +106,7 @@ class OwnerControls {
     const entry = summaryButton.closest('[data-entry]')
     const shownSummary = entry.querySelector('[data-summary]')
     const tools = summaryButton.closest('.personal-tools')
-    const summaryInput = element('textarea', { className: 'xxd-textarea', rows: '3', maxlength: String(MAX_SUMMARY_LENGTH), 'aria-label': '摘要' }, shownSummary?.textContent ?? '')
+    const summaryInput = element('textarea', { className: 'xxd-textarea', rows: '3', maxlength: String(MAX_SUMMARY_LENGTH), 'aria-label': m.client.personal.summaryLabel }, shownSummary?.textContent ?? '')
     const close = () => {
       editor.remove()
       tools.hidden = false
@@ -117,7 +117,7 @@ class OwnerControls {
       try {
         const saved = await api(`/api/artifacts/${encodeURIComponent(summaryButton.dataset.artifactId)}`, { method: 'PATCH', body: { summary } })
         OwnerControls.#showSummary(entry, shownSummary, saved.summary)
-        Xxd.toast(summary === null ? '已改回页面开头的话' : '已保存摘要')
+        Xxd.toast(summary === null ? m.client.personal.summaryReset : m.client.personal.summarySaved)
         close()
       } catch (error) {
         Xxd.toast(userMessageOf(error), { tone: 'danger' })
@@ -127,9 +127,9 @@ class OwnerControls {
     const editor = element('div', { className: 'personal-summary-editor' },
       summaryInput,
       element('div', { className: 'personal-summary-editor__row' },
-        action('用页面开头的话', () => save(null), 'ghost'),
-        action('取消', close),
-        action('保存', () => save(summaryInput.value.trim() || null), 'primary')))
+        action(m.client.personal.useOpening, () => save(null), 'ghost'),
+        action(m.client.dialog.cancel, close),
+        action(m.client.personal.save, () => save(summaryInput.value.trim() || null), 'primary')))
     summaryInput.addEventListener('keydown', event => {
       if (event.key === 'Escape') close()
       if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) save(summaryInput.value.trim() || null)
