@@ -1,30 +1,28 @@
 import { api } from './common.js'
 
 const SHARED_DATA_NAME = /^[A-Za-z0-9_-]{1,64}$/
+const READ_OPERATIONS = new Set(['viewer', 'list'])
 
 /**
- * The artifact page cannot hold credentials, so its SDK asks this page to read and write shared data.
- * The frame is sandboxed without allow-same-origin, so its messages arrive from the opaque origin "null";
- * the frame's window object is what identifies it.
+ * The artifact page cannot hold credentials, so its SDK asks this page to read and write shared data, and this
+ * page calls the API for the viewer. The answer goes back through whoever owns the frame.
  */
 export class SharedDataProxy {
-  constructor(frame, viewerConfig) {
-    this.frame = frame
+  constructor(viewerConfig) {
     this.viewerConfig = viewerConfig
     this.artifactPath = `/api/artifacts/${encodeURIComponent(viewerConfig.artifactId)}`
-    window.addEventListener('message', event => this.#handle(event))
   }
 
-  async #handle(event) {
-    const fromArtifactFrame = event.source === this.frame.contentWindow && event.origin === 'null'
-    const request = event.data
-    const isSdkRequest = request && request.type === 'open-artifact:request' && typeof request.requestId === 'string'
-    if (!fromArtifactFrame || !isSdkRequest) return
+  /**
+   * Performs one request from the page and returns the fields of the response to post back. A page loaded only to
+   * be measured may read but not write, so loading it twice never writes twice.
+   */
+  async answer(request, { readOnly = false } = {}) {
     try {
-      const result = await this.#perform(request)
-      this.#reply(request.requestId, { ok: true, result })
+      if (readOnly && !READ_OPERATIONS.has(request.operation)) throw Object.assign(new Error('This copy of the page is read-only'), { status: 403 })
+      return { ok: true, result: await this.#perform(request) }
     } catch (error) {
-      this.#reply(request.requestId, { ok: false, error: error.message, status: error.status ?? 500 })
+      return { ok: false, error: error.message, status: error.status ?? 500 }
     }
   }
 
@@ -47,10 +45,5 @@ export class SharedDataProxy {
       default:
         throw new Error(`unknown operation ${request.operation}`)
     }
-  }
-
-  // The sandboxed frame's origin is opaque, so "*" is the only target that reaches it; the message goes to that one window.
-  #reply(requestId, response) {
-    this.frame.contentWindow?.postMessage({ type: 'open-artifact:response', requestId, ...response }, '*')
   }
 }

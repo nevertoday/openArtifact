@@ -8,12 +8,18 @@ export type IconName =
   | 'ArrowLeft'
   | 'Bell'
   | 'Bot'
+  | 'Check'
+  | 'ChevronDown'
   | 'Clock'
+  | 'Columns2'
   | 'Copy'
+  | 'Database'
+  | 'ExternalLink'
   | 'FileX'
   | 'Ellipsis'
   | 'Globe'
   | 'History'
+  | 'House'
   | 'Inbox'
   | 'LayoutGrid'
   | 'LayoutTemplate'
@@ -23,13 +29,16 @@ export type IconName =
   | 'LogOut'
   | 'MailCheck'
   | 'MailX'
+  | 'MessageSquare'
   | 'MessageSquareText'
   | 'Pen'
+  | 'Plus'
   | 'RotateCcw'
   | 'SearchX'
   | 'Search'
   | 'Settings'
   | 'Share2'
+  | 'ShieldCheck'
   | 'Trash2'
   | 'TriangleAlert'
   | 'UserMinus'
@@ -46,6 +55,8 @@ export interface PageOptions {
   body: SafeHtml
   /** Scripts under /static, loaded as modules after the body. */
   scripts?: string[]
+  /** Stylesheets under /static that only this page needs, after the app's own. */
+  styles?: string[]
   status?: number
   headers?: Record<string, string>
   /** Open Graph description for link previews in chat apps. */
@@ -71,6 +82,7 @@ ${options.description ? html`<meta name="description" content="${options.descrip
 <script src="/static/vendor/xxd/icons.js"></script>
 <script src="/static/vendor/xxd/xxd.js"></script>
 <link rel="stylesheet" href="/static/app.css">
+${(options.styles ?? []).map(style => html`<link rel="stylesheet" href="/static/${style}">`)}
 </head>
 <body class="xxd-page"><a class="xxd-sr-only-focusable" href="#main">跳到内容</a>${options.body}${(options.scripts ?? []).map(script => html`<script type="module" src="/static/${script}"></script>`)}</body>
 </html>`
@@ -112,8 +124,13 @@ ${options.description ? html`<meta name="description" content="${options.descrip
 
   /** The page's top bar; `middle` sits between the brand and the account menu. */
   static topBar(identity: Identity | null, middle: SafeHtml | string = ''): SafeHtml {
-    const account = identity ? html`${PageShell.#notificationBell()}${PageShell.#accountMenu(identity)}` : html`<a class="xxd-btn" data-size="sm" href="/login">登录</a>`
+    const account = identity ? PageShell.accountControls(identity) : html`<a class="xxd-btn" data-size="sm" href="/login">登录</a>`
     return html`<header class="xxd-topbar app-topbar">${PageShell.brandLink()}${middle}<span class="app-topbar__end">${account}</span></header>`
+  }
+
+  /** The notification bell and the account menu, for a top bar of the page's own. */
+  static accountControls(identity: Identity): SafeHtml {
+    return html`${PageShell.#notificationBell()}${PageShell.#accountMenu(identity)}`
   }
 
   /** The top bar of standalone pages that offer nothing but the way home. */

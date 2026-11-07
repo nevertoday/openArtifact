@@ -1,4 +1,4 @@
-/* Only what the UI kit has no component for: the app frame, artifact covers, the viewer stage and side panel, login. Kit tokens only. */
+/* Only what the UI kit has no component for: the app frame, artifact covers, settings, login. The viewer has viewer.css. Kit tokens only. */
 
 /* App frame: top bar, side navigation, one content column. */
 .app-topbar { position: sticky; top: 0; z-index: var(--z-dock); gap: var(--space-3); }
@@ -58,7 +58,7 @@
 .artifact-cover__blocks span { background: var(--wash-strong); }
 /* Rendered at four times the card's width and scaled down, so the preview shows a desktop-wide page. */
 /* An artifact page without its own background is written for white paper, whatever theme the app is in. */
-.artifact-cover__preview, .viewer-frame iframe, .viewer-full__frame iframe { color-scheme: light; background: #fff; }
+.artifact-cover__preview { color-scheme: light; background: #fff; }
 .artifact-cover__preview { position: absolute; inset: 0 auto auto 0; width: 400%; height: 400%; border: 0; transform: scale(0.25); transform-origin: 0 0; pointer-events: none; }
 .xxd-card__media.artifact-cover { border-bottom: 1px solid var(--line); }
 .artifact-meta { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -123,94 +123,6 @@
 .invite-section .xxd-list__item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
 .invite-section .xxd-list__main { flex: 1 1 12em; min-width: 0; overflow-wrap: anywhere; }
 .invite-actions { --cluster-gap: var(--space-1); flex: none; }
-
-/* Viewer: the artifact on the left, comments, versions and data on the right. */
-.viewer-page { display: flex; flex-direction: column; height: 100dvh; }
-.viewer-heading { display: grid; }
-.viewer-heading__title { overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
-.viewer-heading__meta { overflow: hidden; text-overflow: ellipsis; }
-.viewer-visibility { flex: none; }
-.viewer-body { flex: 1; min-height: 0; display: flex; }
-.viewer-stage { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-4) var(--space-4); }
-.viewer-sandbox-note { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); }
-.viewer-sandbox-note .xxd-cluster { --cluster-gap: var(--space-1-5); }
-.viewer-frame { position: relative; flex: 1; min-height: 480px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-md); }
-/* Pinned to the frame box: when the page grows with its content on narrow screens, a percentage height would fall back to 150px. */
-.viewer-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.viewer-side { flex: none; width: 380px; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--paper); }
-.viewer-side__tabs { flex: none; padding-inline: var(--inset-md); }
-.viewer-side__panel { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
-.viewer-side__status { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: var(--inset-md); color: var(--muted); }
-
-.viewer-full { display: flex; flex-direction: column; height: 100dvh; }
-.viewer-full__bar { flex: none; display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-3); border-bottom: 1px solid var(--line); background: var(--paper); }
-.viewer-full__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: var(--weight-strong); }
-.viewer-full__frame { position: relative; flex: 1; min-height: 0; }
-.viewer-full__frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-
-@media (max-width: 1024px) {
-  .viewer-page { height: auto; min-height: 100dvh; }
-  .viewer-body { flex-direction: column; }
-  .viewer-stage { min-height: 70dvh; }
-  .viewer-side { width: auto; border-left: 0; border-top: 1px solid var(--line); }
-}
-/* On a phone the back arrow already leads home, so the title takes the brand's room and gets a row of its own. */
-@media (max-width: 640px) {
-  .viewer-page .app-brand { display: none; }
-  .viewer-heading { order: 1; flex-basis: 100%; }
-  .viewer-heading__title { white-space: normal; overflow-wrap: anywhere; }
-  .viewer-heading__meta { display: none; }
-  .viewer-visibility { margin-inline-start: auto; }
-  .viewer-page .app-topbar__end { margin-inline-start: 0; }
-}
-
-/* Comments */
-.comment-filters { padding: var(--inset-md) var(--inset-md) var(--space-2); }
-.comment-threads { flex: 1; margin: 0; padding: 0; list-style: none; }
-.comment-thread { display: grid; gap: var(--space-2); padding: var(--space-3) var(--inset-md); }
-.comment-thread + .comment-thread { border-top: 1px solid var(--line); }
-/* A pin clicked on the page marks its thread the way the kit marks a current row. */
-.comment-thread[data-new] { box-shadow: inset 2px 0 0 var(--action); }
-.comment-news { position: sticky; top: 0; z-index: 1; display: flex; justify-content: center; }
-.comment-news:empty { display: none; }
-.comment-news__cue { margin-block-start: var(--space-2); box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,.12)); }
-.comment-thread[data-highlighted] { background: var(--selected-bg); box-shadow: inset 2px 0 0 var(--action); }
-.comment-thread[data-resolved] > .comment-body { color: var(--muted); }
-.comment-header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.comment-header .xxd-badge { margin-inline-start: auto; }
-.comment-author { color: var(--ink); font-weight: var(--weight-medium); }
-.comment-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.comment-reply { display: grid; gap: var(--space-1); margin-inline-start: var(--space-5); padding-inline-start: var(--space-3); border-inline-start: 2px solid var(--line); }
-.comment-reply[data-via-agent] { border-inline-start-color: var(--warning-border); }
-.comment-actions { --cluster-gap: var(--space-1); margin-inline-start: calc(-1 * var(--space-2)); }
-.comment-form-actions { justify-content: flex-end; }
-.comment-composer { margin: 0; padding: var(--inset-md); border-top: 1px solid var(--line); }
-.comment-composer__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.anchor-control { color: var(--muted); }
-.anchor-control[data-picking] { color: var(--action-text); }
-/* The same marker the artifact page draws at the spot, so a pin and its thread read as one thing. */
-.pin-number { display: inline-grid; place-items: center; flex: none; min-width: 20px; height: 20px; padding: 0 var(--space-1); border-radius: var(--r-pill) var(--r-pill) var(--r-pill) var(--r-xs); background: var(--action-fill); color: var(--on-action); font-size: var(--text-2xs); font-weight: var(--weight-strong); }
-.pin-number[data-for-agent] { background: var(--warning-solid); color: var(--warning-on-solid); }
-@media (prefers-reduced-motion: no-preference) { .comment-thread { transition: background-color var(--motion-quick) ease; } }
-
-/* Versions and shared data */
-.version-timeline { padding: var(--inset-md); }
-.version-note { margin-top: var(--space-1); white-space: pre-wrap; overflow-wrap: anywhere; }
-.version-actions { --cluster-gap: var(--space-1); margin-top: var(--space-1); }
-.data-collection { padding: var(--inset-md); }
-.data-collection > p { margin: 0; }
-.data-collection__id { max-width: 9em; overflow: hidden; text-overflow: ellipsis; }
-
-/* Share dialog */
-.share-dialog__heading { flex: 1; min-width: 0; }
-.share-dialog__body { display: grid; gap: var(--gap-block); padding-top: var(--space-4); color: var(--ink); }
-.share-dialog__body > * + * { margin-top: 0; }
-.share-section__title { margin: 0; color: var(--ink); font: var(--weight-medium) var(--text-sm) / var(--leading-sm) var(--font-body); }
-.share-grant-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--gap-items); }
-.share-grant-form__email { flex: 1 1 200px; }
-.share-person { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; }
-.share-person .xxd-list__main { flex: 1 1 8em; min-width: 0; }
-.share-dialog__url { flex: 1 1 200px; min-width: 0; align-self: center; overflow-wrap: anywhere; }
 
 /* Login: the pitch on a dark block, the sign-in form beside it. */
 .login-page { display: flex; flex-wrap: wrap; min-height: 100dvh; }

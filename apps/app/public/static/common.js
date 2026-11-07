@@ -84,6 +84,27 @@ export function element(tagName, attributes = {}, ...children) {
   return created
 }
 
+/** A kit icon built in the browser; it is decoration, so screen readers skip it. */
+export function icon(name, size = 16) {
+  const template = document.createElement('template')
+  template.innerHTML = XxdIcons.iconSVG(name, { size })
+  return template.content.firstElementChild
+}
+
+/**
+ * Sends a form once per submit, however it was submitted (the button, Enter, or ⌘↵ through requestSubmit): its
+ * submit button turns busy at once and a second submit waits for the first. `send` shows its own failures to people;
+ * anything it lets escape is a bug and goes to the console.
+ */
+export function submitOnce(form, send) {
+  form.addEventListener('submit', event => {
+    if (event.target !== form) return
+    event.preventDefault()
+    const submitButton = event.submitter ?? [...form.elements].find(control => control.type === 'submit')
+    Xxd.runBusy(submitButton, send).catch(reportError)
+  })
+}
+
 export function readJsonData(elementId) {
   const dataElement = document.getElementById(elementId)
   return dataElement ? JSON.parse(dataElement.textContent) : null

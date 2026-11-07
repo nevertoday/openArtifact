@@ -408,12 +408,14 @@ describe('what a visitor of a public link sees', () => {
 
     expect(pageMarkup).toContain('artifact-frame')
     expect(pageMarkup).toContain('Launch page')
-    expect(pageMarkup).toContain(`href="/login?next=${encodeURIComponent(`/a/${artifactId}`)}">登录后可以评论</a>`)
-    expect(pageMarkup).not.toContain('panel-comments')
-    expect(pageMarkup).not.toContain('panel-versions')
-    expect(pageMarkup).not.toContain('panel-data')
-    expect(pageMarkup).not.toContain('返回列表')
-    expect(pageMarkup).not.toContain('data-visibility-pill')
+    expect(pageMarkup.match(/登录/g)).toHaveLength(1)
+    expect(pageMarkup).toContain(`href="/login?next=${encodeURIComponent(`/a/${artifactId}`)}">登录后评论</a>`)
+    expect(pageMarkup).not.toContain('id="viewer-drawer"')
+    expect(pageMarkup).not.toContain('data-version-button')
+    expect(pageMarkup).not.toContain('data-open-data')
+    expect(pageMarkup).not.toContain('data-comment-mode')
+    expect(pageMarkup).not.toContain('返回首页')
+    expect(pageMarkup).not.toContain('data-visibility-label')
   })
 
   it('refuses an anonymous visitor the comments, the versions, older files and the data listing', async () => {
@@ -458,9 +460,12 @@ describe('what a visitor of a public link sees', () => {
     expect(comments.body.comments[0]).toMatchObject({ body: 'Internal note from a member', author: { name: 'member' } })
     expect(anonymousComment.status).toBe(401)
     expect(versions.status).toBe(401)
-    expect(pageMarkup).toContain('panel-comments')
-    expect(pageMarkup).not.toContain('panel-versions')
-    expect(pageMarkup).not.toContain('panel-data')
+    expect(pageMarkup).toContain('id="viewer-drawer"')
+    expect(pageMarkup).toContain('data-comment-count-button')
+    expect(pageMarkup).not.toContain('data-comment-mode')
+    expect(pageMarkup).not.toContain('data-composer')
+    expect(pageMarkup).not.toContain('data-version-button')
+    expect(pageMarkup).not.toContain('data-open-data')
     expect(sharing.body.publicLink.showsComments).toBe(true)
   })
 
@@ -473,8 +478,8 @@ describe('what a visitor of a public link sees', () => {
 
     expect(versions.status).toBe(403)
     expect(pageMarkup).toContain('artifact-frame')
-    expect(pageMarkup).not.toContain('panel-versions')
-    expect(pageMarkup).not.toContain('登录后可以评论')
+    expect(pageMarkup).not.toContain('data-version-button')
+    expect(pageMarkup).not.toContain('登录后评论')
   })
 
   it('still shows members the comments, versions and data of an artifact that has a public link', async () => {
@@ -485,8 +490,9 @@ describe('what a visitor of a public link sees', () => {
     const pageMarkup = await (await app.request(`/a/${artifactId}`, { cookie: memberCookie })).text()
 
     expect(statuses).toEqual([200, 200, 200, 200])
-    expect(pageMarkup).toContain('panel-versions')
-    expect(pageMarkup).toContain('返回列表')
+    expect(pageMarkup).toContain('data-version-button')
+    expect(pageMarkup).toContain('data-open-data')
+    expect(pageMarkup).toContain('返回首页')
   })
 })
 

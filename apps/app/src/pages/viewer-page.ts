@@ -3,7 +3,7 @@ import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
 import { html, SafeHtml } from './html.ts'
-import { PageShell } from './page-shell.ts'
+import { PageShell, type IconName } from './page-shell.ts'
 
 // No allow-same-origin: the artifact gets an opaque origin and cannot reach any site's cookies or storage.
 const ARTIFACT_SANDBOX = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads'
@@ -14,19 +14,14 @@ export interface OlderVersion {
   publishedAt: number
 }
 
-interface SideTab {
-  name: 'comments' | 'versions' | 'data'
-  title: string
-  count: SafeHtml | ''
-  shown: boolean
-}
-
 export interface ViewerModel {
   openedArtifact: OpenedArtifact
   identity: Identity | null
   authorName: string
   /** The version on screen; older than the current one when the viewer picked it from the history. */
   shownVersion: number
+  /** A version the address asked for that does not exist; the latest one is shown instead. */
+  missingVersion: number | null
   /** The shown version when it is older than the current one; null on the current version. */
   olderVersion: OlderVersion | null
   /** Absolute URL of the shown version's entry page, signed for this viewer. */
@@ -35,30 +30,36 @@ export interface ViewerModel {
   now: number
 }
 
+/**
+ * The artifact first: a slim bar above it, comments written on the page itself, and a drawer for the
+ * threads that pushes the page aside on a wide screen and rises from the bottom on a phone. The page's
+ * scripts fill in what changes while it is open: threads, versions, pins and the comment composer.
+ */
 export class ViewerPage {
   static render(model: ViewerModel): Response {
     const { summary, permissions } = model.openedArtifact
-    const body = html`<div class="viewer-page">
-${ViewerPage.#isPublicLinkVisitor(model) ? ViewerPage.#publicLinkBar(model) : PageShell.topBar(model.identity, ViewerPage.#heading(model))}
+    const body = html`<div class="viewer" data-viewer>
+${ViewerPage.#bar(model)}
+<div class="viewer-notice" data-version-notice></div>
+${permissions.canSeeVersions ? ViewerPage.#compareBar() : ''}
 <div class="viewer-body">
-  <section class="viewer-stage" aria-label="artifact 内容">
-    ${model.olderVersion ? ViewerPage.#olderVersionBanner(model, model.olderVersion) : ''}
-    <div class="viewer-sandbox-note xxd-text" data-variant="caption">
-      <span class="xxd-cluster">${PageShell.icon('Lock', 14)}在沙箱中运行 · <span class="xxd-mono">${new URL(model.usercontentOrigin).host}</span></span>
-      <a class="xxd-link" href="${ViewerPage.#pathOf(model, '/full')}" target="_blank" rel="noopener">新标签页打开</a>
-    </div>
-    <div class="viewer-frame"><iframe id="artifact-frame" src="${model.artifactUrl}" title="${summary.title}" sandbox="${ARTIFACT_SANDBOX}" referrerpolicy="no-referrer"></iframe></div>
+  <section class="viewer-stage" id="main" tabindex="-1" aria-label="页面内容" data-stage>
+    <iframe id="artifact-frame" src="${model.artifactUrl}" title="${summary.title}" sandbox="${ARTIFACT_SANDBOX}" referrerpolicy="no-referrer"></iframe>
+    ${permissions.canComment ? ViewerPage.#commentingLayer() : ''}
   </section>
-  ${ViewerPage.#side(model)}
+  ${ViewerPage.#drawer(model)}
 </div>
+${permissions.canComment ? ViewerPage.#coachMark() : ''}
 </div>
 ${permissions.canManageSharing ? ViewerPage.#shareDialog() : ''}
+${ViewerPage.#shortcutSheet(model)}
 ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     return PageShell.render({
       title: `${summary.title} · Open Artifact`,
       description: ViewerPage.#description(model),
       body,
-      scripts: ['common.js', 'viewer.js'],
+      scripts: ['common.js', 'viewer/viewer.js'],
+      styles: ['viewer.css'],
       frameOrigin: model.usercontentOrigin,
     })
   }
@@ -68,8 +69,8 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     const { summary } = model.openedArtifact
     const body = html`<div class="viewer-full">
 <header class="viewer-full__bar">
-  <a class="xxd-btn" data-variant="ghost" data-size="sm" href="${ViewerPage.#pathOf(model, '')}">${PageShell.icon('ArrowLeft')}${ViewerPage.#isPublicLinkVisitor(model) ? '返回' : '评论和版本'}</a>
-  <span class="viewer-full__title">${summary.title}</span>
+  <a class="xxd-btn" data-variant="ghost" data-size="sm" href="${ViewerPage.#pathOf(model, '')}">${PageShell.icon('ArrowLeft')}返回查看页</a>
+  <span class="viewer-full__title" tabindex="0" data-tooltip="${summary.title}" data-tooltip-placement="bottom-start">${summary.title}</span>
   <span class="xxd-text xxd-mono" data-variant="caption">v${model.shownVersion}</span>
 </header>
 <div class="viewer-full__frame"><iframe id="artifact-frame" src="${model.artifactUrl}" title="${summary.title}" sandbox="${ARTIFACT_SANDBOX}" referrerpolicy="no-referrer"></iframe></div>
@@ -80,6 +81,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
       description: ViewerPage.#description(model),
       body,
       scripts: ['artifact-full.js'],
+      styles: ['viewer.css'],
       frameOrigin: model.usercontentOrigin,
     })
   }
@@ -98,13 +100,20 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
       title: summary.title,
       shownVersion: model.shownVersion,
       currentVersion: summary.version,
+      missingVersion: model.missingVersion,
+      olderVersion: model.olderVersion,
       usercontentOrigin: model.usercontentOrigin,
+      visibility: summary.sharing.visibility,
+      visibilityLabels: ArtifactLabels.visibilityLabels(),
       permissions: {
         canComment: permissions.canComment,
         canEdit: permissions.canEdit,
         canManageSharing: permissions.canManageSharing,
         canRename: permissions.canRename,
         canRemove: permissions.canRemove,
+        canReadComments: permissions.canReadComments,
+        canSeeVersions: permissions.canSeeVersions,
+        canBrowseSharedData: permissions.canBrowseSharedData,
       },
       removalTakesDown: ViewerPage.#removalTakesDown(model),
       viewer: model.identity ? { userId: model.identity.userId, name: model.identity.name } : null,
@@ -122,49 +131,47 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     return !model.openedArtifact.permissions.canSeeVersions
   }
 
-  static #publicLinkBar(model: ViewerModel): SafeHtml {
-    const loginPath = `/login?next=${encodeURIComponent(ViewerPage.#pathOf(model, ''))}`
-    const signInLink = model.identity ? '' : html`<a class="xxd-link" href="${loginPath}">登录后可以评论</a>`
-    return html`<header class="xxd-topbar app-topbar">
-  <div class="xxd-topbar__title viewer-heading"><span class="viewer-heading__title">${model.openedArtifact.summary.title}</span></div>
-  <span class="app-topbar__end">${signInLink}</span>
+  static #bar(model: ViewerModel): SafeHtml {
+    const { summary, permissions } = model.openedArtifact
+    const isVisitor = ViewerPage.#isPublicLinkVisitor(model)
+    const homeLink = html`<a class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" href="/" aria-label="返回首页" data-tooltip="返回首页" data-tooltip-placement="bottom-start">${PageShell.icon('House')}</a>`
+    return html`<header class="xxd-topbar viewer-bar">
+  ${isVisitor ? '' : homeLink}
+  <div class="viewer-bar__title">
+    <span class="viewer-bar__name" tabindex="0" data-tooltip="${summary.title}" data-tooltip-placement="bottom-start" data-artifact-title>${summary.title}</span>
+    ${permissions.canSeeVersions ? ViewerPage.#versionPicker(model) : ''}
+  </div>
+  <div class="viewer-bar__end">
+    ${isVisitor ? '' : ViewerPage.#visibilityBadge(model)}
+    ${permissions.canReadComments ? ViewerPage.#commentCountButton() : ''}
+    ${permissions.canComment ? html`<button type="button" class="xxd-btn viewer-comment-mode" data-variant="ghost" data-size="sm" aria-pressed="false" aria-keyshortcuts="C" data-tooltip="评论模式（C）" data-comment-mode>${PageShell.icon('Plus')}<span class="viewer-bar__label">评论</span></button>` : ''}
+    ${permissions.canManageSharing ? html`<button type="button" class="xxd-btn" data-variant="primary" data-size="sm" data-open-share>分享</button>` : ''}
+    ${isVisitor ? '' : ViewerPage.#moreMenu(model)}
+    ${model.identity ? PageShell.accountControls(model.identity) : ViewerPage.#signInLink(model)}
+  </div>
 </header>`
   }
 
-  static #side(model: ViewerModel): SafeHtml | '' {
-    const { summary, permissions } = model.openedArtifact
-    const allSideTabs: SideTab[] = [
-      { name: 'comments', title: '评论', count: html`<span class="xxd-count" data-comment-count></span>`, shown: permissions.canReadComments },
-      { name: 'versions', title: '版本', count: html`<span class="xxd-count xxd-mono">${summary.version}</span>`, shown: permissions.canSeeVersions },
-      { name: 'data', title: '数据', count: '', shown: permissions.canBrowseSharedData },
-    ]
-    const sideTabs = allSideTabs.filter(sideTab => sideTab.shown)
-    if (sideTabs.length === 0) return ''
-    const sideLabel = sideTabs.map(sideTab => sideTab.title).join('、')
-    return html`<aside class="viewer-side" aria-label="${sideLabel}">
-    <div class="xxd-tabs viewer-side__tabs" data-xxd-tabs id="viewer-tabs" aria-label="${sideLabel}">
-      ${sideTabs.map((sideTab, index) => html`<button type="button" role="tab" id="tab-${sideTab.name}" aria-controls="panel-${sideTab.name}" aria-selected="${index === 0 ? 'true' : 'false'}">${sideTab.title}${sideTab.count}</button>`)}
-    </div>
-    ${sideTabs.map((sideTab, index) => ViewerPage.#sidePanel(sideTab, index === 0))}
-  </aside>`
+  static #versionPicker(model: ViewerModel): SafeHtml {
+    return html`<button type="button" class="xxd-btn viewer-version" data-variant="ghost" data-size="sm" data-xxd-menu="version-menu" aria-label="版本 ${model.shownVersion}，选择版本" data-version-button><span data-version-label>v${model.shownVersion}</span>${PageShell.icon('ChevronDown', 14)}</button>
+<div class="xxd-menu viewer-version-menu" id="version-menu" role="menu" popover aria-label="版本" data-version-menu></div>`
   }
 
-  // Comments load at once, so their panel opens with a loading line; the others fill when their tab is picked.
-  static #sidePanel(sideTab: SideTab, isFirst: boolean): SafeHtml {
-    if (sideTab.name === 'comments') return html`<div class="viewer-side__panel" id="panel-comments"><p class="viewer-side__status"><span class="xxd-spinner" aria-hidden="true"></span>正在加载评论…</p></div>`
-    return html`<div class="viewer-side__panel" id="panel-${sideTab.name}" ${isFirst ? '' : new SafeHtml('hidden')}></div>`
+  // Whoever manages sharing opens 分享 from the badge; everyone else reads it as a fact.
+  static #visibilityBadge(model: ViewerModel): SafeHtml {
+    const { summary, permissions } = model.openedArtifact
+    const label = ArtifactLabels.visibility(summary.sharing.visibility)
+    if (permissions.canManageSharing) return html`<button type="button" class="xxd-badge viewer-visibility" data-tooltip="谁能看到这个页面 · 点一下分享" data-open-share data-visibility-label>${label}</button>`
+    return html`<span class="xxd-badge viewer-visibility" tabindex="0" data-tooltip="谁能看到这个页面" data-visibility-label>${label}</span>`
   }
 
-  static #heading(model: ViewerModel): SafeHtml {
-    const { summary, permissions } = model.openedArtifact
-    return html`<a class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" href="/" aria-label="返回列表">${PageShell.icon('ArrowLeft')}</a>
-<div class="xxd-topbar__title viewer-heading">
-  <span class="viewer-heading__title">${summary.title}</span>
-  <span class="viewer-heading__meta xxd-text" data-variant="caption">${model.authorName} · ${ArtifactLabels.publishedVia(summary.publishedVia)} 发布 · ${ArtifactLabels.updatedAgo(summary.updatedAt, model.now)}更新</span>
-</div>
-<span class="xxd-badge viewer-visibility" data-visibility-pill>${ArtifactLabels.visibility(summary.sharing.visibility)}</span>
-${permissions.canManageSharing ? html`<button type="button" class="xxd-btn" data-variant="primary" data-size="sm" data-open-share>${PageShell.icon('Share2')}分享</button>` : ''}
-${ViewerPage.#artifactMenu(model)}`
+  static #commentCountButton(): SafeHtml {
+    return html`<button type="button" class="xxd-btn viewer-count-button" data-variant="ghost" data-size="sm" aria-expanded="false" aria-controls="viewer-drawer" aria-label="评论" data-comment-count-button>${PageShell.icon('MessageSquare')}<span class="viewer-count" data-comment-count></span></button>`
+  }
+
+  static #signInLink(model: ViewerModel): SafeHtml {
+    const loginPath = `/login?next=${encodeURIComponent(ViewerPage.#pathOf(model, ''))}`
+    return html`<a class="xxd-link viewer-sign-in" href="${loginPath}">登录后评论</a>`
   }
 
   static #removalTakesDown(model: ViewerModel): boolean {
@@ -172,30 +179,94 @@ ${ViewerPage.#artifactMenu(model)}`
     return viewerId !== undefined && ArtifactRemoval.isTakedown(viewerId, model.openedArtifact.summary.authorId)
   }
 
-  static #artifactMenu(model: ViewerModel): SafeHtml | string {
-    const { canRename, canRemove } = model.openedArtifact.permissions
-    if (!canRename && !canRemove) return ''
-    const renameItem = html`<button type="button" class="xxd-menu__item" role="menuitem" data-rename-artifact>${PageShell.icon('Pen', 14)}重命名</button>`
-    const removeItem = html`<button type="button" class="xxd-menu__item" role="menuitem" data-tone="danger" data-remove-artifact>${PageShell.icon('Trash2', 14)}${ArtifactLabels.removal(ViewerPage.#removalTakesDown(model))}</button>`
+  static #moreMenu(model: ViewerModel): SafeHtml {
+    const { summary, permissions } = model.openedArtifact
+    const menuItem = (icon: IconName, label: string, marker: string) =>
+      html`<button type="button" class="xxd-menu__item" role="menuitem" ${new SafeHtml(marker)}>${PageShell.icon(icon, 14)}${label}</button>`
     const separator = html`<div class="xxd-menu__sep" role="separator"></div>`
-    return html`<button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" data-xxd-menu="artifact-menu" data-artifact-menu aria-label="更多操作">${PageShell.icon('Ellipsis')}</button>
-<div class="xxd-menu" id="artifact-menu" role="menu" popover>
-  ${canRename ? renameItem : ''}${canRename && canRemove ? separator : ''}${canRemove ? removeItem : ''}
+    const removeItem = html`${separator}<button type="button" class="xxd-menu__item" role="menuitem" data-tone="danger" data-remove-artifact>${PageShell.icon('Trash2', 14)}${ArtifactLabels.removal(ViewerPage.#removalTakesDown(model))}</button>`
+    return html`<button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" data-xxd-menu="artifact-menu" aria-label="更多" data-tooltip="更多">${PageShell.icon('Ellipsis')}</button>
+<div class="xxd-menu viewer-more-menu" id="artifact-menu" role="menu" popover aria-label="更多">
+  <a class="xxd-menu__item" role="menuitem" href="${ViewerPage.#pathOf(model, '/full')}" target="_blank" rel="noopener" data-full-view-link>${PageShell.icon('ExternalLink', 14)}在新标签页打开</a>
+  ${permissions.canBrowseSharedData ? menuItem('Database', '数据', 'data-open-data') : ''}
+  ${permissions.canRename ? menuItem('Pen', '重命名', 'data-rename-artifact') : ''}
+  ${menuItem('Link', '复制链接', 'data-copy-artifact-link')}
+  ${permissions.canRemove ? removeItem : ''}
+  ${separator}
+  <div class="xxd-menu__label viewer-more-menu__visibility">可见范围：<span data-visibility-label>${ArtifactLabels.visibility(summary.sharing.visibility)}</span></div>
+  <div class="xxd-menu__label viewer-more-menu__note">${PageShell.icon('ShieldCheck', 14)}这个页面在隔离环境里运行，读不到你的登录信息</div>
 </div>`
   }
 
-  static #olderVersionBanner(model: ViewerModel, olderVersion: OlderVersion): SafeHtml {
-    const { summary, permissions } = model.openedArtifact
-    const publishedAgo = ArtifactLabels.updatedAgo(olderVersion.publishedAt, model.now)
-    const overwriteButton = html`<button type="button" class="xxd-btn" data-size="sm" data-overwrite-with-version="${olderVersion.version}">用 v${olderVersion.version} 覆盖当前</button>`
-    return html`<div class="xxd-banner" data-size="sm" role="status">
-  ${PageShell.icon('History')}
-  <p class="xxd-banner__text">你在看 <strong class="xxd-mono">v${olderVersion.version}</strong>（${publishedAgo}，${olderVersion.authorName} 发布），最新是 <span class="xxd-mono">v${summary.version}</span>。</p>
-  <div class="xxd-banner__actions">
-    <a class="xxd-link" href="/a/${encodeURIComponent(summary.artifactId)}">看最新版</a>
-    ${permissions.canEdit ? overwriteButton : ''}
+  static #compareBar(): SafeHtml {
+    return html`<div class="viewer-compare" role="region" aria-label="版本对比" data-compare-bar hidden>
+  <b class="viewer-compare__title" data-compare-title></b>
+  <div class="viewer-compare__legend" data-compare-legend></div>
+  <div class="viewer-compare__end">
+    <button type="button" class="xxd-btn" data-variant="ghost" data-size="sm" data-compare-previous>上一处</button>
+    <button type="button" class="xxd-btn" data-variant="ghost" data-size="sm" data-compare-next>下一处</button>
+    <button type="button" class="xxd-btn" data-size="sm" data-compare-exit>退出对比</button>
   </div>
 </div>`
+  }
+
+  // The mode hint and the composer float over the artifact; both are drawn here once and shown by the page script.
+  static #commentingLayer(): SafeHtml {
+    return html`<div class="viewer-mode-hint" data-mode-hint hidden><span role="status" data-mode-hint-text></span><kbd class="xxd-kbd">Esc</kbd><button type="button" class="xxd-btn" data-variant="ghost" data-size="xs" data-exit-comment-mode>退出</button></div>
+<form class="viewer-composer" role="dialog" aria-label="写评论" aria-describedby="composer-quote" data-composer hidden>
+  <div class="viewer-composer__head"><b data-composer-label></b><span class="xxd-mono" data-composer-version></span></div>
+  <p class="viewer-composer__quote" id="composer-quote" data-composer-quote></p>
+  <textarea class="xxd-textarea" name="body" rows="3" placeholder="写评论…" aria-label="评论内容" required data-error-required="写点什么再发送"></textarea>
+  <p class="viewer-composer__agent-note" data-agent-note hidden>agent 会按这条评论修改页面，改完回复你。</p>
+  <div class="viewer-composer__row">
+    <label class="xxd-choice"><input type="checkbox" role="switch" class="xxd-switch" data-size="sm" name="forAgent">给 agent</label>
+    <span class="viewer-shortcut" aria-hidden="true"><kbd class="xxd-kbd" data-modifier-key>⌘</kbd><kbd class="xxd-kbd">↵</kbd></span>
+    <button type="button" class="xxd-btn ui-dialog-cancel" data-size="sm" data-cancel-composer>取消</button>
+    <button type="submit" class="xxd-btn" data-variant="primary" data-size="sm">发送</button>
+  </div>
+</form>`
+  }
+
+  static #coachMark(): SafeHtml {
+    return html`<div class="viewer-coach" role="note" data-coach hidden><span data-coach-text></span><button type="button" class="xxd-btn" data-variant="ghost" data-size="xs" data-dismiss-coach>知道了</button></div>`
+  }
+
+  static #drawer(model: ViewerModel): SafeHtml | '' {
+    const { canReadComments, canBrowseSharedData } = model.openedArtifact.permissions
+    if (!canReadComments && !canBrowseSharedData) return ''
+    const commentsView = html`<div class="viewer-drawer__view" data-drawer-view="comments">
+    <div class="viewer-drawer__filters" data-comment-filters></div>
+    <div class="viewer-drawer__cue" data-new-comments></div>
+    <div class="viewer-drawer__threads" data-comment-threads><p class="viewer-drawer__status"><span class="xxd-spinner" aria-hidden="true"></span>正在加载评论…</p></div>
+    <p class="viewer-drawer__foot" data-drawer-foot hidden></p>
+    <div class="xxd-sr-only" role="status" data-comment-status></div>
+  </div>`
+    return html`<aside class="viewer-drawer" id="viewer-drawer" aria-labelledby="viewer-drawer-title" data-drawer hidden>
+  <button type="button" class="viewer-drawer__handle" aria-label="拖动调整评论面板高度" data-drawer-handle></button>
+  <div class="viewer-drawer__head">
+    <h2 class="viewer-drawer__title" id="viewer-drawer-title" tabindex="-1" data-drawer-title>评论</h2>
+    <button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" aria-label="关闭" data-close-drawer>${PageShell.icon('X')}</button>
+  </div>
+  ${canReadComments ? commentsView : ''}
+  ${canBrowseSharedData ? html`<div class="viewer-drawer__view viewer-data" data-drawer-view="data" hidden></div>` : ''}
+</aside>`
+  }
+
+  static #shortcutSheet(model: ViewerModel): SafeHtml {
+    const { canComment, canReadComments } = model.openedArtifact.permissions
+    const shortcut = (keys: SafeHtml, meaning: string) => html`<dt>${keys}</dt><dd>${meaning}</dd>`
+    const key = (name: string) => html`<kbd class="xxd-kbd">${name}</kbd>`
+    return html`<dialog class="xxd-dialog viewer-keys" data-size="sm" id="shortcut-sheet" aria-labelledby="shortcut-sheet-title" data-shortcut-sheet>
+  <div class="xxd-dialog__head"><h2 class="xxd-dialog__title" id="shortcut-sheet-title">快捷键</h2></div>
+  <div class="xxd-dialog__body"><dl class="viewer-keys__list">
+    ${canComment ? shortcut(key('C'), '评论模式：点页面上的内容写评论') : ''}
+    ${canReadComments ? html`${shortcut(key('J'), '下一条评论')}${shortcut(key('K'), '上一条评论')}` : ''}
+    ${canComment ? shortcut(html`<kbd class="xxd-kbd" data-modifier-key>⌘</kbd>${key('↵')}`, '发送评论或回复') : ''}
+    ${shortcut(key('Esc'), '关闭当前的浮层，退出评论模式')}
+    ${shortcut(key('?'), '打开这张表')}
+  </dl></div>
+  <div class="xxd-dialog__actions"><button type="button" class="xxd-btn ui-dialog-cancel" data-xxd-dialog-close>关闭</button></div>
+</dialog>`
   }
 
   static #shareDialog(): SafeHtml {
@@ -205,10 +276,10 @@ ${ViewerPage.#artifactMenu(model)}`
       <div class="xxd-text-pair share-dialog__heading"><h2 class="xxd-dialog__title" id="share-title">分享</h2><p class="xxd-text" data-variant="caption" data-share-subtitle></p></div>
       <button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" aria-label="关闭" data-close-share>${PageShell.icon('X')}</button>
     </div>
-    <div class="xxd-dialog__body share-dialog__body" data-share-body><p class="viewer-side__status"><span class="xxd-spinner" aria-hidden="true"></span>正在加载…</p></div>
+    <div class="xxd-dialog__body share-dialog__body" data-share-body><p class="viewer-drawer__status"><span class="xxd-spinner" aria-hidden="true"></span>正在加载…</p></div>
     <div class="xxd-dialog__actions">
       <span class="xxd-text share-dialog__url" data-variant="mono-secondary" data-share-url></span>
-      <button type="button" class="xxd-btn" data-copy-link data-copy-done="链接已复制">${PageShell.icon('Copy', 14)}复制链接</button>
+      <button type="button" class="xxd-btn" data-copy-link data-copy-done="已复制链接">${PageShell.icon('Copy', 14)}复制链接</button>
       <button type="submit" class="xxd-btn" data-variant="primary" data-save-sharing disabled>保存</button>
     </div>
   </form>

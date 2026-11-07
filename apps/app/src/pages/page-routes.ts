@@ -118,9 +118,11 @@ export class PageRoutes {
     const openedArtifact = await this.#context.gate.open(artifactId, identity, request)
     if (!openedArtifact) return MessagePages.notFound(identity ? null : PageRoutes.#pathOf(request))
     if (!openedArtifact.permissions.canView) return this.#refusal(request, openedArtifact, identity)
-    const requestedVersion = Number(new URL(request.url).searchParams.get('v') ?? openedArtifact.summary.version)
-    const versionExists = Number.isInteger(requestedVersion) && requestedVersion >= 1 && requestedVersion <= openedArtifact.summary.version
+    const versionParameter = new URL(request.url).searchParams.get('v')
+    const requestedVersion = Number(versionParameter ?? openedArtifact.summary.version)
+    const versionExists = ArtifactGate.hasVersion(openedArtifact, requestedVersion)
     const shownVersion = versionExists ? requestedVersion : openedArtifact.summary.version
+    const asksForMissingVersion = versionParameter !== null && Number.isInteger(requestedVersion) && !versionExists
     const showsOlderVersion = shownVersion !== openedArtifact.summary.version
     if (showsOlderVersion && !openedArtifact.permissions.canSeeVersions) return identity ? MessagePages.notFound(null) : this.#redirectToLogin(request)
     const now = Date.now()
@@ -130,6 +132,7 @@ export class PageRoutes {
       identity,
       authorName: authorNames.get(openedArtifact.summary.authorId) ?? '',
       shownVersion,
+      missingVersion: asksForMissingVersion ? requestedVersion : null,
       olderVersion: shownVersion === openedArtifact.summary.version ? null : await this.#olderVersion(artifactId, shownVersion),
       artifactUrl: await this.#context.artifactPages.entryPageUrl(artifactId, shownVersion, now),
       usercontentOrigin: this.#settings.usercontentOrigin,

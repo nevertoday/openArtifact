@@ -186,28 +186,42 @@ describe('home page', () => {
 })
 
 describe('viewer page', () => {
-  it('shows who published an older version, how to see the latest and how to overwrite with it, and keeps viewer data out of reach of markup injection', async () => {
+  const configOf = (markup: string) => JSON.parse(markup.match(/<script type="application\/json" id="viewer-config">(.*?)<\/script>/s)?.[1] ?? '{}')
+
+  it('puts the artifact first with a slim bar, comments on the page, and the page data out of reach of markup injection', async () => {
     const published = await app.publish({ token: agentToken }, '</script><script>alert(1)</script>', '<h1>v1</h1>')
-    await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
 
-    const oldVersionMarkup = await pageText(`/a/${published.artifactId}?v=1`, authorCookie)
-    const configJson = oldVersionMarkup.match(/<script type="application\/json" id="viewer-config">(.*?)<\/script>/s)?.[1] ?? ''
+    const authorMarkup = await pageText(`/a/${published.artifactId}`, authorCookie)
 
-    expect(oldVersionMarkup).toContain('你在看 <strong class="xxd-mono">v1</strong>（刚刚，lin 发布），最新是 <span class="xxd-mono">v2</span>。')
-    expect(oldVersionMarkup).toContain(`<a class="xxd-link" href="/a/${published.artifactId}">看最新版</a>`)
-    expect(oldVersionMarkup).toMatch(/<button [^>]*data-overwrite-with-version="1"[^>]*>用 v1 覆盖当前<\/button>/)
-    expect(JSON.parse(configJson)).toMatchObject({ shownVersion: 1, currentVersion: 2, title: '</script><script>alert(1)</script>' })
-    expect(oldVersionMarkup).not.toContain('<script>alert(1)</script>')
+    expect(authorMarkup).toMatch(/<button [^>]*aria-pressed="false" aria-keyshortcuts="C"[^>]*data-comment-mode/)
+    expect(authorMarkup).toContain('aria-controls="viewer-drawer"')
+    expect(authorMarkup).toMatch(/<form class="viewer-composer" role="dialog" aria-label="写评论"/)
+    expect(authorMarkup).toContain('placeholder="写评论…"')
+    expect(authorMarkup).toContain('这个页面在隔离环境里运行，读不到你的登录信息')
+    expect(authorMarkup).toContain('<link rel="stylesheet" href="/static/viewer.css">')
+    expect(configOf(authorMarkup)).toMatchObject({ shownVersion: 1, currentVersion: 1, title: '</script><script>alert(1)</script>', permissions: { canComment: true, canEdit: true } })
+    expect(authorMarkup).not.toContain('<script>alert(1)</script>')
   })
 
-  it('offers overwriting with an older version only to people who can edit', async () => {
-    const published = await app.publish({ token: agentToken }, 'Read only for zhou', '<h1>v1</h1>')
+  it('tells an older version from the latest and offers overwriting the latest only to people who can edit', async () => {
+    const published = await app.publish({ token: agentToken }, 'Two versions to choose from', '<h1>v1</h1>')
     await app.request(`/api/artifacts/${published.artifactId}`, { method: 'PUT', token: agentToken, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
 
+    const authorMarkup = await pageText(`/a/${published.artifactId}?v=1`, authorCookie)
     const reviewerMarkup = await pageText(`/a/${published.artifactId}?v=1`, reviewerCookie)
 
-    expect(reviewerMarkup).toContain('看最新版')
-    expect(reviewerMarkup).not.toContain('data-overwrite-with-version')
+    expect(authorMarkup).toContain('aria-label="版本 1，选择版本"')
+    expect(configOf(authorMarkup)).toMatchObject({ shownVersion: 1, currentVersion: 2, olderVersion: { version: 1, authorName: 'lin' }, permissions: { canEdit: true } })
+    expect(configOf(reviewerMarkup)).toMatchObject({ shownVersion: 1, permissions: { canEdit: false } })
+  })
+
+  it('shows the latest version when the address asks for one that does not exist, and says so', async () => {
+    const published = await app.publish({ token: agentToken }, 'Missing version', '<h1>v1</h1>')
+
+    const markup = await pageText(`/a/${published.artifactId}?v=99`, authorCookie)
+
+    expect(configOf(markup)).toMatchObject({ shownVersion: 1, missingVersion: 99 })
+    expect(markup).toMatch(new RegExp(`<iframe [^>]*src="http://usercontent\\.test/s/[^"]+/${published.artifactId}/v1/index\\.html"`))
   })
 })
 
@@ -241,6 +255,8 @@ describe('full-screen view', () => {
 
     expect(oldVersionViewer).toContain(`href="/a/${published.artifactId}/full?v=1"`)
     expect(oldVersionFullView).toContain(`/${published.artifactId}/v1/index.html`)
+    expect(oldVersionFullView).toContain(`href="/a/${published.artifactId}?v=1">`)
+    expect(oldVersionFullView).toContain('返回查看页')
   })
 })
 

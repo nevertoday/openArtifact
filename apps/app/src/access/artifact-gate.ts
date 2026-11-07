@@ -61,6 +61,11 @@ export class ArtifactGate {
   }
 
   /** For a permission on an artifact already opened: throws the 401 or 403 the requester should see. */
+  /** Versions are numbered from 1 without gaps, so a version exists when it lies between 1 and the latest. */
+  static hasVersion(openedArtifact: OpenedArtifact, version: number): boolean {
+    return Number.isInteger(version) && version >= 1 && version <= openedArtifact.summary.version
+  }
+
   static demand(openedArtifact: OpenedArtifact, identity: Identity | null, permission: ArtifactPermission, action: string): void {
     if (openedArtifact.permissions[permission]) return
     if (openedArtifact.withheldByTokenScope.includes(permission)) throw HttpError.outsideTokenScope(action)
