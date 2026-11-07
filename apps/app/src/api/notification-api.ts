@@ -1,4 +1,4 @@
-import type { Notification } from '@open-artifact/core'
+import type { ArtifactSummary, Notification } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
@@ -19,11 +19,14 @@ export class NotificationApi {
     const identity = await this.#context.requireIdentity()
     const notifications = await this.#context.repositories.notifications.listForRecipient(identity.userId, SHOWN_NOTIFICATIONS)
     const openableArtifacts = await this.#openableArtifacts(notifications, identity, request)
-    const shownNotifications = notifications.filter(notification => openableArtifacts.has(notification.artifactId))
-    const actorNames = await this.#context.people.namesOf(shownNotifications.map(notification => notification.actorId))
+    const shownNotifications = notifications.flatMap(notification => {
+      const openedArtifact = openableArtifacts.get(notification.artifactId)
+      return openedArtifact ? [{ notification, artifact: openedArtifact.summary }] : []
+    })
+    const actorNames = await this.#context.people.namesOf(shownNotifications.map(({ notification }) => notification.actorId))
     return Response.json({
-      notifications: shownNotifications.map(notification => this.#notificationJson(notification, openableArtifacts, actorNames)),
-      unreadCount: shownNotifications.filter(notification => notification.readAt === null).length,
+      notifications: shownNotifications.map(({ notification, artifact }) => this.#notificationJson(notification, artifact, actorNames)),
+      unreadCount: shownNotifications.filter(({ notification }) => notification.readAt === null).length,
     })
   }
 
@@ -48,9 +51,8 @@ export class NotificationApi {
     return new Map(viewableArtifacts.map(openedArtifact => [openedArtifact.summary.artifactId, openedArtifact]))
   }
 
-  #notificationJson(notification: Notification, openableArtifacts: Map<string, OpenedArtifact>, actorNames: Map<string, string>) {
+  #notificationJson(notification: Notification, artifact: ArtifactSummary, actorNames: Map<string, string>) {
     const actorName = actorNames.get(notification.actorId) ?? ''
-    const artifactTitle = openableArtifacts.get(notification.artifactId)?.summary.title ?? ''
     const actorLabel = NotificationText.actorLabel(actorName, notification.actorAgentClient)
     return {
       notificationId: notification.notificationId,
@@ -58,8 +60,8 @@ export class NotificationApi {
       artifactId: notification.artifactId,
       commentId: notification.commentId,
       actor: { userId: notification.actorId, name: actorName, agentClient: notification.actorAgentClient },
-      text: NotificationText.sentence(notification.kind, actorLabel, artifactTitle),
-      url: NotificationText.link(this.#context.viewerUrl(notification.artifactId), notification.commentId, notification.kind === 'access_requested' ? notification.actorId : null),
+      text: NotificationText.sentence(notification.kind, actorLabel, artifact.title),
+      url: NotificationText.link(this.#context.artifactUrl(artifact), notification.commentId, notification.kind === 'access_requested' ? notification.actorId : null),
       createdAt: notification.createdAt,
       read: notification.readAt !== null,
     }

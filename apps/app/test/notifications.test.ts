@@ -60,7 +60,7 @@ describe('notifications about comments', () => {
     expect(await notificationsAbout(linCookie, published.artifactId)).toMatchObject([
       { kind: 'comment_on_my_artifact', commentId, actor: { name: 'zhou', agentClient: null }, text: 'zhou 评论了你的「Pricing page」', read: false },
     ])
-    expect((await notificationsAbout(linCookie, published.artifactId))[0]?.url).toBe(`http://app.test/a/${published.artifactId}#comment-${commentId}`)
+    expect((await notificationsAbout(linCookie, published.artifactId))[0]?.url).toBe(`http://app.test${published.path}#comment-${commentId}`)
     expect(mailTo('lin@example.com', 'Pricing page')).toEqual(['zhou 在「Pricing page」留了一条给 agent 的评论'])
     expect(await notificationsAbout(zhouCookie, published.artifactId)).toEqual([])
   })
@@ -149,7 +149,7 @@ describe('notifications about new versions', () => {
 
     const zhouNews = await notificationsAbout(zhouCookie, published.artifactId)
     expect(zhouNews.filter(notification => notification.kind === 'new_version')).toMatchObject([
-      { commentId: null, actor: { name: 'lin', agentClient: 'Claude Code' }, text: 'Claude Code（代 lin）发布了「Roadmap Q3」的新版本', url: `http://app.test/a/${published.artifactId}` },
+      { commentId: null, actor: { name: 'lin', agentClient: 'Claude Code' }, text: 'Claude Code（代 lin）发布了「Roadmap Q3」的新版本', url: `http://app.test${published.path}` },
     ])
     expect((await notificationsAbout(wangCookie, published.artifactId)).map(notification => notification.kind)).toEqual(['my_comment_resolved'])
     expect((await notificationsAbout(linCookie, published.artifactId)).map(notification => notification.kind)).not.toContain('new_version')
@@ -211,7 +211,7 @@ describe('asking the author for access', () => {
   it('tells a member without access whose artifact it is, and lets them ask the author once', async () => {
     const draft = await app.publish({ token: linAgentToken }, 'Private draft', '<h1>x</h1>', 'private')
 
-    const noAccessPage = await app.request(`/a/${draft.artifactId}`, { cookie: zhouCookie })
+    const noAccessPage = await app.request(draft.path, { cookie: zhouCookie })
     const noAccessMarkup = await noAccessPage.text()
     const firstAsk = await app.request(`/api/artifacts/${draft.artifactId}/access-requests`, { method: 'POST', cookie: zhouCookie })
     const secondAsk = await app.request(`/api/artifacts/${draft.artifactId}/access-requests`, { method: 'POST', cookie: zhouCookie })
@@ -224,13 +224,13 @@ describe('asking the author for access', () => {
     expect(noAccessMarkup).not.toContain('Private draft')
     expect([firstAsk.status, secondAsk.status]).toEqual([204, 204])
     expect(authorHears.map(notification => notification.text)).toEqual(['zhou 想查看「Private draft」，请你分享给 TA'])
-    expect(authorHears[0]?.url).toMatch(new RegExp(`/a/${draft.artifactId}#share=${authorHears[0]?.actor.userId}$`))
+    expect(authorHears[0]?.url).toMatch(new RegExp(`${draft.path}#share=${authorHears[0]?.actor.userId}$`))
     expect(app.mailer.lastTo('lin@example.com')?.text).toContain('zhou@example.com')
   })
 
   it('keeps answering 找不到 to people outside the workspace, and refuses their request', async () => {
     await env.DB.prepare("INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES ('workspace-elsewhere', 'Elsewhere', ?)").bind(Date.now()).run()
-    const elsewhere = await app.repositories.artifacts.create({ workspaceId: 'workspace-elsewhere', authorId: 'user-elsewhere', title: 'Elsewhere plan', visibility: 'private', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: null, listed: false, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+    const elsewhere = await app.repositories.artifacts.create({ workspaceId: 'workspace-elsewhere', authorId: 'user-elsewhere', title: 'Elsewhere plan', slug: 'elsewhere-plan', visibility: 'private', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: null, listed: false, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
 
     const page = await app.request(`/a/${elsewhere.artifactId}`, { cookie: zhouCookie })
     const ask = await app.json<{ code: string }>(`/api/artifacts/${elsewhere.artifactId}/access-requests`, { method: 'POST', cookie: zhouCookie })

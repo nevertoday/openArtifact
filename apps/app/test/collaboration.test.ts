@@ -351,7 +351,7 @@ describe('the agent inbox', () => {
       commentId: pinned,
       artifactId: mine.artifactId,
       version: 2,
-      url: `http://app.test/a/${mine.artifactId}#comment-${pinned}`,
+      url: `http://app.test${mine.path}#comment-${pinned}`,
       anchor: { x: 0.5, y: 0.25, version: 2 },
       author: { name: 'zhou' },
       replies: [{ body: '还是不对', postedVia: null }],

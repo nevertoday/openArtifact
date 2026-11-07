@@ -1,4 +1,4 @@
-import { CommentThread, PublicLinkPassword, type Invite } from '@open-artifact/core'
+import { ArtifactPath, CommentThread, PublicLinkPassword, type ArtifactPage, type Invite } from '@open-artifact/core'
 import { ArtifactGate, type OpenedArtifact } from '../access/artifact-gate.ts'
 import type { ApiContext } from '../api/api-context.ts'
 import { INVITE_COOKIE } from '../auth/admission.ts'
@@ -132,22 +132,27 @@ export class PageRoutes {
     return new Response(null, { status: 302, headers: { Location: PersonalPages.path(profile.handle) } })
   }
 
-  async viewer(request: Request, artifactId: string): Promise<Response> {
-    const viewing = await this.#viewing(request, artifactId)
+  /** `segment` is the part of the address after /a/, as the link has it. */
+  async viewer(request: Request, segment: string): Promise<Response> {
+    const viewing = await this.#viewing(request, segment, 'viewer')
     return viewing instanceof Response ? viewing : ViewerPage.render(viewing)
   }
 
-  async fullView(request: Request, artifactId: string): Promise<Response> {
-    const viewing = await this.#viewing(request, artifactId)
+  async fullView(request: Request, segment: string): Promise<Response> {
+    const viewing = await this.#viewing(request, segment, 'full')
     return viewing instanceof Response ? viewing : ViewerPage.renderFull(viewing)
   }
 
   // Both pages decide access and sign a fresh file URL on every visit, so their addresses are safe to pass around.
-  async #viewing(request: Request, artifactId: string): Promise<ViewerModel | Response> {
+  async #viewing(request: Request, segment: string, page: ArtifactPage): Promise<ViewerModel | Response> {
     const identity = await this.#context.identity()
-    const openedArtifact = await this.#context.gate.open(artifactId, identity, request)
+    const reference = ArtifactPath.parse(segment)
+    const openedArtifact = reference ? await this.#context.gate.openReferenced(reference, identity, request) : null
     if (!openedArtifact) return MessagePages.notFound(identity ? null : PageRoutes.#pathOf(request))
-    if (!openedArtifact.permissions.canView) return this.#refusal(request, openedArtifact, identity)
+    if (!openedArtifact.permissions.canView) return this.#refusal(request, segment, openedArtifact, identity)
+    // The redirect spells out the artifact's words, so it comes only after the same check that shows its title.
+    if (segment !== ArtifactPath.segmentOf(openedArtifact.summary)) return PageRoutes.#movedTo(`${ArtifactPath.of(openedArtifact.summary, page)}${new URL(request.url).search}`)
+    const artifactId = openedArtifact.summary.artifactId
     const versionParameter = new URL(request.url).searchParams.get('v')
     const requestedVersion = Number(versionParameter ?? openedArtifact.summary.version)
     const versionExists = ArtifactGate.hasVersion(openedArtifact, requestedVersion)
@@ -182,8 +187,8 @@ export class PageRoutes {
     return {
       authorName,
       personalPagePath: PersonalPages.path(profile.handle),
-      articleUrl: this.#context.viewerUrl(summary.artifactId),
-      next: next && next.artifactId !== summary.artifactId ? { artifactId: next.artifactId, title: next.title } : null,
+      articleUrl: this.#context.artifactUrl(summary),
+      next: next && next.artifactId !== summary.artifactId ? { path: ArtifactPath.of(next), title: next.title } : null,
     }
   }
 
@@ -195,29 +200,37 @@ export class PageRoutes {
     return { version, authorName: authorNames.get(versionRecord.authorId) ?? '', publishedAt: versionRecord.createdAt }
   }
 
-  async unlock(request: Request, artifactId: string): Promise<Response> {
-    const summary = await this.#context.repositories.artifacts.findSummary(artifactId)
+  /** Every answer leads back to the address as the link had it; the viewer redirects from there once the password lets the visitor in. */
+  async unlock(request: Request, segment: string): Promise<Response> {
+    const requestedPath = ArtifactPath.atSegment(segment)
+    const reference = ArtifactPath.parse(segment)
+    const summary = reference ? await this.#context.gate.find(reference) : null
     const passwordHash = summary?.sharing.publicLinkPasswordHash ?? null
-    if (!summary || passwordHash === null) return MessagePages.notFound(`/a/${encodeURIComponent(artifactId)}`)
+    if (!summary || passwordHash === null) return MessagePages.notFound(requestedPath)
     // Each guess costs a PBKDF2 run, so guessing is limited per visitor and artifact.
     const visitorAddress = request.headers.get('CF-Connecting-IP') ?? 'unknown'
-    const { success: withinAttemptLimit } = await this.#settings.unlockRateLimiter.limit({ key: `${artifactId}:${visitorAddress}` })
-    if (!withinAttemptLimit) return PageRoutes.#backToPasswordPrompt(artifactId, 'wait')
+    const { success: withinAttemptLimit } = await this.#settings.unlockRateLimiter.limit({ key: `${summary.artifactId}:${visitorAddress}` })
+    if (!withinAttemptLimit) return PageRoutes.#backToPasswordPrompt(requestedPath, 'wait')
     const formData = await request.formData()
     const password = String(formData.get('password') ?? '')
-    if (!(await PublicLinkPassword.verify(password, passwordHash))) return PageRoutes.#backToPasswordPrompt(artifactId, 'wrong')
+    if (!(await PublicLinkPassword.verify(password, passwordHash))) return PageRoutes.#backToPasswordPrompt(requestedPath, 'wrong')
     const unlockCookie = HttpCookies.serialize(
-      ArtifactGate.unlockCookieName(artifactId),
+      ArtifactGate.unlockCookieName(summary.artifactId),
       await this.#context.gate.unlockCookieValue(summary),
       { maxAgeSeconds: UNLOCK_COOKIE_SECONDS, path: '/' },
       new URL(request.url).protocol === 'https:',
     )
-    return new Response(null, { status: 303, headers: { Location: `/a/${encodeURIComponent(artifactId)}`, 'Set-Cookie': unlockCookie } })
+    return new Response(null, { status: 303, headers: { Location: requestedPath, 'Set-Cookie': unlockCookie } })
   }
 
   /** Reloading the result shows the prompt again instead of resubmitting the password. */
-  static #backToPasswordPrompt(artifactId: string, prompt: Exclude<PasswordPrompt, 'ask'>): Response {
-    return new Response(null, { status: 303, headers: { Location: `/a/${encodeURIComponent(artifactId)}?password=${prompt}` } })
+  static #backToPasswordPrompt(requestedPath: string, prompt: Exclude<PasswordPrompt, 'ask'>): Response {
+    return new Response(null, { status: 303, headers: { Location: `${requestedPath}?password=${prompt}` } })
+  }
+
+  // Not cached: whether a link redirects depends on who opens it, and its words may change again.
+  static #movedTo(path: string): Response {
+    return new Response(null, { status: 301, headers: { Location: path, 'Cache-Control': 'no-store' } })
   }
 
   async settings(request: Request, requestedSection: string | undefined): Promise<Response> {
@@ -268,9 +281,9 @@ export class PageRoutes {
     return { artifacts, auditEvents, names: new Map([...artifactNames, ...auditNames]) }
   }
 
-  async #refusal(request: Request, openedArtifact: OpenedArtifact, identity: Identity | null): Promise<Response> {
+  async #refusal(request: Request, segment: string, openedArtifact: OpenedArtifact, identity: Identity | null): Promise<Response> {
     const { summary, permissions } = openedArtifact
-    if (permissions.needsPublicLinkPassword) return MessagePages.publicLinkPassword(summary.artifactId, PageRoutes.#passwordPromptOf(request))
+    if (permissions.needsPublicLinkPassword) return MessagePages.publicLinkPassword(ArtifactPath.atSegment(segment, 'unlock'), PageRoutes.#passwordPromptOf(request))
     if (!identity) return this.#redirectToLogin(request)
     if (!ArtifactGate.mayAskForAccess(openedArtifact, identity)) return MessagePages.notFound(null)
     const authorNames = await this.#context.people.namesOf([summary.authorId])

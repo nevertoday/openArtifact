@@ -40,6 +40,8 @@ export interface Publication {
 export interface NewArtifact extends Omit<Publication, 'origin'> {
   workspaceId: string
   title: string
+  /** Already normalized by ArtifactSlug; the repository gives the artifact its short id. */
+  slug: string
   visibility: ArtifactVisibility
   /** null for a link that never expires; it matters only while the visibility is public_link. */
   publicLinkExpiresAt: number | null
@@ -50,11 +52,16 @@ export interface NewArtifact extends Omit<Publication, 'origin'> {
 
 export interface CreatedArtifact {
   artifactId: string
+  shortId: string
   version: number
 }
 
 export interface ArtifactSummary {
   artifactId: string
+  /** Names the artifact in its address; see ArtifactPath. */
+  shortId: string
+  /** Words in its address for people to read, possibly empty; never used to find the artifact. */
+  slug: string
   workspaceId: string
   title: string
   authorId: string
@@ -107,6 +114,8 @@ export interface ArtifactRepository extends ArtifactFileSource {
   readVersion(artifactId: string, version: number): Promise<ArtifactVersionContent | null>
   /** Finds removed artifacts too; access rules decide who may still act on them. */
   findSummary(artifactId: string): Promise<ArtifactSummary | null>
+  /** Like findSummary, by the short id in the artifact's address. */
+  findSummaryByShortId(shortId: string): Promise<ArtifactSummary | null>
   /** Every artifact of the workspace, removed ones included, most recently updated first. */
   listRecentlyUpdated(workspaceId: string): Promise<ArtifactSummary[]>
   /** The author's active artifacts they put on their personal page, in every workspace, most recently updated first. */
@@ -114,7 +123,8 @@ export interface ArtifactRepository extends ArtifactFileSource {
   /** null goes back to the page's opening words. */
   setSummary(artifactId: string, summary: string | null): Promise<void>
   listVersions(artifactId: string): Promise<ArtifactVersionRecord[]>
-  rename(artifactId: string, title: string): Promise<void>
+  /** Changes the title and the words of the address together; the short id never changes. */
+  rename(artifactId: string, name: { title: string; slug: string }): Promise<void>
   /** Returns false when the artifact is missing or already removed. */
   remove(artifactId: string, removal: ArtifactRemoval): Promise<boolean>
   /** Returns false when the artifact is missing or not removed. */

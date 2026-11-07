@@ -8,7 +8,7 @@ import { HttpError } from '../http-error.ts'
 import { Notifier } from '../notifications/notifier.ts'
 import type { People } from '../people.ts'
 import { PersonalPages } from '../personal-pages.ts'
-import type { Repositories } from '@open-artifact/core'
+import { ArtifactPath, type AddressedArtifact, type Repositories } from '@open-artifact/core'
 
 export interface ApiContextFields {
   repositories: Repositories
@@ -43,7 +43,7 @@ export class ApiContext {
     this.requestIdentity = fields.requestIdentity
     this.people = fields.people
     this.mailer = fields.mailer
-    this.notifier = new Notifier(fields.repositories, fields.mailer, artifactId => this.viewerUrl(artifactId))
+    this.notifier = new Notifier(fields.repositories, fields.mailer, artifact => this.artifactUrl(artifact))
     this.auth = fields.auth
     this.admission = fields.admission
     this.appOrigin = fields.appOrigin
@@ -78,7 +78,7 @@ export class ApiContext {
     return `${this.appOrigin}/invite/${encodeURIComponent(inviteCode)}`
   }
 
-  viewerUrl(artifactId: string): string {
-    return `${this.appOrigin}/a/${encodeURIComponent(artifactId)}`
+  artifactUrl(artifact: AddressedArtifact): string {
+    return `${this.appOrigin}${ArtifactPath.of(artifact)}`
   }
 }

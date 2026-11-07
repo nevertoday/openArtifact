@@ -1,4 +1,4 @@
-import { ArtifactRemoval, type AccessToken, type AuditEvent, type WorkspaceMember } from '@open-artifact/core'
+import { ArtifactPath, ArtifactRemoval, type AccessToken, type AuditEvent, type WorkspaceMember } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import type { GuideFile } from '../guide/agent-guide.ts'
@@ -216,7 +216,7 @@ ${administration ? SettingsPage.#auditSection(administration, model.now) : ''}`
   static #contentSection(administration: WorkspaceAdministration, identity: Identity, now: number): SafeHtml {
     const row = (openedArtifact: OpenedArtifact) => {
       const { summary, permissions } = openedArtifact
-      const titleCell = permissions.canView ? html`<a class="xxd-link" href="/a/${encodeURIComponent(summary.artifactId)}">${summary.title}</a>` : summary.title
+      const titleCell = permissions.canView ? html`<a class="xxd-link" href="${ArtifactPath.of(summary)}">${summary.title}</a>` : summary.title
       return html`<tr>
     <td>${titleCell}</td>
     <td><span class="xxd-text" data-variant="secondary">${administration.names.get(summary.authorId)}</span></td>

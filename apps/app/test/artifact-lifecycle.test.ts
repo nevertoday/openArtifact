@@ -56,7 +56,7 @@ describe('removing an artifact', () => {
     const removal = await app.request(`/api/artifacts/${published.artifactId}`, { method: 'DELETE', cookie: authorCookie })
     const afterRemoval = await Promise.all([
       app.request(`/api/artifacts/${published.artifactId}`, { cookie: authorCookie }),
-      app.request(`/a/${published.artifactId}`, { cookie: memberCookie }),
+      app.request(published.path, { cookie: memberCookie }),
       app.request(`/api/artifacts/${published.artifactId}/comments`, { cookie: authorCookie }),
       app.request(`/api/artifacts/${published.artifactId}/data`, { cookie: memberCookie }),
       app.request(`/api/artifacts/${published.artifactId}/versions`, { cookie: authorCookie }),

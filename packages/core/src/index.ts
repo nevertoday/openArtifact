@@ -1,6 +1,8 @@
 export { ACCESS_TOKEN_SCOPES } from './access-token-repository.ts'
 export type { AccessToken, AccessTokenRepository, AccessTokenScope, NewAccessToken, TokenUse } from './access-token-repository.ts'
 export type { ArtifactAccessRepository, ArtifactGrant, GrantRole, PersonGrant } from './artifact-access-repository.ts'
+export { ArtifactPath, ArtifactSlug, ShortId } from './artifact-address.ts'
+export type { AddressedArtifact, ArtifactPage, ArtifactReference } from './artifact-address.ts'
 export { ArtifactAccess } from './artifact-access.ts'
 export type { ArtifactPermission, ArtifactPermissions, ArtifactViewer } from './artifact-access.ts'
 export type {

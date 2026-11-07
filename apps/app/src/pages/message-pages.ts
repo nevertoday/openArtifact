@@ -15,9 +15,9 @@ const PASSWORD_STATUSES: Record<PasswordPrompt, number> = { ask: 200, wrong: 401
 /** Small standalone pages: a password prompt for protected public links, and errors a person can act on. */
 export class MessagePages {
   /** The prompt for a password-protected public link: first asked, after a wrong password, or after too many guesses. */
-  static publicLinkPassword(artifactId: string, prompt: PasswordPrompt): Response {
+  static publicLinkPassword(unlockPath: string, prompt: PasswordPrompt): Response {
     const fieldError = PASSWORD_ERRORS[prompt]
-    const body = MessagePages.#centered(html`<form class="xxd-surface app-center__card" method="post" action="/a/${encodeURIComponent(artifactId)}/unlock" data-xxd-validate>
+    const body = MessagePages.#centered(html`<form class="xxd-surface app-center__card" method="post" action="${unlockPath}" data-xxd-validate>
   ${PageShell.icon('LockKeyhole', 24)}
   <div class="xxd-text-pair">
     <h1 class="xxd-text" data-variant="heading2">这个链接需要密码</h1>

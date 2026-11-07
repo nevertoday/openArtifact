@@ -101,7 +101,7 @@ export class VersionHistory extends EventTarget {
     this.#button.setAttribute('aria-label', `版本 ${shown}${isOld ? '，不是最新版本' : ''}，选择版本`)
     const versionQuery = isOld ? `?v=${shown}` : ''
     history.replaceState(history.state, '', `${location.pathname}${versionQuery}${location.hash}`)
-    this.#fullViewLink?.setAttribute('href', `/a/${encodeURIComponent(this.#config.artifactId)}/full${versionQuery}`)
+    this.#fullViewLink?.setAttribute('href', `${this.#config.fullViewPath}${versionQuery}`)
     this.#renderNotice()
   }
 

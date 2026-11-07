@@ -1,5 +1,6 @@
 import {
   ArtifactRemoval,
+  ShortId,
   type ArtifactFile,
   type ArtifactRepository,
   type ArtifactSummary,
@@ -14,7 +15,7 @@ import {
 } from '@open-artifact/core'
 
 const SUMMARY_SELECT = `
-  SELECT artifacts.id, artifacts.workspace_id, artifacts.title, artifacts.author_id, artifacts.visibility,
+  SELECT artifacts.id, artifacts.short_id, artifacts.slug, artifacts.workspace_id, artifacts.title, artifacts.author_id, artifacts.visibility,
          artifacts.public_link_expires_at, artifacts.public_link_password_hash, artifacts.anonymous_write_enabled, artifacts.public_link_shows_comments,
          artifacts.listed, COALESCE(artifacts.summary, artifact_versions.excerpt) AS summary,
          artifacts.current_version, artifacts.updated_at, artifact_versions.published_via,
@@ -25,6 +26,8 @@ const SUMMARY_SELECT = `
 
 interface SummaryRow {
   id: string
+  short_id: string
+  slug: string
   workspace_id: string
   title: string
   author_id: string
@@ -58,6 +61,9 @@ interface VersionRow {
   created_at: number
 }
 
+// A new short id clashing with a stored one is a one-in-billions event; a few fresh draws always end it.
+const SHORT_ID_ATTEMPTS = 3
+
 interface FileRow {
   path: string
   content_type: string
@@ -71,24 +77,38 @@ interface FileRow {
 export class CloudflareArtifactRepository implements ArtifactRepository {
   readonly #db: D1Database
   readonly #files: R2Bucket
+  readonly #generateShortId: () => string
 
-  constructor(db: D1Database, files: R2Bucket) {
+  constructor(db: D1Database, files: R2Bucket, generateShortId: () => string = ShortId.generate) {
     this.#db = db
     this.#files = files
+    this.#generateShortId = generateShortId
   }
 
   async create(newArtifact: NewArtifact): Promise<CreatedArtifact> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.#createWithShortId(newArtifact, this.#generateShortId())
+      } catch (error) {
+        if (attempt >= SHORT_ID_ATTEMPTS || !CloudflareArtifactRepository.#isShortIdClash(error)) throw error
+      }
+    }
+  }
+
+  async #createWithShortId(newArtifact: NewArtifact, shortId: string): Promise<CreatedArtifact> {
     const artifactId = crypto.randomUUID()
     const firstVersion = 1
     const createdAt = Date.now()
     await this.#writeVersion(artifactId, newArtifact.files, uploadId => [
       this.#db
         .prepare(
-          `INSERT INTO artifacts (id, workspace_id, author_id, title, visibility, public_link_expires_at, listed, summary, current_version, current_upload_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO artifacts (id, short_id, slug, workspace_id, author_id, title, visibility, public_link_expires_at, listed, summary, current_version, current_upload_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           artifactId,
+          shortId,
+          newArtifact.slug,
           newArtifact.workspaceId,
           newArtifact.authorId,
           newArtifact.title,
@@ -103,7 +123,12 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
         ),
       ...this.#recordVersionStatements(artifactId, firstVersion, uploadId, { ...newArtifact, origin: { kind: 'published' } }, createdAt),
     ])
-    return { artifactId, version: firstVersion }
+    return { artifactId, shortId, version: firstVersion }
+  }
+
+  static #isShortIdClash(error: unknown): boolean {
+    const cause = error instanceof Error ? error.cause : null
+    return cause instanceof Error && cause.message.includes('UNIQUE constraint failed: artifacts.short_id')
   }
 
   async publishOnTopOf(artifactId: string, baseVersion: number, publication: Publication): Promise<PublishResult> {
@@ -159,6 +184,11 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     return summaryRow ? CloudflareArtifactRepository.#summaryOf(summaryRow) : null
   }
 
+  async findSummaryByShortId(shortId: string): Promise<ArtifactSummary | null> {
+    const summaryRow = await this.#db.prepare(`${SUMMARY_SELECT} WHERE artifacts.short_id = ?`).bind(shortId).first<SummaryRow>()
+    return summaryRow ? CloudflareArtifactRepository.#summaryOf(summaryRow) : null
+  }
+
   async listRecentlyUpdated(workspaceId: string): Promise<ArtifactSummary[]> {
     const { results: summaryRows } = await this.#db
       .prepare(`${SUMMARY_SELECT} WHERE artifacts.workspace_id = ? ORDER BY artifacts.updated_at DESC`)
@@ -194,8 +224,8 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     }))
   }
 
-  async rename(artifactId: string, title: string): Promise<void> {
-    await this.#db.prepare('UPDATE artifacts SET title = ? WHERE id = ?').bind(title, artifactId).run()
+  async rename(artifactId: string, name: { title: string; slug: string }): Promise<void> {
+    await this.#db.prepare('UPDATE artifacts SET title = ?, slug = ? WHERE id = ?').bind(name.title, name.slug, artifactId).run()
   }
 
   async remove(artifactId: string, removal: ArtifactRemoval): Promise<boolean> {
@@ -318,6 +348,8 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
   static #summaryOf(summaryRow: SummaryRow): ArtifactSummary {
     return {
       artifactId: summaryRow.id,
+      shortId: summaryRow.short_id,
+      slug: summaryRow.slug,
       workspaceId: summaryRow.workspace_id,
       title: summaryRow.title,
       authorId: summaryRow.author_id,

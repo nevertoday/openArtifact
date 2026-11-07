@@ -208,7 +208,7 @@ class AgentConnection {
   static #connected(firstPage) {
     return element('div', { className: 'xxd-banner', 'data-tone': 'success' },
       element('div', {}, element('p', { className: 'xxd-banner__title' }, `连上了：${firstPage.publishedVia} 刚刚发布了「${firstPage.title}」`)),
-      element('div', { className: 'xxd-banner__actions' }, element('a', { className: 'xxd-btn', 'data-size': 'sm', href: `/a/${encodeURIComponent(firstPage.artifactId)}` }, '打开')),
+      element('div', { className: 'xxd-banner__actions' }, element('a', { className: 'xxd-btn', 'data-size': 'sm', href: firstPage.url }, '打开')),
     )
   }
 }

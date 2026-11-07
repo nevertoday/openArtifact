@@ -31,10 +31,10 @@ describe('viewer page actions', () => {
     await app.grant(authorCookie, published.artifactId, 'member@example.com', 'editor')
     const memberOnly = await app.publish({ token: authorToken }, 'Member view')
 
-    const authorMarkup = await pageText(`/a/${published.artifactId}`, authorCookie)
-    const editorMarkup = await pageText(`/a/${published.artifactId}`, memberCookie)
-    const adminMarkup = await pageText(`/a/${memberOnly.artifactId}`, adminCookie)
-    const memberMarkup = await pageText(`/a/${memberOnly.artifactId}`, memberCookie)
+    const authorMarkup = await pageText(published.path, authorCookie)
+    const editorMarkup = await pageText(published.path, memberCookie)
+    const adminMarkup = await pageText(memberOnly.path, adminCookie)
+    const memberMarkup = await pageText(memberOnly.path, memberCookie)
 
     expect(authorMarkup).toContain('data-rename-artifact')
     expect(authorMarkup).toMatch(/data-remove-artifact[^>]*>.*删除<\/button>/)
@@ -64,7 +64,7 @@ describe('recently removed on the home page', () => {
     expect(removedMarkup).toContain('Oops page')
     expect(removedMarkup).toContain(`data-restore-artifact="${published.artifactId}"`)
     expect(removedMarkup).toContain('30 天后彻底删除')
-    expect(removedMarkup).not.toContain(`href="/a/${published.artifactId}"`)
+    expect(removedMarkup).not.toContain(`href="${published.path}"`)
     expect(memberRemovedMarkup).not.toContain('Oops page')
   })
 })
@@ -93,7 +93,7 @@ describe('settings for an admin', () => {
 
     expect(adminWorkspace).toContain('内容管理')
     expect(adminWorkspace).toContain('Hidden diary 2')
-    expect(adminWorkspace).not.toContain(`href="/a/${privatePage.artifactId}"`)
+    expect(adminWorkspace).not.toContain(`href="${privatePage.path}"`)
     expect(adminWorkspace).toContain(`data-remove-artifact="${privatePage.artifactId}"`)
     expect(adminWorkspace).toContain(`data-restore-artifact="${takenDown.artifactId}"`)
     expect(adminWorkspace).toContain('管理记录')
