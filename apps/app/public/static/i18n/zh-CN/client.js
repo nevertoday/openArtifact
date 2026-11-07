@@ -5,7 +5,7 @@ export default {
   dialog: { cancel: '取消', close: '关闭' },
   errorFallback: '操作没有成功，请重试。',
   /** Keyed by ErrorCode in src/http-error.ts; `network` is the browser's own. */
-  errors: {
+  errors: /** @satisfies {Partial<Record<import('../../../../src/http-error.ts').ErrorCode | 'network', unknown>>} */ ({
     network: '连不上 Open Artifact，请检查网络后重试。',
     unauthenticated: '登录已失效，请刷新页面重新登录。',
     token_invalid: `这个 token 无效，${NEW_TOKEN_HINT}`,
@@ -29,7 +29,7 @@ export default {
     public_links_off: '管理员已关闭公开链接。',
     version_conflict: '刚有人发布了新版本。刷新页面后再试。',
     not_listable: '只有不设密码的公开链接才能列在主页上。',
-  },
+  }),
   /** takeDown is an admin removing someone else's artifact; delete is the author removing their own. */
   removal: {
     takeDown: {
