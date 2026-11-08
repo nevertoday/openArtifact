@@ -1,4 +1,13 @@
-import { ArtifactAccess, type ArtifactPermission, type ArtifactPermissions, type ArtifactReference, type ArtifactSummary, type ArtifactViewer, type SigningKey } from '@open-artifact/core'
+import {
+  ArtifactAccess,
+  type ArtifactPermission,
+  type ArtifactPermissions,
+  type ArtifactReference,
+  type ArtifactSummary,
+  type ArtifactViewer,
+  type ShareReadiness,
+  type SigningKey,
+} from '@open-artifact/core'
 import type { Identity } from '../auth/request-identity.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { HttpError } from '../http-error.ts'
@@ -9,6 +18,8 @@ export interface OpenedArtifact {
   permissions: ArtifactPermissions
   /** What the requester's person may do but the token they sent may not. */
   withheldByTokenScope: ArtifactPermission[]
+  /** Whether a link to it may go out to strangers; the same for every viewer. */
+  shareReadiness: ShareReadiness
 }
 
 /** Every route asks this gate what the requester may do with an artifact; nothing else applies access rules. */
@@ -118,7 +129,7 @@ export class ArtifactGate {
     const workspace = membership?.workspace ?? (await this.#repositories.workspaces.findWorkspace(summary.workspaceId))
     const viewer: ArtifactViewer = { userId: identity?.userId ?? null, workspaceRole: membership?.role ?? null, grantRole, publicLinkUnlocked, tokenScope: identity?.tokenScope ?? null }
     const access = new ArtifactAccess(summary, workspace?.publicLinksEnabled ?? false, this.#now)
-    return { summary, permissions: access.permissionsFor(viewer), withheldByTokenScope: access.withheldByTokenScope(viewer) }
+    return { summary, permissions: access.permissionsFor(viewer), withheldByTokenScope: access.withheldByTokenScope(viewer), shareReadiness: access.shareReadiness }
   }
 
   async #publicLinkUnlocked(summary: ArtifactSummary, request: Request): Promise<boolean> {

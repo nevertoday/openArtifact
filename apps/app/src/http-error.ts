@@ -27,6 +27,7 @@ export type ErrorCode =
   | 'public_links_off'
   | 'version_conflict'
   | 'not_listable'
+  | 'share_text_too_long'
   | 'rate_limited'
 
 /** Which request field an error is about, so a page can show it under that field. */
