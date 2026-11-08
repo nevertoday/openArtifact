@@ -1,7 +1,8 @@
-import { ArtifactRemoval, type ArtifactFile } from '@open-artifact/core'
+import type { ArtifactFile } from '@open-artifact/core'
 import { cloudflareRepositories } from '@open-artifact/storage-cloudflare'
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import { AppRoutes } from './app-routes.ts'
+import { purgePastRestoring } from './purge.ts'
 import { TitleTranslators } from './api/title-translator.ts'
 import { Mailers } from './auth/mailer.ts'
 import type { CardRenderer } from './share/card-renderer.ts'
@@ -38,8 +39,9 @@ export default {
     return appRoutes.respond(request)
   },
 
-  // Daily: artifacts removed more than 30 days ago are deleted for good.
+  // Daily: artifacts removed and workspaces deleted more than 30 days ago are deleted for good. A workspace goes
+  // after its artifacts, whose files only the artifact purge knows how to delete.
   async scheduled(_controller: ScheduledController, env: AppEnv): Promise<void> {
-    await cloudflareRepositories(env.DB, env.FILES).artifacts.purgeRemovedBefore(ArtifactRemoval.purgeCutoff(Date.now()))
+    await purgePastRestoring(cloudflareRepositories(env.DB, env.FILES), Date.now())
   },
 } satisfies ExportedHandler<AppEnv>

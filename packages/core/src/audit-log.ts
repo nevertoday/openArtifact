@@ -10,7 +10,10 @@ export type AuditChange =
   | { action: 'member.invited'; targetType: 'invite'; targetId: string; detail: { email: string | null } }
   | { action: 'invite.revoked'; targetType: 'invite'; targetId: string; detail: { email: string | null } }
   | { action: 'member.joined'; targetType: 'member'; targetId: string; detail: { via: 'link' | 'email' } }
+  | { action: 'member.left'; targetType: 'member'; targetId: string; detail: Record<string, never> }
   | { action: 'workspace.renamed'; targetType: 'workspace'; targetId: string; detail: { from: string; to: string } }
+  | { action: 'workspace.deleted'; targetType: 'workspace'; targetId: string; detail: Record<string, never> }
+  | { action: 'workspace.restored'; targetType: 'workspace'; targetId: string; detail: Record<string, never> }
 
 export type AuditAction = AuditChange['action']
 
@@ -18,7 +21,7 @@ export type NewAuditEvent = AuditChange & { workspaceId: string; actorId: string
 
 export type AuditEvent = NewAuditEvent & { eventId: string; createdAt: number }
 
-/** Who removed, restored or renamed content, who invited, joined or changed membership, and who renamed the workspace; admins read it. */
+/** Who removed, restored or renamed content, who invited, joined, left or changed membership, and who renamed, deleted or restored the workspace; admins read it. */
 export interface AuditLog {
   record(newEvent: NewAuditEvent): Promise<void>
   listLatest(workspaceId: string, limit: number): Promise<AuditEvent[]>

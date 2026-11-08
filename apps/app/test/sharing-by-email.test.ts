@@ -37,12 +37,9 @@ async function userIdOf(cookie: string): Promise<string> {
   return body.user.userId
 }
 
-/** Someone with an account who works only in another workspace, signed in. */
-async function outsiderSignedIn(email: string): Promise<string> {
-  const cookie = await app.signIn(email)
-  await env.DB.prepare("INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES ('workspace-elsewhere', 'Elsewhere', ?)").bind(Date.now()).run()
-  await env.DB.prepare("UPDATE memberships SET workspace_id = 'workspace-elsewhere' WHERE user_id = ?").bind(await userIdOf(cookie)).run()
-  return cookie
+/** Someone with an account who works only in their own personal workspace, signed in. */
+function outsiderSignedIn(email: string): Promise<string> {
+  return app.signInAlone(email)
 }
 
 describe('looking a person up by email', () => {

@@ -96,7 +96,7 @@ describe('removing a member', () => {
     const grantsBefore = await app.json<{ grants: { userId: string }[] }>(`/api/artifacts/${specified.artifactId}/sharing`, { cookie: authorCookie })
 
     const removal = await app.request(`/api/workspace/members/${leaverId}`, { method: 'DELETE', cookie: adminCookie })
-    const sessionAfter = await app.json<{ error: string }>('/api/me', { cookie: leaverCookie })
+    const sessionAfter = await app.json<{ workspace: { personalOf: string }; workspaces: { workspaceId: string }[] }>('/api/me', { cookie: leaverCookie })
     const tokenAfter = await app.request('/api/artifacts', { token: leaverToken })
     const homeAfter = await app.request('/', { cookie: leaverCookie })
     const grantsAfter = await app.json<{ grants: { userId: string }[] }>(`/api/artifacts/${specified.artifactId}/sharing`, { cookie: authorCookie })
@@ -104,28 +104,26 @@ describe('removing a member', () => {
 
     expect(grantsBefore.body.grants.map(grant => grant.userId)).toContain(leaverId)
     expect(removal.status).toBe(204)
-    expect(sessionAfter.status).toBe(403)
-    expect(sessionAfter.body.error).toContain('removed from this workspace')
+    expect(sessionAfter.body.workspace.personalOf).toBe(leaverId)
+    expect(sessionAfter.body.workspaces.map(workspace => workspace.workspaceId)).not.toContain(app.teamWorkspaceId)
     expect(tokenAfter.status).toBe(401)
-    expect(homeAfter.status).toBe(403)
-    expect(await homeAfter.text()).toContain('你已被移出这个 workspace，请联系管理员')
+    expect(homeAfter.status).toBe(200)
+    expect(await homeAfter.text()).not.toContain('Need to know')
     expect(grantsAfter.body.grants.map(grant => grant.userId)).not.toContain(leaverId)
     expect(leaverTokens.every(accessToken => accessToken.revokedAt !== null)).toBe(true)
     expect((await members()).map(member => member.userId)).not.toContain(leaverId)
     expect(await latestAuditEvent()).toMatchObject({ action: 'member.removed', actor: { name: 'admin' }, member: { name: 'leaver' } })
   })
 
-  it('does not let a removed person back in by signing in again', async () => {
-    await app.signIn('gone@example.com')
+  it('does not let a removed person back in by signing in again: they land in their personal workspace', async () => {
     const goneId = await userIdOf(await app.signIn('gone@example.com'))
     await app.request(`/api/workspace/members/${goneId}`, { method: 'DELETE', cookie: adminCookie })
 
     const freshCookie = await app.signIn('gone@example.com')
-    const me = await app.request('/api/me', { cookie: freshCookie })
-    const loginPage = await app.request('/login', { cookie: freshCookie })
+    const me = await app.json<{ workspace: { personalOf: string }; workspaces: { workspaceId: string }[] }>('/api/me', { cookie: freshCookie })
 
-    expect(me.status).toBe(403)
-    expect(await loginPage.text()).toContain('你已被移出这个 workspace，请联系管理员')
+    expect(me.body.workspace.personalOf).toBe(goneId)
+    expect(me.body.workspaces.map(workspace => workspace.workspaceId)).not.toContain(app.teamWorkspaceId)
     expect((await members()).map(member => member.userId)).not.toContain(goneId)
   })
 

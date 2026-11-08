@@ -237,4 +237,35 @@ describe('CloudflareArtifactRepository', () => {
     expect(drawn).toEqual(png)
     expect(await shareCardImages.read(designDoc.artifactId, '1.1')).toBeNull()
   })
+  it('hides the artifacts of a deleted workspace, files included, and purges them with the workspace after the window', async () => {
+    const goneWorkspaceId = crypto.randomUUID()
+    await env.DB.prepare('INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?)').bind(goneWorkspaceId, 'Gone team', Date.now()).run()
+    const goneDoc = await artifactRepository.create({
+      workspaceId: goneWorkspaceId,
+      authorId,
+      title: 'Gone doc',
+      slug: 'gone-doc',
+      visibility: 'public_link',
+      publicLinkExpiresAt: null,
+      publishedVia: null,
+      note: null,
+      excerpt: null,
+      listed: true,
+      summary: null,
+      shareText: null,
+      files: [htmlPage('gone')],
+    })
+    const keptDoc = await createDesignDoc()
+    await env.DB.prepare('UPDATE workspaces SET deleted_at = 1 WHERE id = ?').bind(goneWorkspaceId).run()
+
+    expect(await artifactRepository.findSummary(goneDoc.artifactId)).toBeNull()
+    expect(await artifactRepository.readVersionFile(goneDoc.artifactId, 1, 'index.html')).toBeNull()
+    expect(await artifactRepository.listListedBy(authorId)).not.toContainEqual(expect.objectContaining({ artifactId: goneDoc.artifactId }))
+
+    await artifactRepository.purgeRemovedBefore(2)
+
+    expect(await storedObjectCount(goneDoc.artifactId)).toBe(0)
+    expect(await versionCount(goneDoc.artifactId)).toBe(0)
+    expect(await artifactRepository.findSummary(keptDoc.artifactId)).not.toBeNull()
+  })
 })

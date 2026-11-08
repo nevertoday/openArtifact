@@ -1,5 +1,6 @@
 // @ts-check
 export default /** @satisfies {import('../messages').Messages['server']} */ ({
-  firstWorkspaceName: 'My team',
+  /** @param {string} name */
+  personalWorkspaceName: name => `${name}'s workspace`,
   deletedPerson: 'Deleted user',
 })

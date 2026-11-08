@@ -62,14 +62,23 @@ export class CloudflareAccessTokenRepository implements AccessTokenRepository {
       .prepare(
         `UPDATE personal_access_tokens SET last_used_at = ?
          WHERE token_hash = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)
+           AND workspace_id IN (SELECT id FROM workspaces WHERE deleted_at IS NULL)
          RETURNING ${TOKEN_COLUMNS}`,
       )
       .bind(now, tokenHash, now)
       .first<TokenRow>()
     if (activeRow) return { status: 'active', accessToken: CloudflareAccessTokenRepository.#tokenOf(activeRow) }
-    const refusedRow = await this.#db.prepare('SELECT revoked_at FROM personal_access_tokens WHERE token_hash = ?').bind(tokenHash).first<Pick<TokenRow, 'revoked_at'>>()
+    const refusedRow = await this.#db
+      .prepare(
+        `SELECT personal_access_tokens.revoked_at, personal_access_tokens.expires_at, workspaces.deleted_at
+         FROM personal_access_tokens JOIN workspaces ON workspaces.id = personal_access_tokens.workspace_id WHERE token_hash = ?`,
+      )
+      .bind(tokenHash)
+      .first<Pick<TokenRow, 'revoked_at' | 'expires_at'> & { deleted_at: number | null }>()
     if (!refusedRow) return { status: 'unknown' }
-    return refusedRow.revoked_at === null ? { status: 'expired' } : { status: 'revoked' }
+    if (refusedRow.revoked_at !== null) return { status: 'revoked' }
+    if (refusedRow.expires_at !== null && refusedRow.expires_at <= now) return { status: 'expired' }
+    return { status: 'workspace_deleted' }
   }
 
   static #tokenOf(tokenRow: TokenRow): AccessToken {

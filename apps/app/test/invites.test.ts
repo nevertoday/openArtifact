@@ -60,7 +60,7 @@ describe('an invite link', () => {
     const link = await createLink()
 
     const opened = await openInviteLink(link.url)
-    const guestCookie = await app.signIn('guest@partner.org', opened.browserCookie)
+    const guestCookie = await app.signInAlone('guest@partner.org', opened.browserCookie)
     const guest = await app.json<{ workspace: { name: string; role: string } }>('/api/me', { cookie: guestCookie })
     const linkAfterUse = await pendingInvites()
 
@@ -106,11 +106,11 @@ describe('an invite link', () => {
     const link = await createLink()
 
     const opened = await openInviteLink(link.url)
-    const freshCookie = await app.signIn('removed-by-link@example.com', opened.browserCookie)
-    const me = await app.request('/api/me', { cookie: `${freshCookie}; ${opened.browserCookie}` })
+    const freshCookie = await app.signInAlone('removed-by-link@example.com', opened.browserCookie)
+    const me = await app.json<{ workspaces: { workspaceId: string }[] }>('/api/me', { cookie: `${freshCookie}; ${opened.browserCookie}` })
     const invitePage = await app.request(new URL(link.url).pathname, { cookie: `${freshCookie}; ${opened.browserCookie}` })
 
-    expect(me.status).toBe(403)
+    expect(me.body.workspaces.map(workspace => workspace.workspaceId)).not.toContain(app.teamWorkspaceId)
     expect(invitePage.status).toBe(403)
     expect(await invitePage.text()).toContain('你已被移出这个 workspace')
   })
@@ -121,7 +121,7 @@ describe('an email invite', () => {
     const invited = await inviteByEmail([' Wu@Partner.org ', 'chen@partner.org'])
     const mail = app.mailer.lastTo('wu@partner.org')
 
-    const wuCookie = await app.signIn('wu@partner.org')
+    const wuCookie = await app.signInAlone('wu@partner.org')
     const wu = await app.json<{ workspace: { name: string } }>('/api/me', { cookie: wuCookie })
     const stillPending = await pendingInvites()
 
@@ -140,12 +140,14 @@ describe('an email invite', () => {
     const returningId = await userIdOf(returningCookie)
     await app.request(`/api/workspace/members/${returningId}`, { method: 'DELETE', cookie: adminCookie })
 
-    await inviteByEmail(['returning@example.com'])
-    const freshCookie = await app.signIn('returning@example.com')
-    const me = await app.json<{ workspace: { role: string } }>('/api/me', { cookie: freshCookie })
+    const invited = await inviteByEmail(['returning@example.com'])
+    const freshCookie = await app.signInAlone('returning@example.com')
+    const followed = await app.request(new URL(invited.body.invites[0]?.url ?? '').pathname, { cookie: freshCookie })
+    const workspaceCookie = followed.headers.getSetCookie().map(setCookie => setCookie.split(';')[0]).join('; ')
+    const me = await app.json<{ workspace: { workspaceId: string; role: string } }>('/api/me', { cookie: `${freshCookie}; ${workspaceCookie}` })
 
-    expect(me.status).toBe(200)
-    expect(me.body.workspace.role).toBe('member')
+    expect(followed.status).toBe(302)
+    expect(me.body.workspace).toMatchObject({ workspaceId: app.teamWorkspaceId, role: 'member' })
   })
 
   it('skips people who are already members, and still invites when the mail cannot be sent', async () => {

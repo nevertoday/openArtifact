@@ -23,6 +23,7 @@ const SUMMARY_SELECT = `
          artifact_versions.note AS current_version_note, artifact_versions.created_at AS current_version_at,
          artifacts.removed_at, artifacts.removed_by, artifacts.removed_as_admin
   FROM artifacts
+  JOIN workspaces ON workspaces.id = artifacts.workspace_id AND workspaces.deleted_at IS NULL
   JOIN artifact_versions ON artifact_versions.artifact_id = artifacts.id AND artifact_versions.version = artifacts.current_version`
 
 interface SummaryRow {
@@ -49,6 +50,9 @@ interface SummaryRow {
   removed_by: string | null
   removed_as_admin: number | null
 }
+
+// Removed long enough ago, or in a workspace deleted long enough ago; binds the cutoff twice.
+const PAST_RESTORING = 'artifacts.removed_at <= ? OR artifacts.workspace_id IN (SELECT id FROM workspaces WHERE deleted_at <= ?)'
 
 const VERSION_SELECT = 'SELECT version, upload_id, author_id, published_via, origin, restored_from, note, created_at FROM artifact_versions'
 
@@ -173,6 +177,7 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
         `SELECT artifact_files.upload_id, artifact_files.path, artifact_files.content_type
          FROM artifact_versions
          JOIN artifacts ON artifacts.id = artifact_versions.artifact_id AND artifacts.removed_at IS NULL
+         JOIN workspaces ON workspaces.id = artifacts.workspace_id AND workspaces.deleted_at IS NULL
          JOIN artifact_files ON artifact_files.artifact_id = artifact_versions.artifact_id AND artifact_files.upload_id = artifact_versions.upload_id
          WHERE artifact_versions.artifact_id = ? AND artifact_versions.version = ? AND artifact_files.path = ?`,
       )
@@ -254,11 +259,11 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
   // Files and share cards go first and the row last, so a crash leaves the artifact listed for the next run.
   // Deleting the row cascades to its versions, file rows, comments, grants and shared data.
   async purgeRemovedBefore(cutoff: number): Promise<void> {
-    const { results: purgedRows } = await this.#db.prepare('SELECT id FROM artifacts WHERE removed_at <= ?').bind(cutoff).all<{ id: string }>()
+    const { results: purgedRows } = await this.#db.prepare(`SELECT id FROM artifacts WHERE ${PAST_RESTORING}`).bind(cutoff, cutoff).all<{ id: string }>()
     for (const { id: artifactId } of purgedRows) {
       await this.#deleteObjectsUnder(CloudflareArtifactRepository.#artifactPrefix(artifactId))
       await this.#deleteObjectsUnder(CloudflareShareCardImages.prefixOf(artifactId))
-      await this.#db.prepare('DELETE FROM artifacts WHERE id = ? AND removed_at <= ?').bind(artifactId, cutoff).run()
+      await this.#db.prepare(`DELETE FROM artifacts WHERE id = ? AND (${PAST_RESTORING})`).bind(artifactId, cutoff, cutoff).run()
     }
   }
 

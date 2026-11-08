@@ -11,7 +11,8 @@ export interface Invite {
   code: string
   invitedBy: string
   createdAt: number
-  expiresAt: number
+  /** null for a link that never expires; an email invite always expires. */
+  expiresAt: number | null
 }
 
 export interface NewInvite {
@@ -20,12 +21,12 @@ export interface NewInvite {
   code: string
   invitedBy: string
   createdAt: number
-  expiresAt: number
+  expiresAt: number | null
 }
 
 /**
- * Every read returns only pending invites: not revoked, not expired at `now`, and for an email invite not
- * yet accepted. A spent invite is never handed back, so callers cannot forget to check.
+ * Every read returns only pending invites: not revoked, not expired at `now`, into a workspace not deleted, and
+ * for an email invite not yet accepted. A spent invite is never handed back, so callers cannot forget to check.
  */
 export interface InviteRepository {
   /** Creates the invite; an email invite replaces any pending one for the same address in the workspace. */

@@ -299,6 +299,10 @@ ${administration ? SettingsPage.#auditSection(model.m, administration, model.now
         return events[auditEvent.action]({ actor, viaLink: auditEvent.detail.via === 'link' })
       case 'workspace.renamed':
         return events[auditEvent.action]({ actor, from: auditEvent.detail.from, to: auditEvent.detail.to })
+      case 'member.left':
+      case 'workspace.deleted':
+      case 'workspace.restored':
+        return events[auditEvent.action]({ actor })
     }
   }
 }

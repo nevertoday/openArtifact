@@ -144,6 +144,12 @@ export default {
         'member.joined': ({ actor, viaLink }) => (viaLink ? `${actor} 通过邀请链接加入了 workspace` : `${actor} 接受邀请加入了 workspace`),
         /** @param {{ actor: string, from: string, to: string }} p */
         'workspace.renamed': ({ actor, from, to }) => `${actor} 把 workspace 从「${from}」改名为「${to}」`,
+        /** @param {{ actor: string }} p */
+        'member.left': ({ actor }) => `${actor} 离开了工作区`,
+        /** @param {{ actor: string }} p */
+        'workspace.deleted': ({ actor }) => `${actor} 删除了工作区`,
+        /** @param {{ actor: string }} p */
+        'workspace.restored': ({ actor }) => `${actor} 恢复了工作区`,
       },
     },
   },

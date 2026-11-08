@@ -6,16 +6,17 @@ import { APP_ORIGIN, TestApp } from './test-app.ts'
 const app = new TestApp()
 
 describe('signing in', () => {
-  it('signs a person in with the mailed code and puts them in a workspace', async () => {
-    const founderCookie = await app.signIn('lin@example.com')
-    const colleagueCookie = await app.signIn('zhou@example.com')
+  it('signs a person in with the mailed code and gives them a personal workspace of their own, as its admin', async () => {
+    const linCookie = await app.signInAlone('lin@example.com')
+    const zhouCookie = await app.signInAlone('zhou@example.com')
 
-    const founder = await app.json<{ user: { name: string; email: string }; workspace: { name: string; role: string } }>('/api/me', { cookie: founderCookie })
-    const colleague = await app.json<{ workspace: { name: string; role: string } }>('/api/me', { cookie: colleagueCookie })
+    const lin = await app.json<{ user: { userId: string; name: string; email: string }; workspace: { workspaceId: string; name: string; role: string; personalOf: string } }>('/api/me', { cookie: linCookie })
+    const zhou = await app.json<{ user: { userId: string }; workspace: { workspaceId: string; name: string; role: string; personalOf: string } }>('/api/me', { cookie: zhouCookie })
 
-    expect(founder.body.user).toEqual(expect.objectContaining({ name: 'lin', email: 'lin@example.com' }))
-    expect(founder.body.workspace).toMatchObject({ name: '我的团队', role: 'admin' })
-    expect(colleague.body.workspace).toMatchObject({ name: '我的团队', role: 'member' })
+    expect(lin.body.user).toEqual(expect.objectContaining({ name: 'lin', email: 'lin@example.com' }))
+    expect(lin.body.workspace).toMatchObject({ name: 'lin的工作区', role: 'admin', personalOf: lin.body.user.userId })
+    expect(zhou.body.workspace).toMatchObject({ name: 'zhou的工作区', role: 'admin', personalOf: zhou.body.user.userId })
+    expect(zhou.body.workspace.workspaceId).not.toBe(lin.body.workspace.workspaceId)
   })
 
   it('lets a person choose their display name', async () => {
@@ -231,7 +232,7 @@ describe('who may sign up', () => {
     const refused = await app.json<{ message: string; code: string }>('/api/auth/sign-in/send-code', { method: 'POST', body: { email: 'stranger@other.org' } })
 
     expect(refused.status).toBe(403)
-    expect(refused.body).toMatchObject({ code: 'EMAIL_NOT_ADMITTED', message: "This email can't sign in to Open Artifact. Use your work email, or ask an admin to invite you." })
+    expect(refused.body).toMatchObject({ code: 'EMAIL_NOT_ADMITTED', message: "This email can't sign up for Open Artifact yet. Ask an admin to invite you." })
     expect(refused.body.message).not.toContain('example.com')
     expect(app.mailer.lastTo('stranger@other.org')).toBeUndefined()
   })
@@ -247,15 +248,15 @@ describe('who may sign up', () => {
     expect(existingPerson).toContain('session_token')
   })
 
-  it('lets any address sign up and join the first workspace when the allowed domains are "*"', async () => {
+  it('lets any address sign up into a personal workspace of its own when the allowed domains are "*"', async () => {
     const openApp = new TestApp({ allowedEmailDomains: '*' })
-    await openApp.signIn('lin@example.com')
+    await openApp.signInAlone('lin@example.com')
 
-    const strangerCookie = await openApp.signIn('stranger@other.org')
-    const me = await openApp.json<{ workspace: { role: string } }>('/api/me', { cookie: strangerCookie })
+    const strangerCookie = await openApp.signInAlone('stranger@other.org')
+    const me = await openApp.json<{ user: { userId: string }; workspace: { role: string; personalOf: string }; workspaces: unknown[] }>('/api/me', { cookie: strangerCookie })
 
-    expect(strangerCookie).toContain('session_token')
-    expect(me.body.workspace).toMatchObject({ role: 'member' })
+    expect(me.body.workspace).toMatchObject({ role: 'admin', personalOf: me.body.user.userId })
+    expect(me.body.workspaces).toHaveLength(1)
   })
 })
 

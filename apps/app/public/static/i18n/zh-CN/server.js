@@ -1,5 +1,6 @@
 // @ts-check
 export default {
-  firstWorkspaceName: '我的团队',
+  /** @param {string} name */
+  personalWorkspaceName: name => `${name}的工作区`,
   deletedPerson: '已删除的用户',
 }

@@ -1,9 +1,9 @@
 import { AccessTokenSecret, type AccessToken, type AccessTokenScope, type Locale, type Membership } from '@open-artifact/core'
 import { HttpCookies } from '../http-cookies.ts'
-import { HttpError, RemovedFromWorkspaceError } from '../http-error.ts'
+import { HttpError } from '../http-error.ts'
 import { People } from '../people.ts'
 import type { Repositories } from '@open-artifact/core'
-import { Admission, INVITE_COOKIE } from './admission.ts'
+import { Admission } from './admission.ts'
 import type { OpenArtifactAuth, SignedInUser } from './open-artifact-auth.ts'
 
 export const WORKSPACE_COOKIE = 'oa_workspace'
@@ -15,12 +15,14 @@ const DIRECT_API_CLIENT = 'API'
 const MAX_AGENT_CLIENT_LENGTH = 40
 const NEW_TOKEN_HINT = 'create a new one in Settings › Agent access (设置 › Agent 接入)'
 
-type TokenRefusal = 'token_invalid' | 'token_revoked' | 'token_expired'
+type TokenRefusal = 'token_invalid' | 'token_revoked' | 'token_expired' | 'workspace_deleted'
 
 const TOKEN_REFUSAL_MESSAGES: Record<TokenRefusal, string> = {
   token_invalid: `this API token is not valid; ${NEW_TOKEN_HINT} and send it as "Authorization: Bearer oa_pat_…"`,
   token_revoked: `this API token was revoked; ${NEW_TOKEN_HINT}`,
   token_expired: `this API token has expired; ${NEW_TOKEN_HINT}`,
+  workspace_deleted:
+    'the workspace this API token belongs to was deleted, so the token is not wrong but has nothing to act on; ask your person to restore the workspace within 30 days, or to create a token in another workspace in Settings › Agent access (设置 › Agent 接入)',
 }
 
 export interface Identity {
@@ -87,6 +89,8 @@ export class RequestIdentity {
         return this.#refuseToken('token_revoked')
       case 'expired':
         return this.#refuseToken('token_expired')
+      case 'workspace_deleted':
+        return this.#refuseToken('workspace_deleted')
       case 'active':
         return this.#identityOfToken(tokenUse.accessToken)
     }
@@ -113,8 +117,7 @@ export class RequestIdentity {
     await this.#claimPagesSharedByEmail(signedInUser)
     const memberships = await this.#membershipsOf(signedInUser)
     const chosenWorkspaceId = HttpCookies.read(this.#request, WORKSPACE_COOKIE)
-    const membership = memberships.find(candidate => candidate.workspace.workspaceId === chosenWorkspaceId) ?? memberships[0]
-    if (!membership) throw new Error(`User ${signedInUser.userId} has no workspace`)
+    const membership = memberships.find(candidate => candidate.workspace.workspaceId === chosenWorkspaceId) ?? RequestIdentity.#landing(memberships, signedInUser.userId)
     return { userId: signedInUser.userId, name: People.displayName(signedInUser), hasChosenName: People.hasChosenName(signedInUser), email: signedInUser.email, membership, memberships, agentClient: null, tokenScope: null, locale: signedInUser.locale }
   }
 
@@ -124,14 +127,21 @@ export class RequestIdentity {
     if (signedInUser.emailVerified) await this.#repositories.artifactAccess.claimPendingGrants(Admission.normalizedEmail(signedInUser.email), signedInUser.userId)
   }
 
-  // A person joins a workspace on the first visit after sign-in, through the invite link this browser opened if any.
+  // Sign-up creates the personal workspace; people who signed up before personal workspaces existed get theirs here.
   async #membershipsOf(signedInUser: SignedInUser): Promise<Membership[]> {
     const memberships = await this.#repositories.workspaces.membershipsOf(signedInUser.userId)
-    if (memberships.length > 0) return memberships
-    const firstWorkspaceName = this.#auth.requestMessages(this.#request.headers, signedInUser.locale).server.firstWorkspaceName
-    const joinedMembership = await this.#admission.join(signedInUser, HttpCookies.read(this.#request, INVITE_COOKIE), firstWorkspaceName)
-    if (joinedMembership === null) throw new RemovedFromWorkspaceError()
-    return [joinedMembership]
+    if (memberships.some(membership => membership.workspace.personalOf === signedInUser.userId)) return memberships
+    const m = this.#auth.requestMessages(this.#request.headers, signedInUser.locale)
+    await this.#admission.ensurePersonal(signedInUser, Admission.personalWorkspaceName(m, People.displayName(signedInUser)))
+    return this.#repositories.workspaces.membershipsOf(signedInUser.userId)
+  }
+
+  // With no workspace chosen in this browser, the one joined last other than the personal one: the workspace an invite
+  // just brought a newcomer into, or the one a person used before personal workspaces existed. Else the personal one.
+  static #landing(memberships: Membership[], userId: string): Membership {
+    const landing = memberships.filter(membership => membership.workspace.personalOf !== userId).at(-1) ?? memberships[0]
+    if (!landing) throw new Error(`user ${userId} has no workspace, not even a personal one`)
+    return landing
   }
 
   #agentClient(): string {

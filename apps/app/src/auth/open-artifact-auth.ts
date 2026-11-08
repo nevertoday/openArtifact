@@ -6,6 +6,7 @@ import type { AppEnv } from '../env.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { messagesFor, type Messages } from '../i18n/messages.ts'
 import { fallbackLocaleOf, requestLocaleSignals, resolveLocale } from '../i18n/resolve-locale.ts'
+import { People } from '../people.ts'
 import { Admission, INVITE_COOKIE } from './admission.ts'
 import type { Mailer } from './mailer.ts'
 import { SignInGuesses } from './sign-in-guesses.ts'
@@ -110,11 +111,11 @@ export class OpenArtifactAuth {
             before: async (newUser, endpointContext) => {
               if (!(await this.#admission.mayCreateAccount(newUser.email, OpenArtifactAuth.#inviteCodeIn(endpointContext)))) throw OpenArtifactAuth.#refusal()
             },
-            // Every person belongs to a workspace from their first sign-in on, so the first to sign up becomes its admin.
+            // Every person has a personal workspace from their first sign-in on, and the invite's workspace if they came through one.
             after: async (createdUser, endpointContext) => {
-              const headers = OpenArtifactAuth.#headersOf(endpointContext)
-              const firstWorkspaceName = this.requestMessages(headers, null).server.firstWorkspaceName
-              await this.#admission.join({ userId: createdUser.id, email: createdUser.email }, OpenArtifactAuth.#inviteCodeIn(endpointContext), firstWorkspaceName)
+              const m = this.requestMessages(OpenArtifactAuth.#headersOf(endpointContext), null)
+              const personalWorkspaceName = Admission.personalWorkspaceName(m, People.displayName(createdUser))
+              await this.#admission.welcome({ userId: createdUser.id, email: createdUser.email }, OpenArtifactAuth.#inviteCodeIn(endpointContext), personalWorkspaceName)
             },
           },
         },

@@ -116,7 +116,10 @@ export interface ArtifactRepository extends ArtifactFileSource {
   publishOnTopOf(artifactId: string, baseVersion: number, publication: Publication): Promise<PublishResult>
   readCurrentVersion(artifactId: string): Promise<ArtifactVersionContent | null>
   readVersion(artifactId: string, version: number): Promise<ArtifactVersionContent | null>
-  /** Finds removed artifacts too; access rules decide who may still act on them. */
+  /**
+   * Finds removed artifacts too; access rules decide who may still act on them. Every read leaves out the artifacts
+   * of a deleted workspace, files included.
+   */
   findSummary(artifactId: string): Promise<ArtifactSummary | null>
   /** Like findSummary, by the short id in the artifact's address. */
   findSummaryByShortId(shortId: string): Promise<ArtifactSummary | null>
@@ -136,8 +139,8 @@ export interface ArtifactRepository extends ArtifactFileSource {
   /** Returns false when the artifact is missing or not removed. */
   restore(artifactId: string): Promise<boolean>
   /**
-   * Deletes the artifacts removed at or before `cutoff` with their versions, files, comments, grants and
-   * shared data. Safe to run again after a crash part way through.
+   * Deletes the artifacts removed at or before `cutoff`, and every artifact of a workspace deleted at or before it,
+   * with their versions, files, comments, grants and shared data. Safe to run again after a crash part way through.
    */
   purgeRemovedBefore(cutoff: number): Promise<void>
 }

@@ -16,7 +16,6 @@ export default {
     browser_session_required: '这件事要在网页上登录后做。',
     outside_token_scope: '这个 token 只能发布。要做这件事，请新建一个完全权限的 token，或者在网页上操作。',
     cross_site_request: '请在 Open Artifact 的页面上操作。',
-    removed_from_workspace: '你已被移出这个 workspace，请联系管理员。',
     not_found: '找不到了，它可能已被删除。刷新页面看看。',
     field_required: '这一项不能为空。',
     /** @param {{ maxLength: number }} error */
@@ -31,6 +30,8 @@ export default {
     share_text_too_long: '这段文案加上链接超过了 X 的 280 字限制，请删短一些。',
     workspace_changed: '你在另一个标签页切换了 workspace。请刷新页面后再操作。',
     mail_limit_reached: '今天发出的邀请或分享邮件已经到上限，这次没有发出，也没有保存。请明天再试。',
+    workspace_deleted: '这个工作区已被删除。',
+    personal_workspace: '个人工作区不能离开或删除，你也一直是它的管理员。',
   }),
   /** takeDown is an admin removing someone else's artifact; delete is the author removing their own. */
   removal: {

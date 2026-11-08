@@ -16,7 +16,6 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
     browser_session_required: 'Sign in on the web to do that.',
     outside_token_scope: 'This token can only publish. To do this, create a token with full access, or do it on the web.',
     cross_site_request: 'Please do this from an Open Artifact page.',
-    removed_from_workspace: 'You were removed from this workspace. Contact an admin.',
     not_found: "It's gone, and may have been deleted. Try refreshing the page.",
     field_required: "This can't be empty.",
     field_too_long: ({ maxLength }) => `Use ${plural(maxLength, 'character', 'characters')} or fewer.`,
@@ -30,6 +29,8 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
     share_text_too_long: 'With the link, this text is over the 280 X allows. Make it shorter.',
     workspace_changed: 'You switched workspace in another tab. Reload this page and try again.',
     mail_limit_reached: "You've reached today's limit on invite and share emails, so nothing was sent or saved. Try again tomorrow.",
+    workspace_deleted: 'This workspace was deleted.',
+    personal_workspace: "Your personal workspace can't be left or deleted, and you always stay its admin.",
   },
   removal: {
     takeDown: {

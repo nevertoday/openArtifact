@@ -1,5 +1,7 @@
 const DAY = 24 * 60 * 60 * 1000
 const RESTORE_DAYS = 30
+/** How long something deleted stays restorable before the daily purge: a removed artifact or a deleted workspace. */
+export const RESTORE_WINDOW = RESTORE_DAYS * DAY
 
 /** A removed artifact: hidden from everyone at once, restorable for 30 days, then purged. */
 export class ArtifactRemoval {
@@ -25,11 +27,11 @@ export class ArtifactRemoval {
 
   /** Artifacts removed at or before this time are past restoring and get purged. */
   static purgeCutoff(now: number): number {
-    return now - RESTORE_DAYS * DAY
+    return now - RESTORE_WINDOW
   }
 
   get purgeAt(): number {
-    return this.removedAt + RESTORE_DAYS * DAY
+    return this.removedAt + RESTORE_WINDOW
   }
 
   isPastRestoring(now: number): boolean {

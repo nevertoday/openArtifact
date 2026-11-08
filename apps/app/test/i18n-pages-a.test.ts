@@ -6,8 +6,9 @@ import { TestApp } from './test-app.ts'
 const app = new TestApp()
 const english = { 'Accept-Language': 'en' }
 const anyChinese = /[一-鿿]/
-// The language switch names Chinese in Chinese, and a new workspace is stored as 我的团队; neither is page wording.
-const withoutOwnNames = (markup: string) => markup.replaceAll('>中文<', '><').replaceAll('>我的团队<', '><')
+// The language switch names Chinese in Chinese, and the team and the personal workspaces are stored with Chinese
+// names; none of it is page wording.
+const withoutOwnNames = (markup: string) => markup.replaceAll('>中文<', '><').replaceAll('>我的团队<', '><').replaceAll(/>[a-z]+的工作区</g, '><')
 let authorCookie = ''
 let readerCookie = ''
 

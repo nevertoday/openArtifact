@@ -20,6 +20,7 @@ import { ViewerPage, type Byline, type OlderVersion, type ViewerModel } from './
 const UNLOCK_COOKIE_SECONDS = 30 * 24 * 60 * 60
 const MAX_LIVE_PREVIEWS = 12
 const AUDIT_EVENTS_SHOWN = 50
+const DAY_SECONDS = 24 * 60 * 60
 const YEAR_SECONDS = 365 * 24 * 60 * 60
 
 export interface PageRouteSettings {
@@ -71,7 +72,8 @@ export class PageRoutes {
     const invitation = { inviterName: inviterNames.get(invite.invitedBy) ?? '', workspaceName: workspace.name, email: invite.email }
     const invitePath = new URL(request.url).pathname
     const loginPage = LoginPage.render(await this.#context.messages(), this.#context.auth.loginProviders, invitePath, invitation)
-    const secondsLeft = Math.ceil((invite.expiresAt - Date.now()) / 1000)
+    // The cookie only has to outlast signing up, so a link that never expires is kept for a day.
+    const secondsLeft = invite.expiresAt === null ? DAY_SECONDS : Math.ceil((invite.expiresAt - Date.now()) / 1000)
     loginPage.headers.append('Set-Cookie', HttpCookies.serialize(INVITE_COOKIE, invite.code, { maxAgeSeconds: secondsLeft }, this.#isSecure(request)))
     return loginPage
   }

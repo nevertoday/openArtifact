@@ -25,7 +25,7 @@ export interface NewAccessToken {
 }
 
 /** What presenting a token amounts to: a working token, or why it no longer works. */
-export type TokenUse = { status: 'active'; accessToken: AccessToken } | { status: 'revoked' } | { status: 'expired' } | { status: 'unknown' }
+export type TokenUse = { status: 'active'; accessToken: AccessToken } | { status: 'revoked' } | { status: 'expired' } | { status: 'workspace_deleted' } | { status: 'unknown' }
 
 /** Personal API tokens; only their hash is stored. */
 export interface AccessTokenRepository {
@@ -35,6 +35,6 @@ export interface AccessTokenRepository {
   revoke(tokenId: string, userId: string): Promise<boolean>
   /** Deletes a token of `userId` that is already revoked or expired at `now`; returns whether one was deleted. */
   deleteInactive(tokenId: string, userId: string, now: number): Promise<boolean>
-  /** Records the use of a token that is neither revoked nor expired at `now`; otherwise says why it was refused. */
+  /** Records the use of a token that is neither revoked nor expired at `now`, in a workspace not deleted; otherwise says why it was refused. */
   useToken(tokenHash: string, now: number): Promise<TokenUse>
 }
