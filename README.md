@@ -9,7 +9,7 @@ Any AI agent publishes HTML pages ("artifacts"); the whole team opens, comments 
 - **Versions, sharing and public links.** Private, named people, the whole workspace, or a public link with an expiry and an optional password.
 - **A personal page.** Authors list public artifacts at `/@name`, with share cards and search-engine indexing for those pages only.
 
-The interface is in Chinese for now.
+The interface speaks Chinese and English; see [Languages](#languages).
 
 > **License.** Open Artifact is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE). It is free for noncommercial use. Commercial use, including a company running it for its own staff, needs a separate license: https://ui.xiaoxiaodong.ai/license
 
