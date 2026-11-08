@@ -212,7 +212,7 @@ ${options.description ? html`<meta name="twitter:description" content="${options
     const isPersonal = (workspace: Workspace) => workspace.personalOf === identity.userId
     const workspaceItem = ({ workspace }: Membership) => {
       const isCurrent = workspace.workspaceId === current.workspaceId
-      return html`<button type="button" class="xxd-menu__item app-workspace-menu__item" role="menuitemradio" aria-checked="${String(isCurrent)}" data-switch-workspace="${workspace.workspaceId}">${PageShell.icon(isCurrent ? 'Check' : isPersonal(workspace) ? 'UserRound' : 'Users', 14)}<span class="app-workspace-menu__name">${workspace.name}</span>${isPersonal(workspace) ? html`<span class="xxd-badge" data-size="sm">${m.shell.personal}</span>` : ''}</button>`
+      return html`<button type="button" class="xxd-menu__item app-workspace-menu__item" role="menuitemradio" aria-checked="${String(isCurrent)}" data-switch-workspace="${workspace.workspaceId}">${PageShell.icon(isPersonal(workspace) ? 'UserRound' : 'Users', 14)}<span class="app-workspace-menu__name">${workspace.name}</span>${isPersonal(workspace) ? html`<span class="xxd-badge" data-size="sm">${m.shell.personal}</span>` : ''}</button>`
     }
     return html`<button type="button" class="xxd-btn app-workspace-switcher" data-variant="ghost" data-size="sm" data-xxd-menu="workspace-menu" aria-label="${m.shell.workspaceMenu(current.name)}">${PageShell.icon(isPersonal(current) ? 'UserRound' : 'Users', 16)}<span class="app-workspace-switcher__name">${current.name}</span>${PageShell.icon('ChevronDown', 14)}</button>
 <div class="xxd-menu app-workspace-menu" id="workspace-menu" role="menu" popover>

@@ -269,8 +269,8 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
 
   // Files and share cards go first and the row last, so a crash leaves the artifact listed for the next run.
   // Deleting the row cascades to its versions, file rows, comments, grants and shared data.
-  async purgeRemovedBefore(cutoff: number): Promise<void> {
-    const { results: purgedRows } = await this.#db.prepare(`SELECT id FROM artifacts WHERE ${PAST_RESTORING}`).bind(cutoff, cutoff).all<{ id: string }>()
+  async purgeRemovedBefore(cutoff: number, limit: number): Promise<void> {
+    const { results: purgedRows } = await this.#db.prepare(`SELECT id FROM artifacts WHERE ${PAST_RESTORING} LIMIT ?`).bind(cutoff, cutoff, limit).all<{ id: string }>()
     for (const { id: artifactId } of purgedRows) {
       await this.#deleteObjectsUnder(CloudflareArtifactRepository.#artifactPrefix(artifactId))
       await this.#deleteObjectsUnder(CloudflareShareCardImages.prefixOf(artifactId))

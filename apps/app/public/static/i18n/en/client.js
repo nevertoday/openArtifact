@@ -34,7 +34,7 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
     workspace_changed: 'You switched workspace in another tab. Reload this page and try again.',
     mail_limit_reached: "You've reached today's limit on invite and share emails, so nothing was sent or saved. Try again tomorrow.",
     workspace_deleted: 'This workspace was deleted.',
-    personal_workspace: "Your personal workspace can't be left or deleted, and you always stay its admin.",
+    personal_workspace: "A personal workspace can't be left or deleted, and its owner always stays its admin.",
   },
   removal: {
     takeDown: {

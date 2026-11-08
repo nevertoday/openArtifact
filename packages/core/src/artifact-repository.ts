@@ -143,6 +143,7 @@ export interface ArtifactRepository extends ArtifactFileSource {
   /**
    * Deletes the artifacts removed at or before `cutoff`, and every artifact of a workspace deleted at or before it,
    * with their versions, files, comments, grants and shared data. Safe to run again after a crash part way through.
+   * Purges at most `limit` artifacts; the next call takes the rest.
    */
-  purgeRemovedBefore(cutoff: number): Promise<void>
+  purgeRemovedBefore(cutoff: number, limit: number): Promise<void>
 }

@@ -87,6 +87,16 @@ describe('a personal workspace', () => {
     ])
   })
 
+  it('lands a person in several workspaces, with none chosen in this browser, in the earliest they joined', async () => {
+    const teamCookie = await app.signIn('two-teams@example.com')
+    await createWorkspace(teamCookie, 'Second team')
+    const sessionOnly = teamCookie.replace(/; oa_workspace=[^;]*/g, '')
+
+    const after = await me(sessionOnly)
+
+    expect(after.workspace.workspaceId).toBe(app.teamWorkspaceId)
+  })
+
   it('is joined by the invite’s workspace for a newcomer, who lands in the invited one', async () => {
     const guestCookie = await joinByLink(adminCookie, 'newcomer@partner.org')
     const sessionOnly = guestCookie.replace(/; oa_workspace=[^;]*/g, '')
@@ -136,10 +146,12 @@ describe('leaving a workspace', () => {
     const memberCookie = await app.signIn('leaving-member@example.com')
     const { user } = await me(memberCookie)
     const token = await app.createToken(memberCookie)
+    const teamPage = await app.publish({ cookie: adminCookie }, 'Team-only notes', '<h1>notes</h1>', 'workspace')
 
     const left = await app.request('/api/workspace/leave', { method: 'POST', cookie: memberCookie })
     const after = await me(withCookiesOf(left, memberCookie))
     const tokenAfter = await app.request('/api/artifacts', { token })
+    const teamPageAfter = await app.request(`/api/artifacts/${teamPage.artifactId}`, { cookie: withCookiesOf(left, memberCookie) })
     const { body: audit } = await app.json<{ events: { action: string }[] }>('/api/workspace/audit', { cookie: adminCookie })
     const backCookie = await joinByLink(adminCookie, 'leaving-member@example.com')
 
@@ -147,6 +159,7 @@ describe('leaving a workspace', () => {
     expect(after.workspace.personalOf).toBe(user.userId)
     expect(after.workspaces.map(workspace => workspace.workspaceId)).not.toContain(app.teamWorkspaceId)
     expect(tokenAfter.status).toBe(401)
+    expect(teamPageAfter.status).toBe(404)
     expect(audit.events[0]?.action).toBe('member.left')
     expect((await me(backCookie)).workspace).toMatchObject({ workspaceId: app.teamWorkspaceId, role: 'member' })
   })
@@ -180,7 +193,7 @@ describe('deleting a workspace', () => {
     artifactId = published.artifactId
   })
 
-  it('is for admins only, and never for a personal workspace', async () => {
+  it('is refused to a member who is not an admin', async () => {
     const byMember = await app.json<{ code: string }>('/api/workspace', { method: 'DELETE', cookie: memberCookie })
 
     expect(byMember).toMatchObject({ status: 403, body: { code: 'admin_required' } })

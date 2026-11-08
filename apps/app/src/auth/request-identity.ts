@@ -136,10 +136,10 @@ export class RequestIdentity {
     return this.#repositories.workspaces.membershipsOf(signedInUser.userId)
   }
 
-  // With no workspace chosen in this browser, the one joined last other than the personal one: the workspace an invite
-  // just brought a newcomer into, or the one a person used before personal workspaces existed. Else the personal one.
+  // With no workspace chosen in this browser, the earliest joined other than the personal one, which is where a person
+  // landed before personal workspaces existed; else the personal one. An invite sets the cookie, so it needs no rule here.
   static #landing(memberships: Membership[], userId: string): Membership {
-    const landing = memberships.filter(membership => membership.workspace.personalOf !== userId).at(-1) ?? memberships[0]
+    const landing = memberships.find(membership => membership.workspace.personalOf !== userId) ?? memberships[0]
     if (!landing) throw new Error(`user ${userId} has no workspace, not even a personal one`)
     return landing
   }

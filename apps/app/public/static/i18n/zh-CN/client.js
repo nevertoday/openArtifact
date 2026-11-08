@@ -37,7 +37,7 @@ export default {
     workspace_changed: '你在另一个标签页切换了工作区。请刷新页面后再操作。',
     mail_limit_reached: '今天发出的邀请或分享邮件已经到上限，这次没有发出，也没有保存。请明天再试。',
     workspace_deleted: '这个工作区已被删除。',
-    personal_workspace: '个人工作区不能离开或删除，你也一直是它的管理员。',
+    personal_workspace: '个人工作区不能离开或删除，它的主人也始终是管理员。',
   }),
   /** takeDown is an admin removing someone else's artifact; delete is the author removing their own. */
   removal: {

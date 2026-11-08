@@ -231,7 +231,7 @@ describe('CloudflareArtifactRepository', () => {
     await shareCardImages.write(designDoc.artifactId, '1.1', png)
     const drawn = await shareCardImages.read(designDoc.artifactId, '1.1')
     await artifactRepository.remove(designDoc.artifactId, new ArtifactRemoval(1, authorId, false))
-    await artifactRepository.purgeRemovedBefore(2)
+    await artifactRepository.purgeRemovedBefore(2, 100)
 
     expect(beforeDrawing).toBeNull()
     expect(drawn).toEqual(png)
@@ -262,10 +262,25 @@ describe('CloudflareArtifactRepository', () => {
     expect(await artifactRepository.readVersionFile(goneDoc.artifactId, 1, 'index.html')).toBeNull()
     expect(await artifactRepository.listListedBy(authorId)).not.toContainEqual(expect.objectContaining({ artifactId: goneDoc.artifactId }))
 
-    await artifactRepository.purgeRemovedBefore(2)
+    await artifactRepository.purgeRemovedBefore(2, 100)
 
     expect(await storedObjectCount(goneDoc.artifactId)).toBe(0)
     expect(await versionCount(goneDoc.artifactId)).toBe(0)
     expect(await artifactRepository.findSummary(keptDoc.artifactId)).not.toBeNull()
+  })
+
+  it('purges at most the given number of artifacts in one call, and the rest in the next', async () => {
+    const first = await createDesignDoc()
+    const second = await createDesignDoc()
+    await artifactRepository.remove(first.artifactId, new ArtifactRemoval(1, authorId, false))
+    await artifactRepository.remove(second.artifactId, new ArtifactRemoval(1, authorId, false))
+    const remainingAfter = async () => (await Promise.all([first, second].map(doc => versionCount(doc.artifactId)))).filter(count => (count ?? 0) > 0).length
+
+    await artifactRepository.purgeRemovedBefore(2, 1)
+    const afterOneCall = await remainingAfter()
+    await artifactRepository.purgeRemovedBefore(2, 1)
+
+    expect(afterOneCall).toBe(1)
+    expect(await remainingAfter()).toBe(0)
   })
 })
