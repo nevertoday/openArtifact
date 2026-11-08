@@ -1,15 +1,19 @@
 import {
   ArtifactAccess,
+  LOCALES,
   PublicLinkPassword,
   type ArtifactSharing,
   type ArtifactSummary,
   type ArtifactVisibility,
   type GrantRole,
+  type PendingGrant,
   type PersonGrant,
 } from '@open-artifact/core'
 import { ArtifactGate } from '../access/artifact-gate.ts'
+import { Admission } from '../auth/admission.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
+import { messagesFor } from '../i18n/messages.ts'
 import { People } from '../people.ts'
 import { ShareCard } from '../share/share-card.ts'
 import type { ApiContext } from './api-context.ts'
@@ -22,6 +26,15 @@ const MAX_PASSWORD_LENGTH = 128
 const MAX_GRANTS = 200
 const MANAGE_SHARING = 'change who can see this artifact'
 
+/** The list of people on an artifact: those with an account, and the addresses waiting for one. */
+interface SharingPeople {
+  grants: PersonGrant[]
+  pending: PendingGrant[]
+}
+
+/** A grant as the request names it: an account already on the list, or an address. */
+type RequestedGrant = PersonGrant | { email: string; role: GrantRole }
+
 /** Who can see an artifact; only its author changes this, and every change is saved in one request. */
 export class SharingApi {
   readonly #context: ApiContext
@@ -33,8 +46,7 @@ export class SharingApi {
   async read(request: Request, artifactId: string): Promise<Response> {
     const identity = await this.#context.requireIdentity()
     const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canManageSharing', MANAGE_SHARING)
-    const grants = await this.#context.repositories.artifactAccess.listGrants(artifactId)
-    return Response.json(await this.#sharingJson(summary, grants))
+    return Response.json(await this.#sharingJson(summary, await this.#savedPeople(artifactId)))
   }
 
   /** A member who may not open the artifact asks its author to share it; the author hears through the notifier. */
@@ -46,24 +58,28 @@ export class SharingApi {
     return new Response(null, { status: 204 })
   }
 
-  /** The person the author is about to add; the share dialog shows them before anything is saved. */
+  /**
+   * The person the author is about to add. Every well-formed address gets the same answer, so the dialog never
+   * tells who has an account; the name shows only for someone the author already works with in a workspace.
+   */
   async findPerson(request: Request, artifactId: string): Promise<Response> {
     const identity = await this.#context.requireIdentity()
     const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canManageSharing', MANAGE_SHARING)
-    const email = new URL(request.url).searchParams.get('email')?.trim() ?? ''
+    const email = Admission.normalizedEmail(new URL(request.url).searchParams.get('email') ?? '')
     if (email.length === 0) throw HttpError.fieldRequired('email', null)
+    if (!Admission.looksLikeEmail(email)) throw HttpError.fieldInvalid('email', `"${email}" is not an email address`)
     const person = await this.#context.repositories.users.findByEmail(email)
-    if (!person) throw new HttpError(404, 'person_not_found', 'no person with this email; they need to sign in once before you can add them', { field: 'email' })
-    if (person.userId === summary.authorId) throw new HttpError(400, 'author_always_sees', 'the author can always see their own artifact', { field: 'email' })
-    return Response.json({ userId: person.userId, name: People.displayName(person), email: person.email })
+    if (person?.userId === summary.authorId) throw new HttpError(400, 'author_always_sees', 'the author can always see their own artifact', { field: 'email' })
+    const sharesWorkspace = person !== null && (await this.#shareAWorkspace(identity.userId, person.userId))
+    return Response.json({ email, name: sharesWorkspace ? People.displayName(person) : null })
   }
 
-  /** Each field left out keeps its saved value; `grants`, when sent, is the complete list of people. */
+  /** Each field left out keeps its saved value; `grants`, when sent, is the complete list of people, pending ones included. */
   async update(request: Request, artifactId: string): Promise<Response> {
     const identity = await this.#context.requireIdentity()
     const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canManageSharing', MANAGE_SHARING)
     const requestBody = await JsonBody.of(request)
-    const savedGrants: PersonGrant[] = (await this.#context.repositories.artifactAccess.listGrants(artifactId)).map(({ userId, role }) => ({ userId, role }))
+    const saved = await this.#savedPeople(artifactId)
     const visibility = requestBody.oneOf('visibility', VISIBILITIES, summary.sharing.visibility)
     const listedRequested = requestBody.boolean('listed', summary.sharing.listed)
     const publicLinkExpiry = PublicLinkExpiry.of(
@@ -74,21 +90,59 @@ export class SharingApi {
     )
     const sharing = await this.#sharingFrom(requestBody, summary, visibility, publicLinkExpiry.expiresAt)
     if (sharing.listed) await this.#context.personalPages.claim(summary.authorId)
-    const grants = requestBody.has('grants') ? await this.#grantsFrom(requestBody.raw('grants'), summary, savedGrants) : savedGrants
-    const newlyGranted = SharingApi.#newlyGranted({ visibility: summary.sharing.visibility, grants: savedGrants }, { visibility, grants })
-    await this.#takeShareMailQuota(identity, summary, newlyGranted)
-    await this.#context.repositories.artifactAccess.saveSharing(artifactId, sharing, grants)
+    const people = requestBody.has('grants') ? await this.#peopleFrom(requestBody.raw('grants'), summary, saved, identity) : saved
+    const newlyGranted = SharingApi.#newlyListed(summary.sharing.visibility, saved.grants, visibility, people.grants, grant => grant.userId)
+    const newlyPending = SharingApi.#newlyListed(summary.sharing.visibility, saved.pending, visibility, people.pending, pending => pending.email)
+    const pendingToMail = await this.#mayCreateAccount(newlyPending)
+    await this.#takeShareMailQuota(identity, summary, newlyGranted, pendingToMail.length)
+    await this.#context.repositories.artifactAccess.saveSharing(artifactId, sharing, people.grants, people.pending)
     for (const grant of newlyGranted) await this.#context.notifier.notify(identity, summary, { kind: 'artifact_shared', sharedWithId: grant.userId, role: grant.role })
+    await this.#mailPending(identity, summary, pendingToMail)
     if (publicLinkExpiry.agentDefaultExpiresAt !== null) await this.#context.notifier.notify(identity, summary, { kind: 'public_link_opened_by_agent', expiresAt: publicLinkExpiry.agentDefaultExpiresAt })
-    return Response.json(await this.#sharingJson({ ...summary, sharing }, grants))
+    return Response.json(await this.#sharingJson({ ...summary, sharing }, people))
+  }
+
+  async #savedPeople(artifactId: string): Promise<SharingPeople> {
+    const [grants, pending] = await Promise.all([this.#context.repositories.artifactAccess.listGrants(artifactId), this.#context.repositories.artifactAccess.listPendingGrants(artifactId)])
+    return { grants: grants.map(({ userId, role }) => ({ userId, role })), pending }
+  }
+
+  async #shareAWorkspace(userId: string, otherUserId: string): Promise<boolean> {
+    const [memberships, otherMemberships] = await Promise.all([this.#context.repositories.workspaces.membershipsOf(userId), this.#context.repositories.workspaces.membershipsOf(otherUserId)])
+    const workspaceIds = new Set(memberships.map(membership => membership.workspace.workspaceId))
+    return otherMemberships.some(membership => workspaceIds.has(membership.workspace.workspaceId))
+  }
+
+  // Where this deployment would refuse the address at sign-up, the grant waits quietly instead of mailing an invitation that cannot be used.
+  async #mayCreateAccount(pendingGrants: PendingGrant[]): Promise<PendingGrant[]> {
+    const admitted = await Promise.all(pendingGrants.map(pending => this.#context.admission.mayCreateAccount(pending.email, null)))
+    return pendingGrants.filter((_, index) => admitted[index])
   }
 
   // Members hear about pages in their own workspace all the time; mail to anyone else is what a spammer would send.
-  async #takeShareMailQuota(identity: Identity, summary: ArtifactSummary, newlyGranted: PersonGrant[]): Promise<void> {
+  async #takeShareMailQuota(identity: Identity, summary: ArtifactSummary, newlyGranted: PersonGrant[], pendingMails: number): Promise<void> {
     const members = await this.#context.repositories.workspaces.listMembers(summary.workspaceId)
     const memberIds = new Set(members.map(member => member.userId))
-    const mailsToOutsiders = newlyGranted.filter(grant => !memberIds.has(grant.userId)).length
+    const mailsToOutsiders = newlyGranted.filter(grant => !memberIds.has(grant.userId)).length + pendingMails
     await this.#context.mailLimits.take('share', { senderId: identity.userId, workspaceId: summary.workspaceId }, mailsToOutsiders, Date.now())
+  }
+
+  // The grants are saved and the dialog lists them, so a mail failure is logged and never fails the request.
+  // Nobody knows the person's language yet, so the mail says it in every language, the sharer's first.
+  async #mailPending(sharer: Identity, summary: ArtifactSummary, pendingGrants: PendingGrant[]): Promise<void> {
+    if (pendingGrants.length === 0) return
+    const sharerLocale = await this.#context.locale()
+    const shareWords = [sharerLocale, ...LOCALES.filter(locale => locale !== sharerLocale)].map(locale => messagesFor(locale).mail.pendingShare)
+    const url = this.#context.artifactUrl(summary)
+    const deliveries = await Promise.allSettled(
+      pendingGrants.map(pending => {
+        const details = { sharer: sharer.name, title: summary.title, email: pending.email, url }
+        return this.#context.mailer.send({ to: pending.email, subject: shareWords.map(words => words.subject(details)).join(' / '), text: shareWords.map(words => words.body(details)).join('\n\n---\n\n') })
+      }),
+    )
+    deliveries.forEach((delivery, index) => {
+      if (delivery.status === 'rejected') console.error(new Error(`a pending grant on artifact ${summary.artifactId} could not be mailed to address ${index + 1}`, { cause: delivery.reason }))
+    })
   }
 
   async #sharingFrom(requestBody: JsonBody, summary: ArtifactSummary, visibility: ArtifactVisibility, publicLinkExpiresAt: number | null): Promise<ArtifactSharing> {
@@ -114,27 +168,39 @@ export class SharingApi {
     return listable && requestBody.boolean('listed', summary.sharing.listed)
   }
 
-  // People already on the list stay valid even if their account was deleted; a person added now must exist.
-  async #grantsFrom(grantsJson: unknown, summary: ArtifactSummary, savedGrants: PersonGrant[]): Promise<PersonGrant[]> {
-    if (!Array.isArray(grantsJson)) throw HttpError.badRequest('grants must be a list of { userId, role }')
+  // People already on the list stay valid even if their account was deleted. An address is added as the person
+  // who signs in with it: their account if they have one, else a grant that waits for them to sign up.
+  async #peopleFrom(grantsJson: unknown, summary: ArtifactSummary, saved: SharingPeople, identity: Identity): Promise<SharingPeople> {
+    if (!Array.isArray(grantsJson)) throw HttpError.badRequest('grants must be a list of { email, role } or { userId, role }')
     if (grantsJson.length > MAX_GRANTS) throw HttpError.badRequest(`an artifact may be shared with at most ${MAX_GRANTS} people`)
-    const grants = grantsJson.map(grantJson => SharingApi.#personGrantOf(grantJson))
+    const requested = grantsJson.map(grantJson => SharingApi.#requestedGrantOf(grantJson))
+    const accounts = await Promise.all(requested.map(grant => ('email' in grant ? this.#context.repositories.users.findByEmail(grant.email) : null)))
+    const grants: PersonGrant[] = []
+    const pending: PendingGrant[] = []
+    const savedPending = new Map(saved.pending.map(savedGrant => [savedGrant.email, savedGrant]))
+    requested.forEach((grant, index) => {
+      const account = accounts[index]
+      if ('userId' in grant) grants.push(grant)
+      else if (account) grants.push({ userId: account.userId, role: grant.role })
+      else pending.push({ grantedBy: identity.userId, createdAt: Date.now(), ...savedPending.get(grant.email), email: grant.email, role: grant.role })
+    })
     const userIds = grants.map(grant => grant.userId)
-    if (new Set(userIds).size !== userIds.length) throw HttpError.badRequest('each person may appear only once in grants')
+    const emails = pending.map(pendingGrant => pendingGrant.email)
+    if (new Set(userIds).size !== userIds.length || new Set(emails).size !== emails.length) throw HttpError.badRequest('each person may appear only once in grants')
     if (userIds.includes(summary.authorId)) throw new HttpError(400, 'author_always_sees', 'the author can always see their own artifact')
-    const savedUserIds = new Set(savedGrants.map(grant => grant.userId))
+    const savedUserIds = new Set(saved.grants.map(grant => grant.userId))
     const addedUserIds = userIds.filter(userId => !savedUserIds.has(userId))
     const addedProfiles = await this.#context.repositories.users.profilesOf(addedUserIds)
     const unknownUserIds = addedUserIds.filter(userId => !addedProfiles.has(userId))
     if (unknownUserIds.length > 0) throw HttpError.badRequest(`grants name people who have no account: ${unknownUserIds.join(', ')}`)
-    return grants
+    return { grants, pending }
   }
 
-  async #sharingJson(summary: ArtifactSummary, grants: PersonGrant[]) {
+  async #sharingJson(summary: ArtifactSummary, people: SharingPeople) {
     const [members, workspace, grantedProfiles, profile] = await Promise.all([
       this.#context.repositories.workspaces.listMembers(summary.workspaceId),
       this.#context.repositories.workspaces.findWorkspace(summary.workspaceId),
-      this.#context.repositories.users.profilesOf(grants.map(grant => grant.userId)),
+      this.#context.repositories.users.profilesOf(people.grants.map(grant => grant.userId)),
       this.#context.repositories.profiles.findByUser(summary.authorId),
     ])
     const deletedPersonName = (await this.#context.messages()).server.deletedPerson
@@ -152,28 +218,35 @@ export class SharingApi {
         personalPageUrl: profile ? this.#context.personalPages.url(profile.handle) : null,
       },
       author: { userId: summary.authorId },
-      grants: grants.map(grant => {
-        const profile = grantedProfiles.get(grant.userId)
-        return { userId: grant.userId, role: grant.role, name: profile ? People.displayName(profile) : deletedPersonName, email: profile?.email ?? null }
-      }),
+      grants: [
+        ...people.grants.map(grant => {
+          const profile = grantedProfiles.get(grant.userId)
+          return { userId: grant.userId, role: grant.role, name: profile ? People.displayName(profile) : deletedPersonName, email: profile?.email ?? null, pending: false }
+        }),
+        ...people.pending.map(pendingGrant => ({ userId: null, role: pendingGrant.role, name: null, email: pendingGrant.email, pending: true })),
+      ],
       members: members.map(member => ({ userId: member.userId, name: People.displayName(member), email: member.email })),
       share: ShareCard.of(summary, shareReadiness, this.#context.appOrigin).toJson(),
     }
   }
 
-  static #personGrantOf(grantJson: unknown): PersonGrant {
-    const { userId, role } = (typeof grantJson === 'object' && grantJson !== null ? grantJson : {}) as Record<string, unknown>
+  static #requestedGrantOf(grantJson: unknown): RequestedGrant {
+    const { userId, email, role } = (typeof grantJson === 'object' && grantJson !== null ? grantJson : {}) as Record<string, unknown>
     const knownRole = GRANT_ROLES.find(candidate => candidate === role)
-    const isPersonGrant = typeof userId === 'string' && userId.length > 0 && knownRole !== undefined
-    if (!isPersonGrant) throw HttpError.badRequest(`each grant must be { userId, role } with role one of ${GRANT_ROLES.join(', ')}`)
-    return { userId, role: knownRole }
+    const refusal = HttpError.badRequest(`each grant must be { email, role } or { userId, role } with role one of ${GRANT_ROLES.join(', ')}`)
+    if (knownRole === undefined) throw refusal
+    if (typeof userId === 'string' && userId.length > 0 && email === undefined) return { userId, role: knownRole }
+    if (typeof email !== 'string' || userId !== undefined) throw refusal
+    const normalizedEmail = Admission.normalizedEmail(email)
+    if (!Admission.looksLikeEmail(normalizedEmail)) throw HttpError.badRequest(`"${normalizedEmail}" is not an email address`)
+    return { email: normalizedEmail, role: knownRole }
   }
 
-  // The people who can open the artifact through the list now and could not through it before the save.
-  static #newlyGranted(before: { visibility: ArtifactVisibility; grants: PersonGrant[] }, after: { visibility: ArtifactVisibility; grants: PersonGrant[] }): PersonGrant[] {
-    if (!ArtifactAccess.grantsApplyUnder(after.visibility)) return []
-    const grantedBefore = ArtifactAccess.grantsApplyUnder(before.visibility) ? new Set(before.grants.map(grant => grant.userId)) : new Set<string>()
-    return after.grants.filter(grant => !grantedBefore.has(grant.userId))
+  // The entries that let someone in through the list now and did not before the save.
+  static #newlyListed<Entry>(visibilityBefore: ArtifactVisibility, before: Entry[], visibilityAfter: ArtifactVisibility, after: Entry[], keyOf: (entry: Entry) => string): Entry[] {
+    if (!ArtifactAccess.grantsApplyUnder(visibilityAfter)) return []
+    const listedBefore = ArtifactAccess.grantsApplyUnder(visibilityBefore) ? new Set(before.map(keyOf)) : new Set<string>()
+    return after.filter(entry => !listedBefore.has(keyOf(entry)))
   }
 
   // Absent keeps the current password, null removes it, a string sets a new one.

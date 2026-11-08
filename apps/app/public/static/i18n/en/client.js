@@ -18,7 +18,6 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
     cross_site_request: 'Please do this from an Open Artifact page.',
     removed_from_workspace: 'You were removed from this workspace. Contact an admin.',
     not_found: "It's gone, and may have been deleted. Try refreshing the page.",
-    person_not_found: 'No one has signed in to Open Artifact with this email yet. Ask them to sign in once, then add them.',
     field_required: "This can't be empty.",
     field_too_long: ({ maxLength }) => `Use ${plural(maxLength, 'character', 'characters')} or fewer.`,
     too_large: 'This is too large. Make it smaller and try again.',

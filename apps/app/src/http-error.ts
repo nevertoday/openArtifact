@@ -14,7 +14,6 @@ export type ErrorCode =
   | 'cross_site_request'
   | 'removed_from_workspace'
   | 'not_found'
-  | 'person_not_found'
   | 'method_not_allowed'
   | 'invalid_request'
   | 'field_required'

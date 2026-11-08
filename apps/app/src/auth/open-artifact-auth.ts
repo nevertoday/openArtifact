@@ -44,7 +44,6 @@ interface BetterAuthInstance {
 const SESSION_DAYS = 30
 const OIDC_PROVIDER_ID = 'company-sso'
 const SIGN_IN_CODE_MINUTES = 10
-const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 // Better Auth's own sender swallows every error the mail callback throws, so a refused address or a mail outage
 // would still answer "sent". This app mails the code itself and leaves the plugin only the check at sign-in.
 const UNUSED_EMAIL_OTP_PATHS = [
@@ -110,10 +109,12 @@ export class OpenArtifactAuth {
               if (!(await this.#admission.mayCreateAccount(newUser.email, OpenArtifactAuth.#inviteCodeIn(endpointContext)))) throw OpenArtifactAuth.#refusal()
             },
             // Every person belongs to a workspace from their first sign-in on, so the first to sign up becomes its admin.
+            // Pages shared with the address before it had an account open to the new person from now on.
             after: async (createdUser, endpointContext) => {
               const headers = OpenArtifactAuth.#headersOf(endpointContext)
               const firstWorkspaceName = this.requestMessages(headers, null).server.firstWorkspaceName
               await this.#admission.join({ userId: createdUser.id, email: createdUser.email }, OpenArtifactAuth.#inviteCodeIn(endpointContext), firstWorkspaceName)
+              await this.#repositories.artifactAccess.claimPendingGrants(Admission.normalizedEmail(createdUser.email), createdUser.id)
             },
           },
         },
@@ -127,7 +128,7 @@ export class OpenArtifactAuth {
     // Better Auth checks the origin of its own endpoints; without the same check another site could mail codes for us.
     if (request.headers.get('Origin') !== this.#appOrigin) return Response.json({ code: 'INVALID_ORIGIN', message: 'sign-in codes are asked for from this site only' }, { status: 403 })
     const email = await OpenArtifactAuth.#emailIn(request)
-    if (!EMAIL_SHAPE.test(email)) return Response.json({ code: 'INVALID_EMAIL', message: 'a valid email is required' }, { status: 400 })
+    if (!Admission.looksLikeEmail(email)) return Response.json({ code: 'INVALID_EMAIL', message: 'a valid email is required' }, { status: 400 })
     if (await this.#guesses.isLocked(email)) return OpenArtifactAuth.#lockedOut()
     const account = await this.#repositories.users.findByEmail(email)
     const mayCreateAccount = account !== null || (await this.#admission.mayCreateAccount(email, OpenArtifactAuth.#inviteCodeIn({ headers: request.headers })))

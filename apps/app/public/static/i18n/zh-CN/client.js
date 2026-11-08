@@ -18,7 +18,6 @@ export default {
     cross_site_request: '请在 Open Artifact 的页面上操作。',
     removed_from_workspace: '你已被移出这个 workspace，请联系管理员。',
     not_found: '找不到了，它可能已被删除。刷新页面看看。',
-    person_not_found: '这个邮箱还没登录过 Open Artifact。请对方先登录一次，再添加。',
     field_required: '这一项不能为空。',
     /** @param {{ maxLength: number }} error */
     field_too_long: ({ maxLength }) => `最多 ${maxLength} 个字。`,

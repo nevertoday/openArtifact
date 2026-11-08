@@ -28,6 +28,12 @@ export default {
     /** @param {{ code: string, minutes: number }} p */
     body: ({ code, minutes }) => `你的 Open Artifact 登录验证码是 ${code}，${minutes} 分钟内有效。\n\n如果不是你本人操作，忽略这封邮件即可，你的账号不受影响。`,
   },
+  pendingShare: {
+    /** @param {{ sharer: string, title: string }} p */
+    subject: ({ sharer, title }) => `${sharer} 与你分享了「${title}」`,
+    /** @param {{ sharer: string, title: string, email: string, url: string }} p */
+    body: ({ sharer, title, email, url }) => `${sharer} 在 Open Artifact 上与你分享了「${title}」。\n\n打开下面的链接，用这个邮箱（${email}）登录就能查看。还没有账号的话，登录即注册：\n\n${url}`,
+  },
   invite: {
     /** @param {{ inviter: string, workspace: string }} p */
     subject: ({ inviter, workspace }) => `${inviter} 邀请你加入 ${workspace}`,

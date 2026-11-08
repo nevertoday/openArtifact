@@ -9,7 +9,6 @@ import { JsonBody } from './json-body.ts'
 export const INVITE_LIFETIME_DAYS = 7
 const DAY = 24 * 60 * 60 * 1000
 const MAX_EMAILS_PER_REQUEST = 50
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** Invites into the current workspace; only its admins create, list and revoke them, from the browser. */
 export class InviteApi {
@@ -106,7 +105,7 @@ export class InviteApi {
     const isList = Array.isArray(emails) && emails.length >= 1 && emails.length <= MAX_EMAILS_PER_REQUEST
     if (!isList) throw HttpError.badRequest(`emails must be a list of 1 to ${MAX_EMAILS_PER_REQUEST} addresses`)
     const normalizedEmails = emails.map(email => (typeof email === 'string' ? Admission.normalizedEmail(email) : ''))
-    const malformedEmail = normalizedEmails.find(email => !EMAIL_SHAPE.test(email))
+    const malformedEmail = normalizedEmails.find(email => !Admission.looksLikeEmail(email))
     if (malformedEmail !== undefined) throw HttpError.badRequest(`"${malformedEmail}" is not an email address`)
     return [...new Set(normalizedEmails)]
   }

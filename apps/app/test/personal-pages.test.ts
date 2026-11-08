@@ -55,7 +55,7 @@ describe('listing on a personal page', () => {
     const expiredPage = await publishPublic('过期的活动页')
     await setSharing(listedPage.artifactId, { listed: true })
     await setSharing(expiredPage.artifactId, { listed: true })
-    await app.repositories.artifactAccess.saveSharing(expiredPage.artifactId, { visibility: 'public_link', publicLinkExpiresAt: Date.now() - 1, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, listed: true }, [])
+    await app.repositories.artifactAccess.saveSharing(expiredPage.artifactId, { visibility: 'public_link', publicLinkExpiresAt: Date.now() - 1, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, listed: true }, [], [])
 
     const strangersView = await personalPageOf()
 

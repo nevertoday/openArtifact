@@ -161,11 +161,10 @@ export class TestApp {
   /** Adds or changes one person's grant the way the share dialog saves it: the whole grant list in one request. */
   async grant(cookie: string, artifactId: string, email: string, role: 'viewer' | 'commenter' | 'editor'): Promise<Response> {
     const sharingPath = `/api/artifacts/${encodeURIComponent(artifactId)}/sharing`
-    const person = await this.json<{ userId: string }>(`${sharingPath}/people?email=${encodeURIComponent(email)}`, { cookie })
-    if (person.status !== 200) throw new Error(`no person to grant: ${person.status} ${JSON.stringify(person.body)}`)
-    const sharing = await this.json<{ grants: { userId: string; role: string }[] }>(sharingPath, { cookie })
-    const otherGrants = sharing.body.grants.filter(grant => grant.userId !== person.body.userId).map(grant => ({ userId: grant.userId, role: grant.role }))
-    return this.request(sharingPath, { method: 'PUT', cookie, body: { grants: [...otherGrants, { userId: person.body.userId, role }] } })
+    const sharing = await this.json<{ grants: { userId: string | null; email: string | null; role: string }[] }>(sharingPath, { cookie })
+    const address = email.trim().toLowerCase()
+    const otherGrants = sharing.body.grants.filter(grant => grant.email?.toLowerCase() !== address).map(grant => (grant.userId === null ? { email: grant.email, role: grant.role } : { userId: grant.userId, role: grant.role }))
+    return this.request(sharingPath, { method: 'PUT', cookie, body: { grants: [...otherGrants, { email, role }] } })
   }
 
   /** `path` is the artifact's address on the app, the path of the returned `url`. */

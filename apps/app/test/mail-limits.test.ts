@@ -79,4 +79,16 @@ describe('share mail', () => {
     expect(app.mailer.lastTo('first-outsider@example.com')?.subject).toContain('Board memo')
     expect(app.mailer.lastTo('second-outsider@example.com')?.subject ?? '').not.toContain('Board memo')
   })
+  it('counts mail to an address with no account against the same cap', async () => {
+    const sharerCookie = await app.signIn('sharer@example.com')
+    const sharerId = (await app.json<{ user: { userId: string } }>('/api/me', { cookie: sharerCookie })).body.user.userId
+    const page = await app.publish({ cookie: sharerCookie }, 'Offsite agenda', '<h1>agenda</h1>', 'private')
+    const now = Date.now()
+    await app.repositories.outboundMail.record({ kind: 'share', senderId: sharerId, workspaceId, count: 50, sentAt: now }, { scope: 'sender', max: 50, since: now - DAY_MS })
+
+    const overLimit = await app.json<{ code?: string }>(`/api/artifacts/${page.artifactId}/sharing`, { method: 'PUT', cookie: sharerCookie, body: { visibility: 'specified', grants: [{ email: 'not-yet@example.com', role: 'viewer' }] } })
+
+    expect(overLimit.status).toBe(429)
+    expect(app.mailer.lastTo('not-yet@example.com')).toBeUndefined()
+  })
 })

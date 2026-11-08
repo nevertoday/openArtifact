@@ -142,15 +142,15 @@ describe('artifact access, comments and shared data', () => {
     const { artifactId } = await createArtifactIn(workspaceId, authorId)
 
     const publicSharing = { visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true, listed: false } as const
-    await accessRepository.saveSharing(artifactId, publicSharing, [{ userId: reviewerId, role: 'commenter' }])
-    await accessRepository.saveSharing(artifactId, publicSharing, [{ userId: reviewerId, role: 'editor' }])
+    await accessRepository.saveSharing(artifactId, publicSharing, [{ userId: reviewerId, role: 'commenter' }], [])
+    await accessRepository.saveSharing(artifactId, publicSharing, [{ userId: reviewerId, role: 'editor' }], [])
 
     const summary = await artifactRepository.findSummary(artifactId)
     expect(summary?.sharing).toEqual({ visibility: 'public_link', publicLinkExpiresAt: 1_900_000_000_000, publicLinkPasswordHash: 'hash', anonymousWriteEnabled: true, publicLinkShowsComments: true, listed: false })
     expect(await accessRepository.listGrants(artifactId)).toEqual([{ artifactId, userId: reviewerId, role: 'editor' }])
     expect((await accessRepository.listGrantsOfUser(reviewerId)).map(grant => grant.artifactId)).toContain(artifactId)
 
-    await accessRepository.saveSharing(artifactId, publicSharing, [])
+    await accessRepository.saveSharing(artifactId, publicSharing, [], [])
     expect(await accessRepository.listGrants(artifactId)).toEqual([])
   })
 
@@ -159,7 +159,7 @@ describe('artifact access, comments and shared data', () => {
     const { artifactId } = await createArtifactIn(workspaceId, authorId)
     const privateSharing = { visibility: 'private', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, listed: false } as const
 
-    const duplicatePerson = accessRepository.saveSharing(artifactId, { ...privateSharing, visibility: 'specified' }, [{ userId: reviewerId, role: 'viewer' }, { userId: reviewerId, role: 'editor' }])
+    const duplicatePerson = accessRepository.saveSharing(artifactId, { ...privateSharing, visibility: 'specified' }, [{ userId: reviewerId, role: 'viewer' }, { userId: reviewerId, role: 'editor' }], [])
 
     await expect(duplicatePerson).rejects.toThrow()
     expect((await artifactRepository.findSummary(artifactId))?.sharing.visibility).toBe('workspace')
@@ -250,6 +250,27 @@ describe('artifact access, comments and shared data', () => {
   })
 })
 
+describe('pending grants', () => {
+  it('become grants for the account that signs up with the address, once, keeping a grant the person already has', async () => {
+    const accessRepository = new CloudflareArtifactAccessRepository(env.DB)
+    const authorId = await addUser('PendingAuthor')
+    const membership = await joinedFirstWorkspace(authorId)
+    const draft = await createArtifactIn(membership.workspace.workspaceId, authorId)
+    const notes = await createArtifactIn(membership.workspace.workspaceId, authorId)
+    const sharing = { visibility: 'specified' as const, publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, listed: false }
+    const newcomerId = await addUser('Newcomer')
+    await accessRepository.saveSharing(draft.artifactId, sharing, [], [{ email: 'newcomer@example.com', role: 'editor', grantedBy: authorId, createdAt: 1 }])
+    await accessRepository.saveSharing(notes.artifactId, sharing, [{ userId: newcomerId, role: 'viewer' }], [{ email: 'newcomer@example.com', role: 'editor', grantedBy: authorId, createdAt: 1 }])
+
+    await accessRepository.claimPendingGrants('newcomer@example.com', newcomerId)
+    await accessRepository.claimPendingGrants('newcomer@example.com', newcomerId)
+
+    expect(await accessRepository.listGrants(draft.artifactId)).toEqual([{ artifactId: draft.artifactId, userId: newcomerId, role: 'editor' }])
+    expect(await accessRepository.listGrants(notes.artifactId)).toEqual([{ artifactId: notes.artifactId, userId: newcomerId, role: 'viewer' }])
+    expect(await accessRepository.listPendingGrants(draft.artifactId)).toEqual([])
+  })
+})
+
 describe('CloudflareProfileRepository', () => {
   const profileRepository = new CloudflareProfileRepository(env.DB)
 
@@ -291,7 +312,7 @@ describe('listing on a personal page', () => {
     const withOpening = await artifactRepository.create({ workspaceId, authorId, title: 'Opening', slug: 'opening', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: '页面开头的话', listed: true, summary: null, shareText: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
     const withSummary = await artifactRepository.create({ workspaceId, authorId, title: 'Summarized', slug: 'summarized', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: '页面开头的话', listed: true, summary: '作者写的摘要', shareText: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
     const unlisted = await createArtifactIn(workspaceId, authorId)
-    await accessRepository.saveSharing(unlisted.artifactId, { ...publicSharing, listed: false }, [])
+    await accessRepository.saveSharing(unlisted.artifactId, { ...publicSharing, listed: false }, [], [])
 
     const listed = await artifactRepository.listListedBy(authorId)
     await artifactRepository.setSummary(withSummary.artifactId, null)

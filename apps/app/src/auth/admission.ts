@@ -2,6 +2,7 @@ import type { Invite, JoinResult, Membership, Repositories } from '@open-artifac
 
 /** Set when someone opens an invite link, so sign-up and the first visit after sign-in can use it. */
 export const INVITE_COOKIE = 'oa_invite'
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** A signed-in person, as far as joining a workspace goes. */
 export interface Joiner {
@@ -106,6 +107,10 @@ export class Admission {
 
   static #admits(invite: Invite, email: string): boolean {
     return invite.email === null || invite.email === Admission.normalizedEmail(email)
+  }
+
+  static looksLikeEmail(email: string): boolean {
+    return EMAIL_SHAPE.test(email)
   }
 
   /** Invites store addresses this way, and every comparison with one goes through it. */
