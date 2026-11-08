@@ -6,7 +6,7 @@ import { APP_ORIGIN, TestApp } from './test-app.ts'
 const app = new TestApp()
 
 describe('signing in', () => {
-  it('signs a person in through the emailed link and puts them in a workspace', async () => {
+  it('signs a person in with the mailed code and puts them in a workspace', async () => {
     const founderCookie = await app.signIn('lin@example.com')
     const colleagueCookie = await app.signIn('zhou@example.com')
 
@@ -227,8 +227,8 @@ describe('personal API tokens', () => {
 })
 
 describe('who may sign up', () => {
-  it('refuses an email outside the allowed domains before sending any link, without naming the domains', async () => {
-    const refused = await app.json<{ message: string; code: string }>('/api/auth/sign-in/magic-link', { method: 'POST', body: { email: 'stranger@other.org', callbackURL: '/' } })
+  it('refuses an email outside the allowed domains before sending any code, without naming the domains', async () => {
+    const refused = await app.json<{ message: string; code: string }>('/api/auth/sign-in/send-code', { method: 'POST', body: { email: 'stranger@other.org' } })
 
     expect(refused.status).toBe(403)
     expect(refused.body).toMatchObject({ code: 'EMAIL_NOT_ADMITTED', message: "This email can't sign in to Open Artifact. Use your work email, or ask an admin to invite you." })
@@ -240,7 +240,7 @@ describe('who may sign up', () => {
     const founderOnlyApp = new TestApp({})
     await app.signIn('lin@example.com')
 
-    const newcomer = await founderOnlyApp.request('/api/auth/sign-in/magic-link', { method: 'POST', body: { email: 'newcomer@example.com', callbackURL: '/' } })
+    const newcomer = await founderOnlyApp.sendCode('newcomer@example.com')
     const existingPerson = await founderOnlyApp.signIn('lin@example.com')
 
     expect(newcomer.status).toBe(403)
@@ -278,7 +278,7 @@ class EmailServiceStandIn implements SendEmail {
 describe('mail', () => {
   const signInEmail = { to: 'lin@example.com', subject: '登录 Open Artifact', text: 'https://app.test/sign-in' }
 
-  it('fails loudly instead of logging sign-in links when no mail service is configured', async () => {
+  it('fails loudly instead of logging sign-in codes when no mail service is configured', async () => {
     await expect(Mailers.fromEnv({}).send(signInEmail)).rejects.toThrow('No mail service is configured')
   })
 
@@ -334,18 +334,18 @@ describe('tokens and workspaces', () => {
   })
 })
 
-describe('asking for sign-in links', () => {
+describe('asking for sign-in codes', () => {
   const limitedApp = new TestApp({ allowedEmailDomains: 'example.com', productionSignInLimits: true })
-  const askForLink = (email: string, senderAddress?: string) => {
+  const askForCode = (email: string, senderAddress?: string) => {
     const headers = new Headers({ 'Content-Type': 'application/json', Origin: 'http://app.test' })
     if (senderAddress) headers.set('CF-Connecting-IP', senderAddress)
-    return limitedApp.routes.respond(new Request('http://app.test/api/auth/sign-in/magic-link', { method: 'POST', headers, body: JSON.stringify({ email, callbackURL: '/' }) }))
+    return limitedApp.routes.respond(new Request('http://app.test/api/auth/sign-in/send-code', { method: 'POST', headers, body: JSON.stringify({ email }) }))
   }
 
-  it('mails one address at most three links a minute, whatever letter case is used', async () => {
-    const answers = await Promise.all(['Flood@example.com', 'flood@example.com', 'FLOOD@example.com'].map(email => askForLink(email)))
-    const fourth = await askForLink('flood@example.com')
-    const someoneElse = await askForLink('calm@example.com')
+  it('mails one address at most three codes a minute, whatever letter case is used', async () => {
+    const answers = await Promise.all(['Flood@example.com', 'flood@example.com', 'FLOOD@example.com'].map(email => askForCode(email)))
+    const fourth = await askForCode('flood@example.com')
+    const someoneElse = await askForCode('calm@example.com')
 
     expect(answers.map(answer => answer.status)).toEqual([200, 200, 200])
     expect(fourth.status).toBe(429)
@@ -354,12 +354,12 @@ describe('asking for sign-in links', () => {
     expect(someoneElse.status).toBe(200)
   })
 
-  it('stops one sender from asking for links to many addresses', async () => {
+  it('stops one sender from asking for codes to many addresses', async () => {
     const statuses: number[] = []
-    for (let index = 0; index < 21; index++) statuses.push((await askForLink(`sender-${index}@example.com`, '203.0.113.7')).status)
+    for (let index = 0; index < 21; index++) statuses.push((await askForCode(`sender-${index}@example.com`, '203.0.113.7')).status)
 
     expect(statuses.slice(0, 20).every(status => status === 200)).toBe(true)
     expect(statuses[20]).toBe(429)
-    expect((await askForLink('other-network@example.com', '198.51.100.1')).status).toBe(200)
+    expect((await askForCode('other-network@example.com', '198.51.100.1')).status).toBe(200)
   })
 })

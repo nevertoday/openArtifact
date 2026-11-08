@@ -7,6 +7,7 @@ import type { NotificationRepository } from './notification-repository.ts'
 import type { ProfileRepository } from './profile-repository.ts'
 import type { InviteRepository } from './invite-repository.ts'
 import type { SharedDataRepository } from './shared-data-repository.ts'
+import type { SignInCodeFailures } from './sign-in-code-failures.ts'
 import type { UserDirectory, WorkspaceRepository } from './workspace-repository.ts'
 
 /** Every store the app reads and writes, so one storage adapter can supply them all. */
@@ -22,4 +23,5 @@ export interface Repositories {
   sharedData: SharedDataRepository
   auditLog: AuditLog
   profiles: ProfileRepository
+  signInCodeFailures: SignInCodeFailures
 }

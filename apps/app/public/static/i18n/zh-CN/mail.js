@@ -23,9 +23,10 @@ export default {
     accessRequestedBody: ({ subject, email }) => `${subject}。TA 的邮箱是 ${email}。打开页面后点「分享」，把这个邮箱加进来。`,
   },
   signIn: {
-    subject: '登录 Open Artifact',
-    /** @param {string} url */
-    body: url => `点下面的链接登录 Open Artifact，链接 5 分钟内有效：\n\n${url}\n\n如果不是你本人操作，忽略这封邮件即可。`,
+    /** @param {string} code */
+    subject: code => `${code} 是你的 Open Artifact 验证码`,
+    /** @param {{ code: string, minutes: number }} p */
+    body: ({ code, minutes }) => `你的 Open Artifact 登录验证码是 ${code}，${minutes} 分钟内有效。\n\n如果不是你本人操作，忽略这封邮件即可，你的账号不受影响。`,
   },
   invite: {
     /** @param {{ inviter: string, workspace: string }} p */

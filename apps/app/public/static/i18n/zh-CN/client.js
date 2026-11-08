@@ -76,11 +76,15 @@ export default {
   },
   login: {
     errors: {
-      EXPIRED_TOKEN: '登录链接已过期，请重新发送。',
-      INVALID_TOKEN: '登录链接无效或已用过，请重新发送。',
-      rate_limited: '登录链接发得太频繁了，请等一分钟再试。',
+      INVALID_OTP: '验证码不对，请再检查一下。',
+      OTP_EXPIRED: '验证码已过期，请重新发送。',
+      TOO_MANY_ATTEMPTS: '错误次数太多，这个验证码已失效，请重新发送。',
+      rate_limited: '验证码发得太频繁了，请等一分钟再试。',
+      SIGN_IN_LOCKED: '这个邮箱今天输错验证码的次数太多，验证码登录已暂停。请明天再试，或换一种方式登录。',
+      CODE_NOT_MAILED: '验证码邮件没有发出去，请稍后再试。',
+      INVALID_EMAIL: '请输入有效的邮箱，比如 name@example.com',
     },
-    unknownError: '登录没有成功，请重新发送登录链接。',
+    unknownError: '登录没有成功，请重试。',
     resend: '再发一次',
     /** @param {number} seconds */
     resendIn: seconds => `再发一次（${seconds} 秒）`,

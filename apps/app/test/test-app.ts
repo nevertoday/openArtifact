@@ -9,7 +9,7 @@ export const APP_ORIGIN = 'http://app.test'
 export const USERCONTENT_ORIGIN = 'http://usercontent.test'
 export const SIGNING_KEY = 'test-signing-key-that-is-long-enough'
 
-/** Keeps sent mail in memory, so tests can follow the sign-in link. */
+/** Keeps sent mail in memory, so tests can read the sign-in code. */
 export class RecordingMailer implements Mailer {
   readonly sent: OutgoingEmail[] = []
   #outOfService = false
@@ -26,6 +26,13 @@ export class RecordingMailer implements Mailer {
 
   lastTo(address: string): OutgoingEmail | undefined {
     return this.sent.filter(email => email.to === address).at(-1)
+  }
+
+  /** The six digits in the last sign-in mail to `address`. */
+  lastCodeTo(address: string): string {
+    const code = this.lastTo(address)?.subject.match(/\d{6}/)?.[0]
+    if (!code) throw new Error(`no sign-in code was mailed to ${address}`)
+    return code
   }
 }
 
@@ -63,7 +70,7 @@ export class TestApp {
   readonly routes: AppRoutes
 
   /**
-   * Tests sign the same people in many times a minute, so sign-in links are limited loosely unless
+   * Tests sign the same people in many times a minute, so sign-in codes are limited loosely unless
    * `productionSignInLimits` asks for the limits the app is deployed with.
    */
   constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean } = { allowedEmailDomains: 'example.com' }) {
@@ -108,19 +115,27 @@ export class TestApp {
     return { status: response.status, body: (await response.json()) as Body }
   }
 
+  /** Asks for a sign-in code to be mailed to `email`, as the login page does. */
+  sendCode(email: string, options: Omit<RequestOptions, 'method' | 'body'> = {}): Promise<Response> {
+    return this.request('/api/auth/sign-in/send-code', { ...options, method: 'POST', body: { email } })
+  }
+
+  /** Types `code` into the login page; the answer sets the session cookie when the code is right. */
+  enterCode(email: string, code: string, options: Omit<RequestOptions, 'method' | 'body'> = {}): Promise<Response> {
+    return this.request('/api/auth/sign-in/email-otp', { ...options, method: 'POST', body: { email, otp: code } })
+  }
+
   /**
-   * Signs in through the emailed link, exactly as a person does, and returns the session cookie.
+   * Signs in with the mailed code, exactly as a person does, and returns the session cookie.
    * `browserCookie` is what the browser already holds, such as the cookie an invite link set.
    */
-  async signIn(email: string, browserCookie?: string): Promise<string> {
-    const sendResponse = await this.request('/api/auth/sign-in/magic-link', { method: 'POST', body: { email, callbackURL: '/' }, ...(browserCookie ? { cookie: browserCookie } : {}) })
-    if (!sendResponse.ok) throw new Error(`magic link request failed: ${sendResponse.status} ${await sendResponse.text()}`)
-    const signInLink = this.mailer.lastTo(email)?.text.match(/https?:\/\/\S+/)?.[0]
-    if (!signInLink) throw new Error(`no sign-in link was mailed to ${email}`)
-    const verifyHeaders = new Headers(browserCookie ? { Cookie: browserCookie } : {})
-    const verifyResponse = await this.routes.respond(new Request(signInLink, { redirect: 'manual', headers: verifyHeaders }))
-    const sessionCookie = verifyResponse.headers.getSetCookie().map(setCookie => setCookie.split(';')[0]).join('; ')
-    if (!sessionCookie.includes('session_token')) throw new Error(`sign-in did not set a session: ${verifyResponse.status}`)
+  async signIn(email: string, browserCookie?: string, headers?: Record<string, string>): Promise<string> {
+    const browser = { ...(browserCookie ? { cookie: browserCookie } : {}), ...(headers ? { headers } : {}) }
+    const sendResponse = await this.sendCode(email, browser)
+    if (!sendResponse.ok) throw new Error(`asking for a sign-in code failed: ${sendResponse.status} ${await sendResponse.text()}`)
+    const checkResponse = await this.enterCode(email, this.mailer.lastCodeTo(email), browser)
+    const sessionCookie = checkResponse.headers.getSetCookie().map(setCookie => setCookie.split(';')[0]).join('; ')
+    if (!sessionCookie.includes('session_token')) throw new Error(`sign-in did not set a session: ${checkResponse.status} ${await checkResponse.text()}`)
     return sessionCookie
   }
 

@@ -33,7 +33,7 @@ describe('the server-rendered pages in English', () => {
     expect(markup).toContain('Any agent publishes,<br>your whole team uses it.')
     expect(markup).toContain('After you sign in, the page you were on opens.')
     expect(markup).toContain('data-error-not-admitted="This email can&#39;t sign in to Open Artifact.')
-    expect(markup).toContain('Send sign-in link')
+    expect(markup).toContain('Send code')
     expect(markup).not.toMatch(anyChinese)
   })
 

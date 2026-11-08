@@ -21,7 +21,7 @@ export class ConsoleMailer implements Mailer {
 }
 
 /**
- * Used when no mail service is configured. Sign-in links must never land in a production log, where
+ * Used when no mail service is configured. Sign-in codes must never land in a production log, where
  * anyone who reads the logs could sign in as anyone, so sending fails instead.
  */
 export class UnconfiguredMailer implements Mailer {

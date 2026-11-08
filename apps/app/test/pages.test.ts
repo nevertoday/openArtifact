@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { APP_ORIGIN, TestApp } from './test-app.ts'
+import { messagesFor } from '../src/i18n/messages.ts'
+import { LoginPage } from '../src/pages/login-page.ts'
 
 const app = new TestApp()
 let authorCookie = ''
@@ -22,9 +24,25 @@ describe('login page', () => {
   it('offers email sign-in and only the providers the deployment configured', async () => {
     const loginMarkup = await pageText('/login?next=/settings/agents')
 
-    expect(loginMarkup).toContain('发送登录链接')
+    expect(loginMarkup).toContain('发送验证码')
+    expect(loginMarkup).toContain('autocomplete="one-time-code"')
     expect(loginMarkup).toContain('data-next-path="/settings/agents"')
     expect(loginMarkup).not.toContain('data-provider-id')
+  })
+
+  it('outlines every provider button with its mark, so the only filled button sends the code', async () => {
+    const providers = [
+      { providerId: 'github', label: 'GitHub', kind: 'social' as const },
+      { providerId: 'google', label: 'Google', kind: 'social' as const },
+    ]
+
+    const markup = await LoginPage.render(messagesFor('zh-CN'), providers, '/').text()
+    const providerButtons = markup.match(/<button[^>]*data-provider-id[^>]*>.*?<\/button>/gs) ?? []
+
+    expect(providerButtons).toHaveLength(2)
+    expect(providerButtons.every(button => button.includes('login-provider__mark') && !button.includes('data-variant'))).toBe(true)
+    expect(markup.match(/data-variant="primary"/g)).toHaveLength(1)
+    expect(markup).toContain('用 GitHub 登录')
   })
 
   it('says sign-in will lead back to the page the person came from, only when there is one', async () => {
@@ -33,7 +51,7 @@ describe('login page', () => {
 
     expect(fromSharedLink).toContain('登录后会打开你刚才的页面。')
     expect(plain).not.toContain('登录后会打开你刚才的页面。')
-    expect(plain).toContain('输入邮箱，我们发一个登录链接，不用密码。')
+    expect(plain).toContain('输入邮箱，我们发一个 6 位验证码，不用密码。')
   })
 
   it.each(['//evil.example/steal', '/\t/evil.example', '/\\evil.example', 'https://evil.example/'])('never redirects off the site after sign-in (next=%s)', async nextPath => {

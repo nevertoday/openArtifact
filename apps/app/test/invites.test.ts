@@ -90,7 +90,7 @@ describe('an invite link', () => {
 
     const revocation = await app.request(`/api/workspace/invites/${link.inviteId}`, { method: 'DELETE', cookie: adminCookie })
     const reopened = await openInviteLink(link.url)
-    const signUp = await app.json<{ code: string }>('/api/auth/sign-in/magic-link', { method: 'POST', cookie: opened.browserCookie, body: { email: 'late@partner.org', callbackURL: '/' } })
+    const signUp = await app.json<{ code: string }>('/api/auth/sign-in/send-code', { method: 'POST', cookie: opened.browserCookie, body: { email: 'late@partner.org' } })
 
     expect(revocation.status).toBe(204)
     expect(reopened.status).toBe(410)

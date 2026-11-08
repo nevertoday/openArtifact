@@ -1,17 +1,17 @@
 import { HttpError } from '../http-error.ts'
-
-const SEND_LINK_PATH = '/api/auth/sign-in/magic-link'
+import { OpenArtifactAuth } from './open-artifact-auth.ts'
 
 export interface SignInLimiters {
-  /** Links mailed to one address: keeps anyone from filling a person's inbox. */
+  /** Codes mailed to one address: keeps anyone from filling a person's inbox. */
   byEmail: RateLimit
-  /** Links asked for from one network address: keeps one sender from mailing many addresses. */
+  /** Codes asked for from one network address: keeps one sender from mailing many addresses. */
   byAddress: RateLimit
 }
 
 /**
- * Asking for a sign-in link sends mail, so it is limited per recipient and per sender before Better Auth sees
- * the request. The limits sit on Cloudflare's rate limiter, which every Worker instance shares.
+ * Asking for a sign-in code sends mail, so it is limited per recipient and per sender before Better Auth sees
+ * the request. Cloudflare's rate limiter counts at each Cloudflare location, not globally, so these only slow a sender
+ * down; `SignInGuesses` caps wrong codes for good.
  */
 export class SignInLimits {
   readonly #limiters: SignInLimiters
@@ -22,11 +22,11 @@ export class SignInLimits {
 
   /** The 429 to answer with, or null when the request may go on. */
   async refusalFor(request: Request): Promise<Response | null> {
-    const asksForLink = request.method === 'POST' && new URL(request.url).pathname === SEND_LINK_PATH
-    if (!asksForLink) return null
+    const asksForCode = request.method === 'POST' && new URL(request.url).pathname === OpenArtifactAuth.SEND_CODE_PATH
+    if (!asksForCode) return null
     const [emailAllowed, addressAllowed] = await Promise.all([this.#emailAllowed(request), this.#addressAllowed(request)])
     if (emailAllowed && addressAllowed) return null
-    const refusal = new HttpError(429, 'rate_limited', 'too many sign-in links were asked for; wait a minute and try again').toResponse()
+    const refusal = new HttpError(429, 'rate_limited', 'too many sign-in codes were asked for; wait a minute and try again').toResponse()
     refusal.headers.set('Retry-After', '60')
     return refusal
   }

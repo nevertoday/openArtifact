@@ -16,8 +16,8 @@ export default /** @satisfies {import('../messages').Messages['mail']} */ ({
     accessRequestedBody: ({ subject, email }) => `${subject}. Their email is ${email}. Open the page, click Share and add this address.`,
   },
   signIn: {
-    subject: 'Sign in to Open Artifact',
-    body: url => `Click the link below to sign in to Open Artifact. It works for 5 minutes:\n\n${url}\n\nIf you didn't ask for this, you can ignore this email.`,
+    subject: code => `${code} is your Open Artifact code`,
+    body: ({ code, minutes }) => `Your Open Artifact sign-in code is ${code}. It works for ${minutes} minutes.\n\nIf you didn't ask for this, you can ignore this email. Your account is safe.`,
   },
   invite: {
     subject: ({ inviter, workspace }) => `${inviter} invited you to join ${workspace}`,
