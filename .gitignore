@@ -7,3 +7,4 @@ node_modules/
 .archify/
 x-drafts/
 wrangler.production.jsonc
+.verify/
