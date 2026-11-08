@@ -192,7 +192,7 @@ export default /** @satisfies {import('../messages').Messages['viewerClient']} *
     peopleHint: 'Give someone more access than everyone else, like Can edit to also publish new versions. People you add get an email once you save.',
     roleOf: name => `${name}'s access`,
     addedOnSave: 'Added when you save',
-    pendingSignUp: 'Pending sign-up',
+    invited: 'Invited',
     remove: 'Remove',
     role: 'Access',
     anonymousWrite: 'Let anonymous visitors write shared data',

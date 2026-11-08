@@ -37,8 +37,16 @@ async function userIdOf(cookie: string): Promise<string> {
   return body.user.userId
 }
 
+/** Someone with an account who works only in another workspace, signed in. */
+async function outsiderSignedIn(email: string): Promise<string> {
+  const cookie = await app.signIn(email)
+  await env.DB.prepare("INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES ('workspace-elsewhere', 'Elsewhere', ?)").bind(Date.now()).run()
+  await env.DB.prepare("UPDATE memberships SET workspace_id = 'workspace-elsewhere' WHERE user_id = ?").bind(await userIdOf(cookie)).run()
+  return cookie
+}
+
 describe('looking a person up by email', () => {
-  it('gives the same answer for an unknown address and an account outside every shared workspace', async () => {
+  it('answers alike for an unknown address and an account the author shares no workspace with', async () => {
     const formerCookie = await app.signIn('former@example.com')
     await app.request(`/api/workspace/members/${await userIdOf(formerCookie)}`, { method: 'DELETE', cookie: adminCookie })
     const page = await app.publish({ cookie: authorCookie }, 'Lookup page')
@@ -87,7 +95,7 @@ describe('sharing with an address that has no account yet', () => {
     expect(await grantsOf(page.artifactId)).toEqual([{ userId: joinerId, email: 'late-joiner@example.com', name: 'late-joiner', role: 'commenter', pending: false }])
   })
 
-  it('grants an address that already has an account to that account at once', async () => {
+  it('grants the address of someone the author works with to their account at once', async () => {
     const colleagueCookie = await app.signIn('colleague@example.com')
     const page = await app.publish({ cookie: authorCookie }, 'Team retro', '<h1>retro</h1>', 'private')
 
@@ -96,6 +104,35 @@ describe('sharing with an address that has no account yet', () => {
 
     expect(saved.body.grants).toMatchObject([{ userId: await userIdOf(colleagueCookie), pending: false, role: 'editor' }])
     expect(duplicate.status).toBe(400)
+  })
+
+  it('saves an account the author shares no workspace with exactly as an address with no account', async () => {
+    await outsiderSignedIn('outsider@example.com')
+    const page = await app.publish({ cookie: authorCookie }, 'Roadmap', '<h1>roadmap</h1>', 'private')
+    const sharingPut = (email: string) => app.request(sharingPath(page.artifactId), { method: 'PUT', cookie: authorCookie, body: { visibility: 'specified', grants: [{ email, role: 'viewer' }] } })
+    const sharingGet = () => app.request(sharingPath(page.artifactId), { cookie: authorCookie })
+    const withoutAddress = async (response: Response, email: string) => (await response.text()).replaceAll(email, '<address>')
+
+    const registeredPut = await withoutAddress(await sharingPut('outsider@example.com'), 'outsider@example.com')
+    const registeredGet = await withoutAddress(await sharingGet(), 'outsider@example.com')
+    const unregisteredPut = await withoutAddress(await sharingPut('nobody-yet@example.com'), 'nobody-yet@example.com')
+    const unregisteredGet = await withoutAddress(await sharingGet(), 'nobody-yet@example.com')
+
+    expect(registeredPut).toBe(unregisteredPut)
+    expect(registeredGet).toBe(unregisteredGet)
+    expect(JSON.parse(registeredPut).grants).toEqual([{ userId: null, email: '<address>', name: null, role: 'viewer', pending: true }])
+    expect(app.mailer.lastTo('outsider@example.com')?.subject).toBe(app.mailer.lastTo('nobody-yet@example.com')?.subject)
+  })
+
+  it('opens the page to that account once its owner signs in', async () => {
+    const outsiderCookie = await outsiderSignedIn('outsider-reader@example.com')
+    const page = await app.publish({ cookie: authorCookie }, 'Partner notes', '<h1>notes</h1>', 'private')
+    await saveGrants(page.artifactId, [{ email: 'outsider-reader@example.com', role: 'commenter' }])
+
+    const read = await app.request(`/api/artifacts/${page.artifactId}`, { cookie: outsiderCookie })
+
+    expect(read.status).toBe(200)
+    expect(await grantsOf(page.artifactId)).toMatchObject([{ userId: await userIdOf(outsiderCookie), role: 'commenter', pending: false }])
   })
 
   it('waits quietly, without mail, for an address this deployment would not let sign up', async () => {

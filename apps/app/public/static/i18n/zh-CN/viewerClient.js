@@ -260,7 +260,7 @@ export default {
     /** @param {string} name */
     roleOf: name => `${name} 的权限`,
     addedOnSave: '保存后添加',
-    pendingSignUp: '待注册',
+    invited: '已邀请',
     remove: '移除',
     role: '权限',
     anonymousWrite: '允许匿名访客写入共享数据',

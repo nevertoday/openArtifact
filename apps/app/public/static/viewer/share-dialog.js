@@ -269,7 +269,7 @@ export class ShareDialog extends EventTarget {
     })
     const badge = this.#draft.isNewPerson(grantKey)
       ? element('span', { className: 'xxd-badge', 'data-tone': 'action' }, m.viewerClient.share.addedOnSave)
-      : grant.pending ? element('span', { className: 'xxd-badge', 'data-share-pending': true }, m.viewerClient.share.pendingSignUp) : null
+      : grant.pending ? element('span', { className: 'xxd-badge', 'data-share-pending': true }, m.viewerClient.share.invited) : null
     return element('li', { className: 'xxd-list__item share-person' },
       element('span', { className: 'xxd-avatar', 'data-size': 'sm', 'aria-hidden': 'true' }, initialOf(label)),
       element('span', { className: 'xxd-list__main' }, element('span', { className: 'xxd-list__title xxd-cluster' }, label, badge), element('span', { className: 'xxd-list__meta' }, grant.name === null ? '' : grant.email ?? '')),
