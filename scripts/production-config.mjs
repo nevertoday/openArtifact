@@ -7,6 +7,9 @@
 //   APP_ZONE               the Cloudflare zone APP_HOST belongs to, e.g. example.com
 //   USERCONTENT_HOST       artifact files, on another site than the app, e.g. artifact-files.example-content.com
 //   MAIL_FROM              optional sender for sign-in mail; mail goes through Cloudflare Email Service when set
+//   ALLOWED_EMAIL_DOMAINS  optional; who may sign up: "*" for anyone, or domains like "example.com, example.cn".
+//                          Unset leaves the app as it was, including a value kept as a Worker secret, which
+//                          has to be deleted before this is set, since a var and a secret cannot share a name.
 // The app also gets Workers AI, which local development goes without, to translate Chinese titles for their links.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -36,6 +39,7 @@ const appHost = setting('APP_HOST')
 const appOrigin = `https://${appHost}`
 const usercontentHost = setting('USERCONTENT_HOST')
 const mailFrom = process.env.MAIL_FROM?.trim()
+const allowedEmailDomains = process.env.ALLOWED_EMAIL_DOMAINS?.trim()
 
 const app = readBaseConfig('app')
 app.d1_databases[0].database_id = setting('D1_DATABASE_ID')
@@ -45,7 +49,13 @@ writeProductionConfig('app', {
   workers_dev: false,
   routes: [{ pattern: appHost, custom_domain: true }],
   ai: { binding: 'AI' },
-  vars: { ...app.vars, USERCONTENT_ORIGIN: `https://${usercontentHost}`, MCP_ORIGIN: appOrigin, ...(mailFrom ? { MAILER: 'cloudflare', MAIL_FROM: mailFrom } : {}) },
+  vars: {
+    ...app.vars,
+    USERCONTENT_ORIGIN: `https://${usercontentHost}`,
+    MCP_ORIGIN: appOrigin,
+    ...(mailFrom ? { MAILER: 'cloudflare', MAIL_FROM: mailFrom } : {}),
+    ...(allowedEmailDomains ? { ALLOWED_EMAIL_DOMAINS: allowedEmailDomains } : {}),
+  },
 })
 
 const usercontent = readBaseConfig('usercontent')

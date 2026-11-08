@@ -30,6 +30,7 @@ jobs:
           APP_ZONE: ${{ vars.APP_ZONE }}
           USERCONTENT_HOST: ${{ vars.USERCONTENT_HOST }}
           MAIL_FROM: ${{ vars.MAIL_FROM }}
+          ALLOWED_EMAIL_DOMAINS: ${{ vars.ALLOWED_EMAIL_DOMAINS }}
       - run: pnpm deploy:production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
