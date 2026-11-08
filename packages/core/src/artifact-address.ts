@@ -18,7 +18,6 @@ const SHORT_ID_VALUES = BigInt(SHORT_ID_ALPHABET.length) ** BigInt(SHORT_ID_LENG
 const UNBIASED_LIMIT = ((1n << 64n) / SHORT_ID_VALUES) * SHORT_ID_VALUES
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_SLUG_LENGTH = 60
-const HAN = /\p{Script=Han}/u
 
 /** Twelve random characters from 0-9 and a-z; 36^12 is about 4.7 × 10^18 addresses, too many to guess. */
 export class ShortId {
@@ -61,15 +60,10 @@ export class ArtifactSlug {
 
   /**
    * The words the publisher chose, or else those of the title. `englishTitle` is the title translated, for a title
-   * whose own words would be lost to the address; see needsEnglishTitle.
+   * whose own words would be lost to the address; see titleToTranslate.
    */
   static forNewArtifact(requested: string | null, title: string, englishTitle: string | null = null): string {
-    return ArtifactSlug.#requested(requested) ?? ArtifactSlug.#titleWords(title, englishTitle)
-  }
-
-  /** A Chinese title loses its Chinese words to the address, so the address is worth a translated title, unless the publisher chose words. */
-  static needsEnglishTitle(requested: string | null, title: string): boolean {
-    return ArtifactSlug.#requested(requested) === null && HAN.test(title)
+    return ArtifactSlug.afterChange('', requested, title, englishTitle)
   }
 
   /**
@@ -83,9 +77,14 @@ export class ArtifactSlug {
     return current
   }
 
-  /** Whether a change of title gives the address its words, so that a Chinese one is worth translating first. */
-  static takesWordsFromTitle(current: string, requested: string | null, changedTitle: string | null): boolean {
-    return current === '' && changedTitle !== null && ArtifactSlug.needsEnglishTitle(requested, changedTitle)
+  /**
+   * The title worth translating before afterChange: one that gives the address its words but has letters, such as
+   * Chinese ones, that the address cannot keep. A new artifact is a change from no words, `current` ''.
+   */
+  static titleToTranslate(current: string, requested: string | null, changedTitle: string | null): string | null {
+    if (ArtifactSlug.#requested(requested) !== null || current !== '' || changedTitle === null) return null
+    const lettersLost = changedTitle.normalize('NFKD').replace(/\p{M}/gu, '').replace(/[a-z]/gi, '')
+    return /\p{L}/u.test(lettersLost) ? changedTitle : null
   }
 
   // A translation that keeps no ASCII words is no better than the title's own.

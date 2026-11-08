@@ -2,6 +2,7 @@ import { ArtifactRemoval, type ArtifactFile } from '@open-artifact/core'
 import { cloudflareRepositories } from '@open-artifact/storage-cloudflare'
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import { AppRoutes } from './app-routes.ts'
+import { TitleTranslators } from './api/title-translator.ts'
 import { Mailers } from './auth/mailer.ts'
 import type { AppEnv } from './env.ts'
 
@@ -21,6 +22,7 @@ export default {
       env,
       repositories: cloudflareRepositories(env.DB, env.FILES),
       mailer: Mailers.fromEnv(env),
+      titleTranslator: TitleTranslators.fromEnv(env),
       mcpUrl: `${env.MCP_ORIGIN}/mcp`,
     })
     return appRoutes.respond(request)

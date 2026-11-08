@@ -1,5 +1,3 @@
-import type { TranslationModels } from './api/title-translator.ts'
-
 export interface AppEnv {
   DB: D1Database
   FILES: R2Bucket
@@ -33,6 +31,6 @@ export interface AppEnv {
   OIDC_DISPLAY_NAME?: string
   /** The interface language when neither the person nor their browser picks one: "zh-CN" (the default) or "en". */
   DEFAULT_LOCALE?: string
-  /** Workers AI, which translates Chinese titles into the English words of their address; unbound in local development. */
-  AI?: TranslationModels
+  /** Workers AI, which translates a title such as a Chinese one into the English words of its address; unbound in local development. */
+  AI?: Ai
 }

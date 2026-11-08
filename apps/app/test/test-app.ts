@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers'
 import { AppRoutes } from '../src/app-routes.ts'
 import type { Mailer, OutgoingEmail } from '../src/auth/mailer.ts'
-import type { TranslationModels } from '../src/api/title-translator.ts'
+import type { TitleTranslator } from '../src/api/title-translator.ts'
 import type { AppEnv } from '../src/env.ts'
 import { cloudflareRepositories } from '@open-artifact/storage-cloudflare'
 
@@ -29,6 +29,17 @@ export class RecordingMailer implements Mailer {
   }
 }
 
+/** Answers every translation with `english`, null by default as without Workers AI, and keeps the titles asked about. */
+export class RecordingTranslator implements TitleTranslator {
+  readonly asked: string[] = []
+  english: string | null = null
+
+  async toEnglish(title: string): Promise<string | null> {
+    this.asked.push(title)
+    return this.english
+  }
+}
+
 export interface Caller {
   /** Session cookie of a signed-in person, or an API token. */
   cookie?: string
@@ -47,6 +58,7 @@ export interface RequestOptions extends Caller {
 
 export class TestApp {
   readonly mailer = new RecordingMailer()
+  readonly translator = new RecordingTranslator()
   readonly repositories = cloudflareRepositories(env.DB, env.FILES)
   readonly routes: AppRoutes
 
@@ -54,7 +66,7 @@ export class TestApp {
    * Tests sign the same people in many times a minute, so sign-in links are limited loosely unless
    * `productionSignInLimits` asks for the limits the app is deployed with.
    */
-  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean; translationModels?: TranslationModels } = { allowedEmailDomains: 'example.com' }) {
+  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean } = { allowedEmailDomains: 'example.com' }) {
     const appEnv: AppEnv = {
       DB: env.DB,
       FILES: env.FILES,
@@ -68,9 +80,8 @@ export class TestApp {
       USERCONTENT_SIGNING_KEY: SIGNING_KEY,
       // Tests assert Chinese wording, so they hold the default language fixed whatever a deployment sets.
       DEFAULT_LOCALE: 'zh-CN',
-      ...(options.translationModels ? { AI: options.translationModels } : {}),
     }
-    this.routes = new AppRoutes({ env: appEnv, repositories: this.repositories, mailer: this.mailer, mcpUrl: 'http://mcp.test/mcp' })
+    this.routes = new AppRoutes({ env: appEnv, repositories: this.repositories, mailer: this.mailer, titleTranslator: this.translator, mcpUrl: 'http://mcp.test/mcp' })
   }
 
   async request(path: string, options: RequestOptions = {}): Promise<Response> {

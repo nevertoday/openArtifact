@@ -30,18 +30,18 @@ export class ArtifactApi {
     const requestBody = await JsonBody.of(request)
     const title = requestBody.text('title', MAX_TITLE_LENGTH)
     const requestedSlug = requestBody.optionalText('slug', MAX_SLUG_INPUT_LENGTH)
-    const englishTitle = ArtifactSlug.needsEnglishTitle(requestedSlug, title) ? await this.#context.titleTranslator.toEnglish(title) : null
-    const slug = ArtifactSlug.forNewArtifact(requestedSlug, title, englishTitle)
     const visibility = requestBody.oneOf('visibility', VISIBILITIES, 'workspace')
     const listed = ArtifactApi.#listedOnCreate(requestBody, identity, visibility)
     const publicLinkExpiry = PublicLinkExpiry.of(requestBody, identity, { visibilityBefore: null, visibilityAfter: visibility, savedExpiresAt: null, listedAfter: listed }, Date.now())
     const files = ArtifactFileJson.filesFrom(requestBody.raw('files'))
+    const [englishTitle, excerpt] = await Promise.all([this.#englishTitle('', requestedSlug, title), PageExcerpt.of(files)])
+    const slug = ArtifactSlug.forNewArtifact(requestedSlug, title, englishTitle)
     const createdArtifact = await this.#context.repositories.artifacts.create({
       workspaceId: identity.membership.workspace.workspaceId,
       authorId: identity.userId,
       publishedVia: identity.agentClient,
       note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
-      excerpt: await PageExcerpt.of(files),
+      excerpt,
       title,
       slug,
       visibility,
@@ -260,12 +260,17 @@ export class ArtifactApi {
   async #rename(identity: Identity, summary: ArtifactSummary, newName: { title: string | null; slug: string | null }): Promise<ArtifactSummary> {
     const title = newName.title ?? summary.title
     const changedTitle = title === summary.title ? null : title
-    const englishTitle = ArtifactSlug.takesWordsFromTitle(summary.slug, newName.slug, changedTitle) ? await this.#context.titleTranslator.toEnglish(title) : null
+    const englishTitle = await this.#englishTitle(summary.slug, newName.slug, changedTitle)
     const slug = ArtifactSlug.afterChange(summary.slug, newName.slug, changedTitle, englishTitle)
     if (changedTitle === null && slug === summary.slug) return summary
     await this.#context.repositories.artifacts.rename(summary.artifactId, { title, slug })
     if (changedTitle !== null) await this.#recordRename(identity, summary, title)
     return { ...summary, title, slug }
+  }
+
+  async #englishTitle(currentSlug: string, requestedSlug: string | null, changedTitle: string | null): Promise<string | null> {
+    const titleToTranslate = ArtifactSlug.titleToTranslate(currentSlug, requestedSlug, changedTitle)
+    return titleToTranslate === null ? null : this.#context.titleTranslator.toEnglish(titleToTranslate)
   }
 
   async #recordRename(identity: Identity, summary: ArtifactSummary, title: string): Promise<void> {
