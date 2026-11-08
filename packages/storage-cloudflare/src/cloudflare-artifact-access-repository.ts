@@ -40,7 +40,10 @@ export class CloudflareArtifactAccessRepository implements ArtifactAccessReposit
     return pendingRows.map(pendingRow => ({ email: pendingRow.email, role: pendingRow.role, grantedBy: pendingRow.granted_by, createdAt: pendingRow.created_at }))
   }
 
+  // Runs on every signed-in request, so with nothing waiting it costs one indexed read and no write.
   async claimPendingGrants(email: string, userId: string): Promise<void> {
+    const waiting = await this.#db.prepare('SELECT 1 FROM pending_grants WHERE email = ? LIMIT 1').bind(email).first()
+    if (waiting === null) return
     await this.#db.batch([
       this.#db.prepare('INSERT INTO artifact_grants (artifact_id, user_id, role) SELECT artifact_id, ?, role FROM pending_grants WHERE email = ? ON CONFLICT (artifact_id, user_id) DO NOTHING').bind(userId, email),
       this.#db.prepare('DELETE FROM pending_grants WHERE email = ?').bind(email),

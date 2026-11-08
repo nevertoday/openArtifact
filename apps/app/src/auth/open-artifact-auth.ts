@@ -14,6 +14,8 @@ export interface SignedInUser {
   userId: string
   name: string
   email: string
+  /** Whether the person proved they own `email`; an identity provider may assert an address it never checked. */
+  emailVerified: boolean
   locale: Locale | null
 }
 
@@ -35,7 +37,7 @@ interface AuthEndpointContext {
 interface BetterAuthInstance {
   handler(request: Request): Promise<Response>
   api: {
-    getSession(context: { headers: Headers }): Promise<{ user: { id: string; name: string; email: string; locale?: string | null | undefined } } | null>
+    getSession(context: { headers: Headers }): Promise<{ user: { id: string; name: string; email: string; emailVerified: boolean; locale?: string | null | undefined } } | null>
     updateUser(context: { headers: Headers; body: { name: string } }): Promise<unknown>
     createVerificationOTP(context: { body: { email: string; type: 'sign-in' } }): Promise<string>
   }
@@ -109,12 +111,10 @@ export class OpenArtifactAuth {
               if (!(await this.#admission.mayCreateAccount(newUser.email, OpenArtifactAuth.#inviteCodeIn(endpointContext)))) throw OpenArtifactAuth.#refusal()
             },
             // Every person belongs to a workspace from their first sign-in on, so the first to sign up becomes its admin.
-            // Pages shared with the address before it had an account open to the new person from now on.
             after: async (createdUser, endpointContext) => {
               const headers = OpenArtifactAuth.#headersOf(endpointContext)
               const firstWorkspaceName = this.requestMessages(headers, null).server.firstWorkspaceName
               await this.#admission.join({ userId: createdUser.id, email: createdUser.email }, OpenArtifactAuth.#inviteCodeIn(endpointContext), firstWorkspaceName)
-              await this.#repositories.artifactAccess.claimPendingGrants(Admission.normalizedEmail(createdUser.email), createdUser.id)
             },
           },
         },
@@ -185,7 +185,7 @@ export class OpenArtifactAuth {
   async signedInUser(request: Request): Promise<SignedInUser | null> {
     const session = await this.#auth.api.getSession({ headers: request.headers })
     if (!session) return null
-    return { userId: session.user.id, name: session.user.name, email: session.user.email, locale: parseLocale(session.user.locale) }
+    return { userId: session.user.id, name: session.user.name, email: session.user.email, emailVerified: session.user.emailVerified, locale: parseLocale(session.user.locale) }
   }
 
   async rename(request: Request, name: string): Promise<void> {

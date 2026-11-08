@@ -1,4 +1,4 @@
--- A role on an artifact kept for an address with no account yet. When someone signs up with that address it
+-- A role on an artifact kept for an address. When its owner signs in with that address verified, it
 -- becomes a row in artifact_grants and leaves this table.
 CREATE TABLE pending_grants (
   artifact_id TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,

@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:workers'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { TestApp } from './test-app.ts'
 
@@ -104,5 +105,42 @@ describe('sharing with an address that has no account yet', () => {
 
     expect(saved.body.grants).toMatchObject([{ email: 'someone@partner.org', pending: true }])
     expect(app.mailer.lastTo('someone@partner.org')).toBeUndefined()
+  })
+})
+
+describe('claiming pages kept for an address', () => {
+  async function keepForAddress(artifactId: string, email: string): Promise<void> {
+    await env.DB.prepare("INSERT INTO pending_grants (artifact_id, email, role, granted_by, created_at) VALUES (?, ?, 'viewer', 'someone', ?)").bind(artifactId, email, Date.now()).run()
+  }
+
+  async function setEmailVerified(email: string, verified: boolean): Promise<void> {
+    await env.DB.prepare('UPDATE "user" SET "emailVerified" = ? WHERE email = ?').bind(verified ? 1 : 0, email).run()
+  }
+
+  it('opens the page to someone who already had an account on their next request', async () => {
+    const holderCookie = await app.signIn('holder@example.com')
+    const page = await app.publish({ cookie: authorCookie }, 'Board memo', '<h1>memo</h1>', 'specified')
+    const before = await app.request(`/api/artifacts/${page.artifactId}`, { cookie: holderCookie })
+    await keepForAddress(page.artifactId, 'holder@example.com')
+
+    const after = await app.request(`/api/artifacts/${page.artifactId}`, { cookie: holderCookie })
+
+    expect([before.status, after.status]).toEqual([404, 200])
+    expect(await grantsOf(page.artifactId)).toMatchObject([{ userId: await userIdOf(holderCookie), pending: false, role: 'viewer' }])
+  })
+
+  it('waits while the signed-in address is not verified', async () => {
+    const unprovenCookie = await app.signIn('unproven@example.com')
+    const page = await app.publish({ cookie: authorCookie }, 'Salary bands', '<h1>bands</h1>', 'specified')
+    await keepForAddress(page.artifactId, 'unproven@example.com')
+    await setEmailVerified('unproven@example.com', false)
+
+    const unverified = await app.request(`/api/artifacts/${page.artifactId}`, { cookie: unprovenCookie })
+    const keptWhileUnverified = await grantsOf(page.artifactId)
+    await setEmailVerified('unproven@example.com', true)
+    const verified = await app.request(`/api/artifacts/${page.artifactId}`, { cookie: unprovenCookie })
+
+    expect([unverified.status, verified.status]).toEqual([404, 200])
+    expect(keptWhileUnverified).toMatchObject([{ email: 'unproven@example.com', pending: true }])
   })
 })

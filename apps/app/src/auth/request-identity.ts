@@ -3,7 +3,7 @@ import { HttpCookies } from '../http-cookies.ts'
 import { HttpError, RemovedFromWorkspaceError } from '../http-error.ts'
 import { People } from '../people.ts'
 import type { Repositories } from '@open-artifact/core'
-import { INVITE_COOKIE, type Admission } from './admission.ts'
+import { Admission, INVITE_COOKIE } from './admission.ts'
 import type { OpenArtifactAuth, SignedInUser } from './open-artifact-auth.ts'
 
 export const WORKSPACE_COOKIE = 'oa_workspace'
@@ -110,11 +110,18 @@ export class RequestIdentity {
   async #sessionIdentity(): Promise<Identity | null> {
     const signedInUser = await this.#auth.signedInUser(this.#request)
     if (!signedInUser) return null
+    await this.#claimPagesSharedByEmail(signedInUser)
     const memberships = await this.#membershipsOf(signedInUser)
     const chosenWorkspaceId = HttpCookies.read(this.#request, WORKSPACE_COOKIE)
     const membership = memberships.find(candidate => candidate.workspace.workspaceId === chosenWorkspaceId) ?? memberships[0]
     if (!membership) throw new Error(`User ${signedInUser.userId} has no workspace`)
     return { userId: signedInUser.userId, name: People.displayName(signedInUser), hasChosenName: People.hasChosenName(signedInUser), email: signedInUser.email, membership, memberships, agentClient: null, tokenScope: null, locale: signedInUser.locale }
+  }
+
+  // Pages shared with an address are kept by address until its owner signs in, whether or not they had an account then.
+  // It runs before joining a workspace, so a refused join never leaves the grants waiting.
+  async #claimPagesSharedByEmail(signedInUser: SignedInUser): Promise<void> {
+    if (signedInUser.emailVerified) await this.#repositories.artifactAccess.claimPendingGrants(Admission.normalizedEmail(signedInUser.email), signedInUser.userId)
   }
 
   // A person joins a workspace on the first visit after sign-in, through the invite link this browser opened if any.
