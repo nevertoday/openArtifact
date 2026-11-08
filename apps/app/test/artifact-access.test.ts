@@ -72,19 +72,20 @@ describe('visibility', () => {
     expect(members.body.artifacts.map(artifact => artifact.title)).toContain('Salary review')
   })
 
-  it('finds a person to share with by email, and explains who cannot be added', async () => {
+  it('looks a person up by email without telling whether they have an account', async () => {
     const published = await app.publish({ token: authorToken }, 'Invite test')
     const peoplePath = `/api/artifacts/${published.artifactId}/sharing/people`
 
-    const found = await app.json<{ userId: string; name: string; email: string }>(`${peoplePath}?email=Member@example.com`, { cookie: authorCookie })
-    const neverSignedIn = await app.json<{ error: string }>(`${peoplePath}?email=nobody@example.com`, { cookie: authorCookie })
+    const colleague = await app.json<Record<string, unknown>>(`${peoplePath}?email=Member@example.com`, { cookie: authorCookie })
+    const neverSignedIn = await app.json<Record<string, unknown>>(`${peoplePath}?email=nobody@example.com`, { cookie: authorCookie })
+    const malformed = await app.json<{ code: string; field: string }>(`${peoplePath}?email=not-an-address`, { cookie: authorCookie })
     const theAuthor = await app.json<{ error: string }>(`${peoplePath}?email=author@example.com`, { cookie: authorCookie })
     const askedByMember = await app.request(`${peoplePath}?email=author@example.com`, { cookie: memberCookie })
 
-    expect(found.status).toBe(200)
-    expect(found.body).toMatchObject({ name: 'member', email: 'member@example.com' })
-    expect(neverSignedIn.status).toBe(404)
-    expect(neverSignedIn.body.error).toContain('sign in once')
+    expect([colleague.status, neverSignedIn.status]).toEqual([200, 200])
+    expect(colleague.body).toEqual({ email: 'member@example.com', name: 'member' })
+    expect(neverSignedIn.body).toEqual({ email: 'nobody@example.com', name: null })
+    expect(malformed).toMatchObject({ status: 400, body: { code: 'field_invalid', field: 'email' } })
     expect(theAuthor.status).toBe(400)
     expect(askedByMember.status).toBe(403)
   })
@@ -95,14 +96,14 @@ describe('saving sharing in one request', () => {
     return (await app.json<{ visibility: string; peopleApplyUnder: string[]; grants: { userId: string; role: string }[]; publicLink: { expiresAt: number | null; hasPassword: boolean } }>(`/api/artifacts/${artifactId}/sharing`, { cookie: authorCookie })).body
   }
 
-  async function memberUserId(artifactId: string): Promise<string> {
-    const { body } = await app.json<{ userId: string }>(`/api/artifacts/${artifactId}/sharing/people?email=member@example.com`, { cookie: authorCookie })
-    return body.userId
+  async function memberUserId(): Promise<string> {
+    const { body } = await app.json<{ user: { userId: string } }>('/api/me', { cookie: memberCookie })
+    return body.user.userId
   }
 
   it('applies the visibility, the people and the public link settings together', async () => {
     const published = await app.publish({ token: authorToken }, 'Hiring plan', '<h1>v1</h1>', 'private')
-    const memberId = await memberUserId(published.artifactId)
+    const memberId = await memberUserId()
 
     const saved = await app.json<{ visibility: string; grants: { userId: string; role: string }[] }>(`/api/artifacts/${published.artifactId}/sharing`, {
       method: 'PUT',
@@ -121,7 +122,7 @@ describe('saving sharing in one request', () => {
 
   it('changes nothing when any part of the save is wrong', async () => {
     const published = await app.publish({ token: authorToken }, 'Atomic save', '<h1>v1</h1>', 'private')
-    const memberId = await memberUserId(published.artifactId)
+    const memberId = await memberUserId()
 
     const unknownPerson = await setSharing(published.artifactId, { visibility: 'specified', grants: [{ userId: memberId, role: 'viewer' }, { userId: 'user-nobody', role: 'viewer' }] })
     const unknownRole = await setSharing(published.artifactId, { visibility: 'specified', grants: [{ userId: memberId, role: 'owner' }] })
@@ -169,7 +170,7 @@ describe('saving sharing in one request', () => {
 
   it('does not tell people about grants that do nothing yet', async () => {
     const published = await app.publish({ token: authorToken }, 'Draft budget', '<h1>v1</h1>', 'private')
-    const memberId = await memberUserId(published.artifactId)
+    const memberId = await memberUserId()
     const mailBefore = app.mailer.sent.length
 
     await setSharing(published.artifactId, { grants: [{ userId: memberId, role: 'viewer' }] })
@@ -336,7 +337,7 @@ describe('public links', () => {
     const published = await app.publish({ token: authorToken }, 'Expired campaign')
     await setSharing(published.artifactId, { visibility: 'public_link', publicLinkExpiresAt: Date.now() + 60_000 })
     const summary = await app.repositories.artifacts.findSummary(published.artifactId)
-    await app.repositories.artifactAccess.saveSharing(published.artifactId, { ...(summary?.sharing ?? { visibility: 'public_link', publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, listed: false }), publicLinkExpiresAt: Date.now() - 1 }, [])
+    await app.repositories.artifactAccess.saveSharing(published.artifactId, { ...(summary?.sharing ?? { visibility: 'public_link', publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, listed: false }), publicLinkExpiresAt: Date.now() - 1 }, [], [])
 
     const backToPrivate = await setSharing(published.artifactId, { visibility: 'private' })
     const sharing = await app.json<{ visibility: string; publicLink: { expiresAt: number } }>(`/api/artifacts/${published.artifactId}/sharing`, { cookie: authorCookie })

@@ -248,8 +248,8 @@ export default {
       workspace: '默认。成员可以查看、评论，也能读写页面里的共享数据',
       public_link: '拿到链接的人不用登录就能打开，只看到页面本身',
     },
-    emailPlaceholder: '输入成员邮箱',
-    emailLabel: '成员邮箱',
+    emailPlaceholder: '输入对方的邮箱',
+    emailLabel: '对方的邮箱',
     emailInvalid: '请输入有效的邮箱，比如 name@example.com',
     add: '添加',
     nobodyYetSpecified: '还没有添加任何人，现在只有你能看到。',
@@ -260,6 +260,7 @@ export default {
     /** @param {string} name */
     roleOf: name => `${name} 的权限`,
     addedOnSave: '保存后添加',
+    invited: '已邀请',
     remove: '移除',
     role: '权限',
     anonymousWrite: '允许匿名访客写入共享数据',

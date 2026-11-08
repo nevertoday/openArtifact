@@ -14,6 +14,8 @@ export interface SignedInUser {
   userId: string
   name: string
   email: string
+  /** Whether the person proved they own `email`; an identity provider may assert an address it never checked. */
+  emailVerified: boolean
   locale: Locale | null
 }
 
@@ -35,7 +37,7 @@ interface AuthEndpointContext {
 interface BetterAuthInstance {
   handler(request: Request): Promise<Response>
   api: {
-    getSession(context: { headers: Headers }): Promise<{ user: { id: string; name: string; email: string; locale?: string | null | undefined } } | null>
+    getSession(context: { headers: Headers }): Promise<{ user: { id: string; name: string; email: string; emailVerified: boolean; locale?: string | null | undefined } } | null>
     updateUser(context: { headers: Headers; body: { name: string } }): Promise<unknown>
     createVerificationOTP(context: { body: { email: string; type: 'sign-in' } }): Promise<string>
   }
@@ -44,7 +46,6 @@ interface BetterAuthInstance {
 const SESSION_DAYS = 30
 const OIDC_PROVIDER_ID = 'company-sso'
 const SIGN_IN_CODE_MINUTES = 10
-const EMAIL_SHAPE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 // Better Auth's own sender swallows every error the mail callback throws, so a refused address or a mail outage
 // would still answer "sent". This app mails the code itself and leaves the plugin only the check at sign-in.
 const UNUSED_EMAIL_OTP_PATHS = [
@@ -127,7 +128,7 @@ export class OpenArtifactAuth {
     // Better Auth checks the origin of its own endpoints; without the same check another site could mail codes for us.
     if (request.headers.get('Origin') !== this.#appOrigin) return Response.json({ code: 'INVALID_ORIGIN', message: 'sign-in codes are asked for from this site only' }, { status: 403 })
     const email = await OpenArtifactAuth.#emailIn(request)
-    if (!EMAIL_SHAPE.test(email)) return Response.json({ code: 'INVALID_EMAIL', message: 'a valid email is required' }, { status: 400 })
+    if (!Admission.looksLikeEmail(email)) return Response.json({ code: 'INVALID_EMAIL', message: 'a valid email is required' }, { status: 400 })
     if (await this.#guesses.isLocked(email)) return OpenArtifactAuth.#lockedOut()
     const account = await this.#repositories.users.findByEmail(email)
     const mayCreateAccount = account !== null || (await this.#admission.mayCreateAccount(email, OpenArtifactAuth.#inviteCodeIn({ headers: request.headers })))
@@ -184,7 +185,7 @@ export class OpenArtifactAuth {
   async signedInUser(request: Request): Promise<SignedInUser | null> {
     const session = await this.#auth.api.getSession({ headers: request.headers })
     if (!session) return null
-    return { userId: session.user.id, name: session.user.name, email: session.user.email, locale: parseLocale(session.user.locale) }
+    return { userId: session.user.id, name: session.user.name, email: session.user.email, emailVerified: session.user.emailVerified, locale: parseLocale(session.user.locale) }
   }
 
   async rename(request: Request, name: string): Promise<void> {

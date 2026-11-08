@@ -14,7 +14,6 @@ export type ErrorCode =
   | 'cross_site_request'
   | 'removed_from_workspace'
   | 'not_found'
-  | 'person_not_found'
   | 'method_not_allowed'
   | 'invalid_request'
   | 'field_required'
@@ -29,6 +28,8 @@ export type ErrorCode =
   | 'not_listable'
   | 'share_text_too_long'
   | 'rate_limited'
+  | 'mail_limit_reached'
+  | 'workspace_changed'
 
 /** Which request field an error is about, so a page can show it under that field. */
 export interface FieldDetail {

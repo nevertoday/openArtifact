@@ -3,11 +3,12 @@ import type { ArtifactPageAddress } from '../access/artifact-page-address.ts'
 import type { Admission } from '../auth/admission.ts'
 import type { Mailer } from '../auth/mailer.ts'
 import type { OpenArtifactAuth } from '../auth/open-artifact-auth.ts'
-import type { Identity, RequestIdentity } from '../auth/request-identity.ts'
+import { WORKSPACE_HEADER, type Identity, type RequestIdentity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
 import { Notifier } from '../notifications/notifier.ts'
 import { People } from '../people.ts'
 import { PersonalPages } from '../personal-pages.ts'
+import { MailLimits } from './mail-limits.ts'
 import type { TitleTranslator } from './title-translator.ts'
 import { ArtifactPath, type AddressedArtifact, type Locale, type Repositories } from '@open-artifact/core'
 import { messagesFor, type Messages } from '../i18n/messages.ts'
@@ -42,6 +43,7 @@ export class ApiContext {
   readonly artifactPages: ArtifactPageAddress
   readonly personalPages: PersonalPages
   readonly titleTranslator: TitleTranslator
+  readonly mailLimits: MailLimits
   readonly #localeSignals: Omit<LocaleSignals, 'account'>
   #locale: Promise<Locale> | null = null
 
@@ -58,6 +60,7 @@ export class ApiContext {
     this.artifactPages = fields.artifactPages
     this.personalPages = new PersonalPages(fields.repositories, fields.appOrigin)
     this.titleTranslator = fields.titleTranslator
+    this.mailLimits = new MailLimits(fields.repositories.outboundMail)
     this.#localeSignals = fields.localeSignals
   }
 
@@ -94,6 +97,19 @@ export class ApiContext {
     const identity = await this.requireBrowserSession()
     if (identity.membership.role !== 'admin') throw HttpError.adminRequired(action)
     return identity
+  }
+
+  /**
+   * The workspace cookie is shared by every tab, so a write from the browser must name the workspace its page showed.
+   * A token always acts in its own workspace, and a request from nobody is left to the handler's 401.
+   */
+  async requireNamedWorkspace(request: Request): Promise<void> {
+    if (this.requestIdentity.usesAccessToken) return
+    const identity = await this.identity()
+    if (identity === null) return
+    if (request.headers.get(WORKSPACE_HEADER) !== identity.membership.workspace.workspaceId) {
+      throw new HttpError(409, 'workspace_changed', 'another tab switched to a different workspace since this page loaded; reload the page and try again')
+    }
   }
 
   inviteUrl(inviteCode: string): string {

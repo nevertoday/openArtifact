@@ -18,7 +18,6 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
     cross_site_request: 'Please do this from an Open Artifact page.',
     removed_from_workspace: 'You were removed from this workspace. Contact an admin.',
     not_found: "It's gone, and may have been deleted. Try refreshing the page.",
-    person_not_found: 'No one has signed in to Open Artifact with this email yet. Ask them to sign in once, then add them.',
     field_required: "This can't be empty.",
     field_too_long: ({ maxLength }) => `Use ${plural(maxLength, 'character', 'characters')} or fewer.`,
     too_large: 'This is too large. Make it smaller and try again.',
@@ -29,6 +28,8 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
     version_conflict: 'Someone just published a new version. Refresh the page and try again.',
     not_listable: 'Only public links without a password can be listed on your page.',
     share_text_too_long: 'With the link, this text is over the 280 X allows. Make it shorter.',
+    workspace_changed: 'You switched workspace in another tab. Reload this page and try again.',
+    mail_limit_reached: "You've reached today's limit on invite and share emails, so nothing was sent or saved. Try again tomorrow.",
   },
   removal: {
     takeDown: {

@@ -19,6 +19,10 @@ export default /** @satisfies {import('../messages').Messages['mail']} */ ({
     subject: code => `${code} is your Open Artifact code`,
     body: ({ code, minutes }) => `Your Open Artifact sign-in code is ${code}. It works for ${minutes} minutes.\n\nIf you didn't ask for this, you can ignore this email. Your account is safe.`,
   },
+  pendingShare: {
+    subject: ({ sharer, title }) => `${sharer} shared “${title}” with you`,
+    body: ({ sharer, title, email, url }) => `${sharer} shared “${title}” with you on Open Artifact.\n\nOpen the link below and sign in with this email address (${email}) to see it. If you don't have an account yet, signing in creates one:\n\n${url}`,
+  },
   invite: {
     subject: ({ inviter, workspace }) => `${inviter} invited you to join ${workspace}`,
     body: ({ inviter, workspace, days: lifetime, url }) => `${inviter} invited you to join ${workspace} on Open Artifact. Your team's agents publish pages here, and everyone views and comments on them together.\n\nClick the link below and sign in with this email address to join. It works for ${days(lifetime)}:\n\n${url}`,

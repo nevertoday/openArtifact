@@ -4,6 +4,11 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const SHARE_LINK_PREFIX = '#share='
 const GRANT_ROLES = ['viewer', 'commenter', 'editor']
 
+// A person is known by their address, which names the same person before and after they sign up; only a deleted account has none.
+function grantKeyOf(grant) {
+  return grant.email?.toLowerCase() ?? `user:${grant.userId}`
+}
+
 /**
  * Every change made in the share dialog, kept until saving sends them in one request. Only what the dialog shows for
  * the chosen visibility counts: the people where the server says they apply, the link settings for a public link.
@@ -12,7 +17,7 @@ class SharingDraft {
   constructor(saved) {
     this.saved = saved
     this.visibility = saved.visibility
-    this.grants = new Map(saved.grants.map(grant => [grant.userId, { ...grant }]))
+    this.grants = new Map(saved.grants.map(grant => [grantKeyOf(grant), { ...grant }]))
     // 'current' keeps the saved expiry; '7', '30' or 'never' replaces it on save.
     this.expiryChoice = 'current'
     // 'keep' the saved password, 'remove' it, or 'set' the one typed; without a saved password the field is open.
@@ -54,35 +59,38 @@ class SharingDraft {
     return visibilityChanged || peopleChanged || publicLinkChanged
   }
 
-  isNewPerson(userId) {
-    return !this.saved.grants.some(grant => grant.userId === userId)
+  isNewPerson(grantKey) {
+    return !this.saved.grants.some(grant => grantKeyOf(grant) === grantKey)
   }
 
+  /** `person` is the lookup's answer, an address and a name only for someone the author already works with. */
   addPerson(person, role) {
-    this.grants.set(person.userId, { ...person, role })
+    const grantKey = grantKeyOf(person)
+    const saved = this.saved.grants.find(grant => grantKeyOf(grant) === grantKey)
+    this.grants.set(grantKey, saved ? { ...saved, role } : { userId: null, email: person.email, name: person.name, pending: false, role })
   }
 
-  setRole(userId, role) {
-    const grant = this.grants.get(userId)
+  setRole(grantKey, role) {
+    const grant = this.grants.get(grantKey)
     if (grant) grant.role = role
   }
 
-  removePerson(userId) {
-    this.grants.delete(userId)
+  removePerson(grantKey) {
+    this.grants.delete(grantKey)
   }
 
   /** The PUT body: the complete list of people wherever it counts, and only the link settings that changed. */
   toRequest() {
     const sharingUpdate = { visibility: this.visibility }
-    if (this.peopleApply) sharingUpdate.grants = [...this.grants.values()].map(grant => ({ userId: grant.userId, role: grant.role }))
+    if (this.peopleApply) sharingUpdate.grants = [...this.grants.values()].map(grant => (grant.userId === null ? { email: grant.email, role: grant.role } : { userId: grant.userId, role: grant.role }))
     if (this.visibility === 'public_link') Object.assign(sharingUpdate, this.#publicLinkChanges())
     return sharingUpdate
   }
 
   #grantsChanged() {
-    const savedRoles = new Map(this.saved.grants.map(grant => [grant.userId, grant.role]))
+    const savedRoles = new Map(this.saved.grants.map(grant => [grantKeyOf(grant), grant.role]))
     const samePeopleCount = savedRoles.size === this.grants.size
-    const anyRoleDiffers = [...this.grants.values()].some(grant => savedRoles.get(grant.userId) !== grant.role)
+    const anyRoleDiffers = [...this.grants].some(([grantKey, grant]) => savedRoles.get(grantKey) !== grant.role)
     return !samePeopleCount || anyRoleDiffers
   }
 
@@ -179,7 +187,7 @@ export class ShareDialog extends EventTarget {
   // Someone who asked for access can only be added where the list of people counts, so specified people is chosen if needed.
   #prepareToAdd(userId) {
     const member = this.#draft.saved.members.find(candidate => candidate.userId === userId)
-    const alreadyAdded = this.#draft.grants.has(userId)
+    const alreadyAdded = member !== undefined && this.#draft.grants.has(grantKeyOf(member))
     if (!member || alreadyAdded) return
     if (!this.#draft.peopleApply) this.#draft.visibility = 'specified'
     this.#emailToAdd = member.email
@@ -239,9 +247,8 @@ export class ShareDialog extends EventTarget {
       element('div', { className: 'xxd-field share-grant-form__email' }, emailInput), ShareDialog.#selectBox(roleSelect), element('button', { type: 'submit', className: 'xxd-btn', 'data-size': 'sm' }, m.viewerClient.share.add))
     submitOnce(addForm, () => this.#addPerson(emailInput, roleSelect.value))
     const memberOptions = element('datalist', { id: 'workspace-members' }, this.#draft.saved.members.map(member => element('option', { value: member.email }, member.name)))
-    const grants = [...this.#draft.grants.values()]
-    const peopleList = grants.length > 0
-      ? element('ul', { className: 'xxd-list' }, grants.map(grant => this.#personRow(grant)))
+    const peopleList = this.#draft.grants.size > 0
+      ? element('ul', { className: 'xxd-list' }, [...this.#draft.grants].map(([grantKey, grant]) => this.#personRow(grantKey, grant)))
       : element('p', { className: 'xxd-text', 'data-variant': 'secondary' }, this.#draft.visibility === 'specified' ? m.viewerClient.share.nobodyYetSpecified : m.viewerClient.share.nobodyYet)
     return element('section', { className: 'xxd-stack share-section' },
       element('div', { className: 'xxd-text-pair' },
@@ -251,19 +258,23 @@ export class ShareDialog extends EventTarget {
     )
   }
 
-  #personRow(grant) {
-    const roleSelect = ShareDialog.#roleSelect(grant.role, `grant-role-${grant.userId}`)
-    roleSelect.setAttribute('aria-label', m.viewerClient.share.roleOf(grant.name))
+  // Someone the author does not work with is shown by address alone, since the lookup does not say who they are.
+  #personRow(grantKey, grant) {
+    const label = grant.name ?? grant.email
+    const roleSelect = ShareDialog.#roleSelect(grant.role, `grant-role-${grantKey}`)
+    roleSelect.setAttribute('aria-label', m.viewerClient.share.roleOf(label))
     roleSelect.addEventListener('change', () => {
-      this.#draft.setRole(grant.userId, roleSelect.value)
+      this.#draft.setRole(grantKey, roleSelect.value)
       this.#refreshSaveButton()
     })
-    const unsavedBadge = this.#draft.isNewPerson(grant.userId) ? element('span', { className: 'xxd-badge', 'data-tone': 'action' }, m.viewerClient.share.addedOnSave) : null
+    const badge = this.#draft.isNewPerson(grantKey)
+      ? element('span', { className: 'xxd-badge', 'data-tone': 'action' }, m.viewerClient.share.addedOnSave)
+      : grant.pending ? element('span', { className: 'xxd-badge', 'data-share-pending': true }, m.viewerClient.share.invited) : null
     return element('li', { className: 'xxd-list__item share-person' },
-      element('span', { className: 'xxd-avatar', 'data-size': 'sm', 'aria-hidden': 'true' }, initialOf(grant.name)),
-      element('span', { className: 'xxd-list__main' }, element('span', { className: 'xxd-list__title xxd-cluster' }, grant.name, unsavedBadge), element('span', { className: 'xxd-list__meta' }, grant.email ?? '')),
+      element('span', { className: 'xxd-avatar', 'data-size': 'sm', 'aria-hidden': 'true' }, initialOf(label)),
+      element('span', { className: 'xxd-list__main' }, element('span', { className: 'xxd-list__title xxd-cluster' }, label, badge), element('span', { className: 'xxd-list__meta' }, grant.name === null ? '' : grant.email ?? '')),
       ShareDialog.#selectBox(roleSelect),
-      element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'sm', onClick: () => { this.#draft.removePerson(grant.userId); this.#render() } }, m.viewerClient.share.remove),
+      element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'sm', onClick: () => { this.#draft.removePerson(grantKey); this.#render() } }, m.viewerClient.share.remove),
     )
   }
 

@@ -28,7 +28,7 @@ Commands (all print JSON on stdout; errors exit 1 with {"error", "hint"}):
         Request a sign-in code, read it from the app log, enter it, store the session cookie for that email.
   token [--scope publish|full] [--name verify]
         Create an API token from the stored session (default scope full). Stored as the run's token.
-  api <METHOD> <path> [--body '<json>' | --body @file.json] [--as token|session|anon]
+  api <METHOD> <path> [--body '<json>' | --body @file.json] [--as token|session|anon] [--workspace <id>|none]
         Call the app HTTP API. Default --as token. Prints {status, body}.
   publish --file <index.html> [--title T] [--visibility workspace|private|specified|public_link]
         POST /api/artifacts with the run's token. Prints {artifactId, version, shortId, url, path}; url is the canonical /a/{slug}-{shortId}.
@@ -271,10 +271,16 @@ async function signIn(run, email) {
   return meBody
 }
 
+// A page names the workspace it shows on every write (X-Open-Artifact-Workspace), as common.js does.
+async function pageWorkspaceId(run) {
+  const me = await fetch(`${run.origins.app}/api/me`, { headers: { Cookie: run.cookie } })
+  return me.ok ? (await me.json()).workspace.workspaceId : null
+}
+
 async function createToken(run, scope, name) {
   if (!run.cookie) fail('no session in this run', 'oa-verify sign-in first')
   const response = await fetch(`${run.origins.app}/api/tokens`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', Origin: run.origins.app, Cookie: run.cookie }, body: JSON.stringify({ name, scope, expiresInDays: 1 }),
+    method: 'POST', headers: { 'Content-Type': 'application/json', Origin: run.origins.app, Cookie: run.cookie, 'X-Open-Artifact-Workspace': (await pageWorkspaceId(run)) ?? '' }, body: JSON.stringify({ name, scope, expiresInDays: 1 }),
   })
   const body = await response.json().catch(() => null)
   if (response.status !== 201) fail(`token creation answered ${response.status}`, JSON.stringify(body))
@@ -290,6 +296,9 @@ async function api(run, method, path, flags) {
   const headers = { Origin: run.origins.app }
   if (as === 'token') { if (!run.token) fail('no token in this run', 'oa-verify token'); headers.Authorization = `Bearer ${run.token}` }
   if (as === 'session') { if (!run.cookie) fail('no session in this run', 'oa-verify sign-in'); headers.Cookie = run.cookie }
+  // --workspace <id> names another workspace, --workspace none names none; left out, the current one is named.
+  const namedWorkspace = as === 'session' ? (flags.workspace === undefined ? await pageWorkspaceId(run) : flags.workspace === 'none' ? null : flags.workspace) : null
+  if (namedWorkspace) headers['X-Open-Artifact-Workspace'] = namedWorkspace
   let body
   if (flags.body !== undefined) {
     body = flags.body.startsWith('@') ? readFileSync(resolve(flags.body.slice(1)), 'utf8') : flags.body

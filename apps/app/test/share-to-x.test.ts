@@ -128,7 +128,7 @@ describe('the card picture X shows', () => {
     await app.request(`/api/artifacts/${withPassword.body.artifactId}/sharing`, { method: 'PUT', cookie, body: { listed: false, publicLinkPassword: 'secret-123' } })
     const expired = await listed({})
     const expiredSharing = { visibility: 'public_link', publicLinkExpiresAt: Date.now() - 1, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, listed: true } as const
-    await app.repositories.artifactAccess.saveSharing(expired.body.artifactId, expiredSharing, [])
+    await app.repositories.artifactAccess.saveSharing(expired.body.artifactId, expiredSharing, [], [])
     const removed = await listed({})
     await app.request(`/api/artifacts/${removed.body.artifactId}`, { method: 'DELETE', cookie })
 

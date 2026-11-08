@@ -8,6 +8,7 @@ import type { ProfileRepository } from './profile-repository.ts'
 import type { InviteRepository } from './invite-repository.ts'
 import type { ShareCardImages } from './share-card-images.ts'
 import type { SharedDataRepository } from './shared-data-repository.ts'
+import type { OutboundMailLog } from './outbound-mail-log.ts'
 import type { SignInCodeFailures } from './sign-in-code-failures.ts'
 import type { UserDirectory, WorkspaceRepository } from './workspace-repository.ts'
 
@@ -26,4 +27,5 @@ export interface Repositories {
   profiles: ProfileRepository
   signInCodeFailures: SignInCodeFailures
   shareCardImages: ShareCardImages
+  outboundMail: OutboundMailLog
 }
