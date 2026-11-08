@@ -83,6 +83,7 @@ export class AgentGuide {
 - Each person has a public page at \`/@name\` listing the artifacts they chose to show strangers; search engines may index it.
 - Pass \`listed: true\` with \`visibility: "public_link"\` only when the person asks to put the page there. It needs a \`full\` token, and the link then does not expire.
 - Pass \`summary\` (at most 300 characters) to say what the page is about; otherwise its \`<meta name="description">\` or first paragraph is shown, so give pages a description.
+- To share a page on X, list it on the personal page: only a listed page gets the picture card X shows, and links to anything else may stop working. Publish and update answer \`share\` with \`readiness\` (why not, when it cannot go out) and \`x.intentUrl\`, a ready post to hand the person; pass \`shareText\` to write the post's words yourself (280 with the link counted as 23 and CJK as 2).
 
 ### Removing
 - Remove an artifact only when the person asks. MCP has no tool for it: use the HTTP API below, or ask the person to choose Delete (删除) on the artifact's page. It disappears for everyone at once and can be restored for 30 days; then it is deleted for good.
@@ -109,9 +110,9 @@ const viewer = await window.openArtifact.viewer()  // { userId, name } or null f
 Collection names and ids: letters, digits, \`-\`, \`_\`; at most 64 characters. A document is at most 64 KB of JSON.
 
 ### HTTP API
-- \`POST ${api}/artifacts\` \`{ title, slug?, visibility?, publicLinkExpiresAt?, listed?, summary?, note?, files: [{ path, content, encoding?: "utf8"|"base64", contentType? }] }\`
+- \`POST ${api}/artifacts\` \`{ title, slug?, visibility?, publicLinkExpiresAt?, listed?, summary?, shareText?, note?, files: [{ path, content, encoding?: "utf8"|"base64", contentType? }] }\`
 - \`GET ${api}/artifacts\`, \`GET ${api}/artifacts/{id}\`
-- \`PUT ${api}/artifacts/{id}\` \`{ baseVersion, note, files, title?, slug?, summary? }\`; \`PATCH ${api}/artifacts/{id}\` \`{ title?, slug?, summary? }\` renames or re-summarizes without a new version. \`{id}\` is the \`artifactId\`; the address part of a link someone gave you (\`/a/{this-part}\`) works too
+- \`PUT ${api}/artifacts/{id}\` \`{ baseVersion, note, files, title?, slug?, summary?, shareText? }\`; \`PATCH ${api}/artifacts/{id}\` \`{ title?, slug?, summary?, shareText? }\` renames or re-summarizes without a new version. \`{id}\` is the \`artifactId\`; the address part of a link someone gave you (\`/a/{this-part}\`) works too
 - \`PUT ${api}/artifacts/{id}/sharing\` \`{ visibility?, publicLinkExpiresAt?, publicLinkPassword?, anonymousWriteEnabled?, publicLinkShowsComments?, listed? }\` (full token); fields left out keep their value
 - \`DELETE ${api}/artifacts/{id}\` removes it; \`GET ${api}/artifacts?removed=true\` lists what you can restore; \`POST ${api}/artifacts/{id}/restore\` brings it back
 - \`GET ${api}/comments?for=me&status=open\`: your agent's open comments across artifacts you can edit.

@@ -438,7 +438,7 @@ describe('settings', () => {
     expect(llmsTxt).toContain('window.openArtifact.db')
     expect(llmsTxt).toContain('`publish` (the default)')
     expect(llmsTxt).toContain('expires in 7 days')
-    expect(llmsTxt).toContain('{ baseVersion, note, files, title?, slug?, summary? }')
+    expect(llmsTxt).toContain('{ baseVersion, note, files, title?, slug?, summary?, shareText? }')
     expect(llmsTxt).toContain('Always pass a `slug`')
     expect(llmsTxt).toContain(`DELETE ${APP_ORIGIN}/api/artifacts/{id}`)
     expect(llmsTxt).toContain(`POST ${APP_ORIGIN}/api/artifacts/{id}/restore`)
