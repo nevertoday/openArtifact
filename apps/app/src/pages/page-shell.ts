@@ -79,7 +79,12 @@ export interface PageOptions {
 export interface PublicCard {
   url: string
   kind: 'article' | 'profile'
+  /** The 1200 × 630 picture with the title drawn in it; `alt` says in words what it shows. */
+  image: { url: string; alt: string }
 }
+
+const CARD_IMAGE_WIDTH = 1200
+const CARD_IMAGE_HEIGHT = 630
 
 export class PageShell {
   static render(options: PageOptions): Response {
@@ -119,15 +124,22 @@ ${(options.styles ?? []).map(style => html`<link rel="stylesheet" href="/static/
     })
   }
 
-  // A small summary card: the title and description carry it, so no picture has to be made for each page.
+  // A large picture card: X may show only the picture and the site's name, so the title is drawn into the picture.
   static #publicCardMeta(options: PageOptions): SafeHtml {
     if (!options.publicCard) return html`<meta name="robots" content="noindex">`
-    const { url, kind } = options.publicCard
+    const { url, kind, image } = options.publicCard
     return html`<link rel="canonical" href="${url}">
 <meta property="og:url" content="${url}">
 <meta property="og:type" content="${kind}">
 <meta property="og:locale" content="${options.m.meta.ogLocale}">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="${image.url}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="${String(CARD_IMAGE_WIDTH)}">
+<meta property="og:image:height" content="${String(CARD_IMAGE_HEIGHT)}">
+<meta property="og:image:alt" content="${image.alt}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${image.url}">
+<meta name="twitter:image:alt" content="${image.alt}">
 <meta name="twitter:title" content="${options.title}">
 ${options.description ? html`<meta name="twitter:description" content="${options.description}">` : ''}`
   }

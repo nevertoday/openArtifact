@@ -12,6 +12,7 @@ import { HOME_FILTERS, HomeListing, HomePage, type HomeFilter } from './home-pag
 import { LoginPage } from './login-page.ts'
 import { MessagePages, type PasswordPrompt } from './message-pages.ts'
 import { PersonalPage } from './personal-page.ts'
+import { ProfileShareCard, ShareCard } from '../share/share-card.ts'
 import { SettingsPage, type WorkspaceAdministration } from './settings-page.ts'
 import { SETTINGS_SECTIONS, type SettingsSection } from './settings-sections.ts'
 import { ViewerPage, type Byline, type OlderVersion, type ViewerModel } from './viewer-page.ts'
@@ -132,14 +133,18 @@ export class PageRoutes {
     const previewUrls = new Map(
       await Promise.all(entries.map(async entry => [entry.artifactId, `${await this.#context.artifactPages.entryPageUrl(entry.artifactId, entry.version, now)}?preview`] as const)),
     )
+    const name = names.get(profile.userId) ?? profile.handle
+    const pageUrl = this.#context.personalPages.url(profile.handle)
+    const cardVariant = await ProfileShareCard.variant(ProfileShareCard.drawing(name, profile.handle, entries))
     return PersonalPage.render({
       m: await this.#context.messages(),
       profile,
-      name: names.get(profile.userId) ?? profile.handle,
+      name,
       entries,
       previewUrls,
       isOwner: identity?.userId === profile.userId,
-      pageUrl: this.#context.personalPages.url(profile.handle),
+      pageUrl,
+      cardImageUrl: `${pageUrl}/card.png?v=${cardVariant}`,
       usercontentOrigin: this.#settings.usercontentOrigin,
       now,
     })
@@ -206,7 +211,7 @@ export class PageRoutes {
     return {
       authorName,
       personalPagePath: PersonalPages.path(profile.handle),
-      articleUrl: this.#context.artifactUrl(summary),
+      share: ShareCard.of(summary, openedArtifact.shareReadiness, this.#context.appOrigin),
       next: next && next.artifactId !== summary.artifactId ? { path: ArtifactPath.of(next), title: next.title } : null,
     }
   }

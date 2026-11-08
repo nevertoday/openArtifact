@@ -1,10 +1,12 @@
 import { ArtifactPath, type ArtifactSummary, type ShareReadiness } from '@open-artifact/core'
 import { composeShareText, postWeight } from '../../public/static/share-text.js'
+import type { CardDrawing } from './card-renderer.ts'
 
 /** Bumped whenever the card pictures are drawn differently, so X and the store fetch the new drawing. */
 export const CARD_TEMPLATE_VERSION = 1
 
 const X_POST_INTENT = 'https://x.com/intent/post'
+const PROFILE_CARD_TITLES = 3
 
 /**
  * One artifact as it goes out on X: its link, the picture X shows, the words before the link and the address
@@ -56,5 +58,23 @@ export class ShareCard {
       imageUrl: this.imageUrl,
       x: { text: this.text, weightedLength: postWeight(this.text), intentUrl: this.intentUrl },
     }
+  }
+}
+
+/** The card of a personal page: the person and the titles of their three latest pieces. */
+export class ProfileShareCard {
+  static drawing(name: string, handle: string, entries: Pick<ArtifactSummary, 'title'>[]): Extract<CardDrawing, { kind: 'profile' }> {
+    return { kind: 'profile', name, handle, titles: entries.slice(0, PROFILE_CARD_TITLES).map(entry => entry.title) }
+  }
+
+  static ownerId(userId: string): string {
+    return `profile-${userId}`
+  }
+
+  /** Changes whenever anything drawn changes, so a new listing or a new name is a new picture at a new address. */
+  static async variant(drawing: Extract<CardDrawing, { kind: 'profile' }>): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(drawing)))
+    const hex = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+    return `${hex.slice(0, 16)}.${CARD_TEMPLATE_VERSION}`
   }
 }

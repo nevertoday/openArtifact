@@ -3,6 +3,7 @@ import { AppRoutes } from '../src/app-routes.ts'
 import type { Mailer, OutgoingEmail } from '../src/auth/mailer.ts'
 import type { TitleTranslator } from '../src/api/title-translator.ts'
 import type { AppEnv } from '../src/env.ts'
+import type { CardDrawing, CardRenderer } from '../src/share/card-renderer.ts'
 import { cloudflareRepositories } from '@open-artifact/storage-cloudflare'
 
 export const APP_ORIGIN = 'http://app.test'
@@ -47,6 +48,18 @@ export class RecordingTranslator implements TitleTranslator {
   }
 }
 
+/** Keeps what it was asked to draw and answers with a stand-in PNG; `failing` makes every drawing throw. */
+export class RecordingCardRenderer implements CardRenderer {
+  readonly drawn: CardDrawing[] = []
+  failing = false
+
+  async render(drawing: CardDrawing): Promise<Uint8Array> {
+    if (this.failing) throw new Error('fonts unavailable')
+    this.drawn.push(drawing)
+    return new TextEncoder().encode(`PNG ${JSON.stringify(drawing)}`)
+  }
+}
+
 export interface Caller {
   /** Session cookie of a signed-in person, or an API token. */
   cookie?: string
@@ -66,6 +79,7 @@ export interface RequestOptions extends Caller {
 export class TestApp {
   readonly mailer = new RecordingMailer()
   readonly translator = new RecordingTranslator()
+  readonly cardRenderer = new RecordingCardRenderer()
   readonly repositories = cloudflareRepositories(env.DB, env.FILES)
   readonly routes: AppRoutes
 
@@ -88,7 +102,7 @@ export class TestApp {
       // Tests assert Chinese wording, so they hold the default language fixed whatever a deployment sets.
       DEFAULT_LOCALE: 'zh-CN',
     }
-    this.routes = new AppRoutes({ env: appEnv, repositories: this.repositories, mailer: this.mailer, titleTranslator: this.translator, mcpUrl: 'http://mcp.test/mcp' })
+    this.routes = new AppRoutes({ env: appEnv, repositories: this.repositories, mailer: this.mailer, titleTranslator: this.translator, cardRenderer: this.cardRenderer, mcpUrl: 'http://mcp.test/mcp' })
   }
 
   async request(path: string, options: RequestOptions = {}): Promise<Response> {

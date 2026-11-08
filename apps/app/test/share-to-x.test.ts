@@ -86,3 +86,93 @@ describe('sharing an artifact on X', () => {
     expect(withPassword.body.share.readiness).toEqual({ kind: 'has_password' })
   })
 })
+
+describe('the card picture X shows', () => {
+  const cardPathOf = (url: string) => `${new URL(url).pathname}/card.png`
+
+  it('draws a listed article once, keeps it, and lets X cache it for good', async () => {
+    const published = await publishByAgent({ title: 'pstack 使用指南', visibility: 'public_link', listed: true })
+    const drawnBefore = app.cardRenderer.drawn.length
+
+    const first = await app.request(`${cardPathOf(published.body.url)}?v=1.1`)
+    const firstBytes = await first.arrayBuffer()
+    const second = await app.request(`${cardPathOf(published.body.url)}?v=1.1`)
+    const withoutVersion = await app.request(cardPathOf(published.body.url))
+
+    expect(first.status).toBe(200)
+    expect(first.headers.get('Content-Type')).toBe('image/png')
+    expect(first.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable')
+    expect(await second.arrayBuffer()).toEqual(firstBytes)
+    expect(withoutVersion.headers.get('Cache-Control')).toBe('public, max-age=300')
+    expect(app.cardRenderer.drawn.length - drawnBefore).toBe(1)
+    expect(app.cardRenderer.drawn.at(-1)).toMatchObject({ kind: 'article', template: 'paper', title: 'pstack 使用指南', author: 'share', version: 1 })
+  })
+
+  it('draws a dark page on the ink card', async () => {
+    const darkPage = '<html><head><meta name="theme-color" content="#0b0d10"></head><body><p>深色页面的第一段话写得足够长了。</p></body></html>'
+    const styledPage = '<html><head><style>body { background: rgb(20, 22, 26); color: #eee }</style></head><body><p>x</p></body></html>'
+    for (const content of [darkPage, styledPage]) {
+      const published = await app.json<{ url: string }>('/api/artifacts', { method: 'POST', token: agentToken, body: { title: '深色', visibility: 'public_link', listed: true, files: [{ path: 'index.html', content }] } })
+      await app.request(cardPathOf(published.body.url))
+      expect(app.cardRenderer.drawn.at(-1)).toMatchObject({ kind: 'article', template: 'ink' })
+    }
+  })
+
+  it('answers a card of anything not on the personal page exactly as it answers one that never existed', async () => {
+    const missing = await app.request('/a/nothing-here-000000000000/card.png')
+    const missingBody = await missing.text()
+    const listed = (body: Record<string, unknown>) => publishByAgent({ title: '不该露出的标题', visibility: 'public_link', listed: true, ...body })
+    const privatePage = await publishByAgent({ title: '不该露出的标题', visibility: 'private' })
+    const unlisted = await publishByAgent({ title: '不该露出的标题', visibility: 'public_link' })
+    const withPassword = await listed({})
+    await app.request(`/api/artifacts/${withPassword.body.artifactId}/sharing`, { method: 'PUT', cookie, body: { listed: false, publicLinkPassword: 'secret-123' } })
+    const expired = await listed({})
+    const expiredSharing = { visibility: 'public_link', publicLinkExpiresAt: Date.now() - 1, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, listed: true } as const
+    await app.repositories.artifactAccess.saveSharing(expired.body.artifactId, expiredSharing, [])
+    const removed = await listed({})
+    await app.request(`/api/artifacts/${removed.body.artifactId}`, { method: 'DELETE', cookie })
+
+    for (const hidden of [privatePage, unlisted, withPassword, expired, removed]) {
+      const response = await app.request(cardPathOf(hidden.body.url), { cookie })
+      expect(response.status).toBe(404)
+      expect(await response.text()).toBe(missingBody)
+      expect([...response.headers]).toEqual([...missing.headers])
+    }
+    expect(missing.status).toBe(404)
+    expect(missingBody).not.toContain('不该露出的标题')
+  })
+
+  it('keeps nothing when a drawing fails, and draws again next time', async () => {
+    const published = await publishByAgent({ title: '字体加载失败', visibility: 'public_link', listed: true })
+    app.cardRenderer.failing = true
+    const failed = await app.request(cardPathOf(published.body.url))
+    app.cardRenderer.failing = false
+    const retried = await app.request(cardPathOf(published.body.url))
+
+    expect(failed.status).toBe(503)
+    expect(failed.headers.get('Cache-Control')).toBe('no-store')
+    expect(retried.status).toBe(200)
+  })
+
+  it('puts a large picture card on a listed article and on the personal page', async () => {
+    const published = await publishByAgent({ title: 'Open Artifact 使用指南', visibility: 'public_link', listed: true })
+    const articleMarkup = await (await app.request(new URL(published.body.url).pathname, { headers: { 'User-Agent': 'Twitterbot/1.0' } })).text()
+    const ownPage = await app.request('/@me', { cookie })
+    const profilePath = ownPage.headers.get('Location') ?? ''
+    const profileMarkup = await (await app.request(profilePath)).text()
+    const profileImage = /<meta property="og:image" content="([^"]+)">/.exec(profileMarkup)?.[1] ?? ''
+    const profileCard = await app.request(new URL(profileImage).pathname + new URL(profileImage).search)
+
+    expect(articleMarkup).toContain('<meta name="twitter:card" content="summary_large_image">')
+    expect(articleMarkup).toContain(`<meta property="og:image" content="${published.body.url}/card.png?v=1.1">`)
+    expect(articleMarkup).toContain(`<meta name="twitter:image" content="${published.body.url}/card.png?v=1.1">`)
+    expect(articleMarkup).toContain('<meta property="og:image:width" content="1200">')
+    expect(articleMarkup).toContain('<meta property="og:image:height" content="630">')
+    expect(articleMarkup).toContain('<meta property="og:image:alt" content="Open Artifact 使用指南">')
+    expect(profileMarkup).toContain('<meta name="twitter:card" content="summary_large_image">')
+    expect(profileImage).toMatch(new RegExp(`^http://app\\.test${profilePath}/card\\.png\\?v=[0-9a-f]{16}\\.1$`))
+    expect(profileCard.status).toBe(200)
+    expect(profileCard.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable')
+    expect(app.cardRenderer.drawn.at(-1)).toMatchObject({ kind: 'profile', titles: expect.arrayContaining(['Open Artifact 使用指南']) })
+  })
+})

@@ -16,6 +16,8 @@ export interface PersonalPageModel {
   /** The person looking is the page's owner, who may change the line about them, the pin and the summaries. */
   isOwner: boolean
   pageUrl: string
+  /** The page's own share card, naming its latest titles. */
+  cardImageUrl: string
   usercontentOrigin: string
   now: number
 }
@@ -48,7 +50,7 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
       scripts: ['common.js', 'personal.js'],
       styles: ['personal.css'],
       frameOrigin: model.usercontentOrigin,
-      publicCard: { url: model.pageUrl, kind: 'profile' },
+      publicCard: { url: model.pageUrl, kind: 'profile', image: { url: model.cardImageUrl, alt: model.name } },
     })
   }
 

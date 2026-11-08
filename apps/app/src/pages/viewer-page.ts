@@ -5,6 +5,7 @@ import type { Identity } from '../auth/request-identity.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
 import { html, SafeHtml } from './html.ts'
 import { PageShell, type IconName } from './page-shell.ts'
+import type { ShareCard } from '../share/share-card.ts'
 
 // No allow-same-origin: the artifact gets an opaque origin and cannot reach any site's cookies or storage.
 const ARTIFACT_SANDBOX = 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads'
@@ -19,8 +20,8 @@ export interface OlderVersion {
 export interface Byline {
   authorName: string
   personalPagePath: string
-  /** Where search engines and share cards should send people: the artifact's own address. */
-  articleUrl: string
+  /** What the link carries on X; its url is where search engines and share cards should send people. */
+  share: ShareCard
   /** The next piece on the author's page; null when this is the only one. */
   next: { path: string; title: string } | null
 }
@@ -77,7 +78,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
       scripts: ['common.js', 'viewer/viewer.js'],
       styles: ['viewer.css'],
       frameOrigin: model.usercontentOrigin,
-      ...(model.byline ? { publicCard: { url: model.byline.articleUrl, kind: 'article' as const } } : {}),
+      ...(model.byline ? { publicCard: { url: model.byline.share.url, kind: 'article' as const, image: { url: model.byline.share.imageUrl, alt: summary.title } } } : {}),
     })
   }
 

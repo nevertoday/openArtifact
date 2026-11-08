@@ -4,6 +4,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers'
 import { AppRoutes } from './app-routes.ts'
 import { TitleTranslators } from './api/title-translator.ts'
 import { Mailers } from './auth/mailer.ts'
+import type { CardRenderer } from './share/card-renderer.ts'
 import type { AppEnv } from './env.ts'
 
 /**
@@ -16,6 +17,14 @@ export class ArtifactFileReader extends WorkerEntrypoint<AppEnv> {
   }
 }
 
+// Loaded with the first card asked for, so no other request loads the drawing engines and their WebAssembly.
+const cardRenderer: CardRenderer = {
+  async render(drawing) {
+    const { SatoriCardRenderer } = await import('./share/satori-card-renderer.ts')
+    return new SatoriCardRenderer().render(drawing)
+  },
+}
+
 export default {
   async fetch(request: Request, env: AppEnv): Promise<Response> {
     const appRoutes = new AppRoutes({
@@ -23,6 +32,7 @@ export default {
       repositories: cloudflareRepositories(env.DB, env.FILES),
       mailer: Mailers.fromEnv(env),
       titleTranslator: TitleTranslators.fromEnv(env),
+      cardRenderer,
       mcpUrl: `${env.MCP_ORIGIN}/mcp`,
     })
     return appRoutes.respond(request)

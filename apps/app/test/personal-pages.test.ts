@@ -66,7 +66,7 @@ describe('listing on a personal page', () => {
     expect(strangersView.markup).not.toContain('只发给一个人的草稿')
     expect(strangersView.markup).not.toContain('过期的活动页')
     expect(strangersView.robots).toBeNull()
-    expect(strangersView.markup).toContain('<meta name="twitter:card" content="summary">')
+    expect(strangersView.markup).toContain('<meta name="twitter:card" content="summary_large_image">')
     expect(strangersView.markup).not.toContain('data-edit-bio')
     expect(unlistedPage.artifactId).not.toBe(listedPage.artifactId)
   })

@@ -14,6 +14,8 @@ import { HttpError, RemovedFromWorkspaceError } from './http-error.ts'
 import { fallbackLocaleOf, requestLocaleSignals } from './i18n/resolve-locale.ts'
 import { MessagePages } from './pages/message-pages.ts'
 import { PageRoutes } from './pages/page-routes.ts'
+import type { CardRenderer } from './share/card-renderer.ts'
+import { CardRoutes } from './share/card-routes.ts'
 import type { Repositories } from '@open-artifact/core'
 
 const VIEWER = new URLPattern({ pathname: '/a/:segment' })
@@ -22,6 +24,8 @@ const UNLOCK = new URLPattern({ pathname: '/a/:segment/unlock' })
 const SETTINGS = new URLPattern({ pathname: '/settings{/:section}?' })
 const INVITE = new URLPattern({ pathname: '/invite/:inviteCode' })
 const PERSONAL_PAGE = new URLPattern({ pathname: '/@:handle' })
+const ARTIFACT_CARD = new URLPattern({ pathname: '/a/:segment/card.png' })
+const PERSONAL_PAGE_CARD = new URLPattern({ pathname: '/@:handle/card.png' })
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 export interface AppDependencies {
@@ -29,6 +33,8 @@ export interface AppDependencies {
   repositories: Repositories
   mailer: Mailer
   titleTranslator: TitleTranslator
+  /** Draws the pictures X shows for shared links. */
+  cardRenderer: CardRenderer
   mcpUrl: string
 }
 
@@ -76,6 +82,10 @@ export class AppRoutes {
     if (requestUrl.pathname === '/') return pageRoutes.home(request)
     if (requestUrl.pathname === '/login') return pageRoutes.login(request)
     if (requestUrl.pathname === '/llms.txt') return pageRoutes.llmsTxt()
+    const artifactCardMatch = ARTIFACT_CARD.exec(requestUrl)
+    if (artifactCardMatch) return new CardRoutes(context, this.#dependencies.cardRenderer).article(request, decodeURIComponent(artifactCardMatch.pathname.groups.segment ?? ''))
+    const personalPageCardMatch = PERSONAL_PAGE_CARD.exec(requestUrl)
+    if (personalPageCardMatch) return new CardRoutes(context, this.#dependencies.cardRenderer).profile(request, decodeURIComponent(personalPageCardMatch.pathname.groups.handle ?? ''))
     const viewerMatch = VIEWER.exec(requestUrl)
     if (viewerMatch) return pageRoutes.viewer(request, decodeURIComponent(viewerMatch.pathname.groups.segment ?? ''))
     const fullViewMatch = FULL_VIEW.exec(requestUrl)
