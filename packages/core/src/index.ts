@@ -4,7 +4,7 @@ export type { ArtifactAccessRepository, ArtifactGrant, GrantRole, PersonGrant } 
 export { ArtifactPath, ArtifactSlug, ShortId } from './artifact-address.ts'
 export type { AddressedArtifact, ArtifactPage, ArtifactReference } from './artifact-address.ts'
 export { ArtifactAccess } from './artifact-access.ts'
-export type { ArtifactPermission, ArtifactPermissions, ArtifactViewer } from './artifact-access.ts'
+export type { ArtifactPermission, ArtifactPermissions, ArtifactViewer, ShareReadiness } from './artifact-access.ts'
 export type {
   ArtifactFile,
   ArtifactFileSource,

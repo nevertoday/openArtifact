@@ -15,6 +15,7 @@ const glossedLabel = /(?<=[A-Za-z0-9`)] )\([\p{Script=Han}\u3000-\u303f\uff00-\u
 const readsPeoplesText = new Map([
   ['apps/app/src/api/page-excerpt.ts', /\['。', '！', '？'/],
   ['apps/app/public/static/settings.js', /text\.split\(\/\[\\s,，;；\]\+\/\)/],
+  ['apps/app/public/static/share-text.js', /^const (SENTENCE|CLAUSE)_ENDS = \[/],
 ])
 
 function sourceFilesUnder(directory) {
