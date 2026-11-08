@@ -221,3 +221,60 @@ describe('changing the words of an address', () => {
     expect(renamed.body.slug).toBe('budget')
   })
 })
+
+describe('the address of an artifact with a Chinese title', () => {
+  const translatedTitles: string[] = []
+  let translation: (title: string) => Promise<{ translated_text?: string }> = async () => ({ translated_text: 'Quarterly sales review' })
+  const translatingApp = new TestApp({
+    allowedEmailDomains: 'example.com',
+    translationModels: {
+      run: async (_model, input) => {
+        translatedTitles.push(input.text)
+        return translation(input.text)
+      },
+    },
+  })
+  let translatingToken = ''
+
+  beforeAll(async () => {
+    translatingToken = await translatingApp.createToken(await translatingApp.signIn('translated-author@example.com'), 'full')
+  })
+
+  async function publishTranslated(body: Record<string, unknown>): Promise<Published> {
+    const { status, body: published } = await translatingApp.json<Published>('/api/artifacts', { method: 'POST', token: translatingToken, body: { files: [{ path: 'index.html', content: '<h1>v1</h1>' }], ...body } })
+    if (status !== 201) throw new Error(`publish failed with ${status}`)
+    return published
+  }
+
+  it('reads like the title machine-translated into English when the agent chose no words', async () => {
+    translation = async () => ({ translated_text: 'Quarterly sales review' })
+    const published = await publishTranslated({ title: '季度销售复盘' })
+
+    expect(published.url).toBe(`${APP_ORIGIN}/a/quarterly-sales-review-${published.shortId}`)
+  })
+
+  it('keeps the words the agent chose without translating the title', async () => {
+    translatedTitles.length = 0
+    const published = await publishTranslated({ title: '季度销售复盘', slug: 'q3-review' })
+
+    expect(published.slug).toBe('q3-review')
+    expect(translatedTitles).toEqual([])
+  })
+
+  it('still publishes, with the title\'s own English words, when translation fails', async () => {
+    translation = async () => { throw new Error('Workers AI is unavailable') }
+    const published = await publishTranslated({ title: 'pstack 使用指南' })
+
+    expect(published.url).toBe(`${APP_ORIGIN}/a/pstack-${published.shortId}`)
+  })
+
+  it('gives a wordless address the translated words of its new title', async () => {
+    translation = async () => { throw new Error('Workers AI is unavailable') }
+    const wordless = await publishTranslated({ title: '季度销售复盘' })
+    translation = async () => ({ translated_text: 'Annual plan' })
+
+    const { body: renamed } = await translatingApp.json<Published>(`/api/artifacts/${wordless.artifactId}`, { method: 'PATCH', token: translatingToken, body: { title: '年度计划' } })
+
+    expect(new URL(renamed.url).pathname).toBe(`/a/annual-plan-${wordless.shortId}`)
+  })
+})

@@ -18,6 +18,7 @@ const SHORT_ID_VALUES = BigInt(SHORT_ID_ALPHABET.length) ** BigInt(SHORT_ID_LENG
 const UNBIASED_LIMIT = ((1n << 64n) / SHORT_ID_VALUES) * SHORT_ID_VALUES
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_SLUG_LENGTH = 60
+const HAN = /\p{Script=Han}/u
 
 /** Twelve random characters from 0-9 and a-z; 36^12 is about 4.7 × 10^18 addresses, too many to guess. */
 export class ShortId {
@@ -58,20 +59,39 @@ export class ArtifactSlug {
     return slug
   }
 
-  /** The words the publisher chose, or else the ASCII words of the title. */
-  static forNewArtifact(requested: string | null, title: string): string {
-    return ArtifactSlug.#requested(requested) ?? ArtifactSlug.normalize(title)
+  /**
+   * The words the publisher chose, or else those of the title. `englishTitle` is the title translated, for a title
+   * whose own words would be lost to the address; see needsEnglishTitle.
+   */
+  static forNewArtifact(requested: string | null, title: string, englishTitle: string | null = null): string {
+    return ArtifactSlug.#requested(requested) ?? ArtifactSlug.#titleWords(title, englishTitle)
+  }
+
+  /** A Chinese title loses its Chinese words to the address, so the address is worth a translated title, unless the publisher chose words. */
+  static needsEnglishTitle(requested: string | null, title: string): boolean {
+    return ArtifactSlug.#requested(requested) === null && HAN.test(title)
   }
 
   /**
    * Links already sent keep their words when only the title changes. An artifact that has no words yet takes
    * them from its new title.
    */
-  static afterChange(current: string, requested: string | null, changedTitle: string | null): string {
+  static afterChange(current: string, requested: string | null, changedTitle: string | null, englishTitle: string | null = null): string {
     const chosen = ArtifactSlug.#requested(requested)
     if (chosen !== null) return chosen
-    if (current === '' && changedTitle !== null) return ArtifactSlug.normalize(changedTitle)
+    if (current === '' && changedTitle !== null) return ArtifactSlug.#titleWords(changedTitle, englishTitle)
     return current
+  }
+
+  /** Whether a change of title gives the address its words, so that a Chinese one is worth translating first. */
+  static takesWordsFromTitle(current: string, requested: string | null, changedTitle: string | null): boolean {
+    return current === '' && changedTitle !== null && ArtifactSlug.needsEnglishTitle(requested, changedTitle)
+  }
+
+  // A translation that keeps no ASCII words is no better than the title's own.
+  static #titleWords(title: string, englishTitle: string | null): string {
+    const translated = englishTitle === null ? '' : ArtifactSlug.normalize(englishTitle)
+    return translated === '' ? ArtifactSlug.normalize(title) : translated
   }
 
   // Words that normalize to nothing, such as a slug written only in Chinese, count as not given.

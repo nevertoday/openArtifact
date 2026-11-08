@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers'
 import { AppRoutes } from '../src/app-routes.ts'
 import type { Mailer, OutgoingEmail } from '../src/auth/mailer.ts'
+import type { TranslationModels } from '../src/api/title-translator.ts'
 import type { AppEnv } from '../src/env.ts'
 import { cloudflareRepositories } from '@open-artifact/storage-cloudflare'
 
@@ -53,7 +54,7 @@ export class TestApp {
    * Tests sign the same people in many times a minute, so sign-in links are limited loosely unless
    * `productionSignInLimits` asks for the limits the app is deployed with.
    */
-  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean } = { allowedEmailDomains: 'example.com' }) {
+  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean; translationModels?: TranslationModels } = { allowedEmailDomains: 'example.com' }) {
     const appEnv: AppEnv = {
       DB: env.DB,
       FILES: env.FILES,
@@ -67,6 +68,7 @@ export class TestApp {
       USERCONTENT_SIGNING_KEY: SIGNING_KEY,
       // Tests assert Chinese wording, so they hold the default language fixed whatever a deployment sets.
       DEFAULT_LOCALE: 'zh-CN',
+      ...(options.translationModels ? { AI: options.translationModels } : {}),
     }
     this.routes = new AppRoutes({ env: appEnv, repositories: this.repositories, mailer: this.mailer, mcpUrl: 'http://mcp.test/mcp' })
   }

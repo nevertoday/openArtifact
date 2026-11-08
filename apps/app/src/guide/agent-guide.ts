@@ -52,7 +52,7 @@ export class AgentGuide {
 ### When to publish
 - Publish when the result is something people will read or use outside this chat: a design doc, report, dashboard, plan, sign-up sheet.
 - Before creating a new artifact for the same subject, \`list\` the existing ones and update the right one instead.
-- Always pass a \`slug\`: 3–6 lower-case English words joined by dashes that say what the page is (\`quarterly-sales-review\`), above all when the title is not in English. It goes into the link (\`/a/quarterly-sales-review-k7f3q9x2m4ab\`), so people who get the link in a chat can tell what it is before they sign in. Without one, the link takes the English words of the title, or has none.
+- Always pass a \`slug\`: 3–6 lower-case English words joined by dashes that say what the page is (\`quarterly-sales-review\`), above all when the title is not in English. It goes into the link (\`/a/quarterly-sales-review-k7f3q9x2m4ab\`), so people who get the link in a chat can tell what it is before they sign in. Without one, the link takes the words of the title, a Chinese one machine-translated.
 - Share the \`url\` the response returns. It stays valid when the title or slug changes later.
 
 ### How to connect

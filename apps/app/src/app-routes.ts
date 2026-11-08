@@ -3,6 +3,7 @@ import { ArtifactGate } from './access/artifact-gate.ts'
 import { ArtifactPageAddress } from './access/artifact-page-address.ts'
 import { ApiContext } from './api/api-context.ts'
 import { ApiRoutes } from './api/api-routes.ts'
+import { TitleTranslator } from './api/title-translator.ts'
 import { Admission } from './auth/admission.ts'
 import { SignInLimits } from './auth/sign-in-limits.ts'
 import type { Mailer } from './auth/mailer.ts'
@@ -35,11 +36,13 @@ export class AppRoutes {
   readonly #signingKey: SigningKey
   readonly #artifactPages: ArtifactPageAddress
   readonly #signInLimits: SignInLimits
+  readonly #titleTranslator: TitleTranslator
 
   constructor(dependencies: AppDependencies) {
     this.#dependencies = dependencies
     this.#signingKey = new SigningKey(dependencies.env.USERCONTENT_SIGNING_KEY)
     this.#artifactPages = new ArtifactPageAddress(dependencies.env.USERCONTENT_ORIGIN, new UsercontentSignature(this.#signingKey))
+    this.#titleTranslator = new TitleTranslator(dependencies.env.AI)
     this.#signInLimits = new SignInLimits({ byEmail: dependencies.env.SIGN_IN_EMAIL_RATE_LIMITER, byAddress: dependencies.env.SIGN_IN_ADDRESS_RATE_LIMITER })
   }
 
@@ -100,6 +103,7 @@ export class AppRoutes {
       admission,
       appOrigin,
       artifactPages: this.#artifactPages,
+      titleTranslator: this.#titleTranslator,
       localeSignals: { ...requestLocaleSignals(request.headers), fallback: fallbackLocaleOf(env) },
     })
   }

@@ -8,6 +8,7 @@ import { HttpError } from '../http-error.ts'
 import { Notifier } from '../notifications/notifier.ts'
 import { People } from '../people.ts'
 import { PersonalPages } from '../personal-pages.ts'
+import type { TitleTranslator } from './title-translator.ts'
 import { ArtifactPath, type AddressedArtifact, type Locale, type Repositories } from '@open-artifact/core'
 import { messagesFor, type Messages } from '../i18n/messages.ts'
 import { resolveLocale, type LocaleSignals } from '../i18n/resolve-locale.ts'
@@ -21,6 +22,7 @@ export interface ApiContextFields {
   admission: Admission
   appOrigin: string
   artifactPages: ArtifactPageAddress
+  titleTranslator: TitleTranslator
   /** What the request says about language before anyone is identified; the account's choice is added later. */
   localeSignals: Omit<LocaleSignals, 'account'>
 }
@@ -39,6 +41,7 @@ export class ApiContext {
   readonly appOrigin: string
   readonly artifactPages: ArtifactPageAddress
   readonly personalPages: PersonalPages
+  readonly titleTranslator: TitleTranslator
   readonly #localeSignals: Omit<LocaleSignals, 'account'>
   #locale: Promise<Locale> | null = null
 
@@ -54,6 +57,7 @@ export class ApiContext {
     this.appOrigin = fields.appOrigin
     this.artifactPages = fields.artifactPages
     this.personalPages = new PersonalPages(fields.repositories, fields.appOrigin)
+    this.titleTranslator = fields.titleTranslator
     this.#localeSignals = fields.localeSignals
   }
 
