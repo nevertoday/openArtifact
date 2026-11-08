@@ -8,6 +8,7 @@ import {
   type PersonGrant,
 } from '@open-artifact/core'
 import { ArtifactGate } from '../access/artifact-gate.ts'
+import type { Identity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
 import { People } from '../people.ts'
 import { ShareCard } from '../share/share-card.ts'
@@ -74,11 +75,20 @@ export class SharingApi {
     const sharing = await this.#sharingFrom(requestBody, summary, visibility, publicLinkExpiry.expiresAt)
     if (sharing.listed) await this.#context.personalPages.claim(summary.authorId)
     const grants = requestBody.has('grants') ? await this.#grantsFrom(requestBody.raw('grants'), summary, savedGrants) : savedGrants
-    await this.#context.repositories.artifactAccess.saveSharing(artifactId, sharing, grants)
     const newlyGranted = SharingApi.#newlyGranted({ visibility: summary.sharing.visibility, grants: savedGrants }, { visibility, grants })
+    await this.#takeShareMailQuota(identity, summary, newlyGranted)
+    await this.#context.repositories.artifactAccess.saveSharing(artifactId, sharing, grants)
     for (const grant of newlyGranted) await this.#context.notifier.notify(identity, summary, { kind: 'artifact_shared', sharedWithId: grant.userId, role: grant.role })
     if (publicLinkExpiry.agentDefaultExpiresAt !== null) await this.#context.notifier.notify(identity, summary, { kind: 'public_link_opened_by_agent', expiresAt: publicLinkExpiry.agentDefaultExpiresAt })
     return Response.json(await this.#sharingJson({ ...summary, sharing }, grants))
+  }
+
+  // Members hear about pages in their own workspace all the time; mail to anyone else is what a spammer would send.
+  async #takeShareMailQuota(identity: Identity, summary: ArtifactSummary, newlyGranted: PersonGrant[]): Promise<void> {
+    const members = await this.#context.repositories.workspaces.listMembers(summary.workspaceId)
+    const memberIds = new Set(members.map(member => member.userId))
+    const mailsToOutsiders = newlyGranted.filter(grant => !memberIds.has(grant.userId)).length
+    await this.#context.mailLimits.take('share', { senderId: identity.userId, workspaceId: summary.workspaceId }, mailsToOutsiders, Date.now())
   }
 
   async #sharingFrom(requestBody: JsonBody, summary: ArtifactSummary, visibility: ArtifactVisibility, publicLinkExpiresAt: number | null): Promise<ArtifactSharing> {

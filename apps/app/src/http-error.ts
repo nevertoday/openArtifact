@@ -29,6 +29,7 @@ export type ErrorCode =
   | 'not_listable'
   | 'share_text_too_long'
   | 'rate_limited'
+  | 'mail_limit_reached'
 
 /** Which request field an error is about, so a page can show it under that field. */
 export interface FieldDetail {

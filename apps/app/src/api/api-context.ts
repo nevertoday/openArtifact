@@ -8,6 +8,7 @@ import { HttpError } from '../http-error.ts'
 import { Notifier } from '../notifications/notifier.ts'
 import { People } from '../people.ts'
 import { PersonalPages } from '../personal-pages.ts'
+import { MailLimits } from './mail-limits.ts'
 import type { TitleTranslator } from './title-translator.ts'
 import { ArtifactPath, type AddressedArtifact, type Locale, type Repositories } from '@open-artifact/core'
 import { messagesFor, type Messages } from '../i18n/messages.ts'
@@ -42,6 +43,7 @@ export class ApiContext {
   readonly artifactPages: ArtifactPageAddress
   readonly personalPages: PersonalPages
   readonly titleTranslator: TitleTranslator
+  readonly mailLimits: MailLimits
   readonly #localeSignals: Omit<LocaleSignals, 'account'>
   #locale: Promise<Locale> | null = null
 
@@ -58,6 +60,7 @@ export class ApiContext {
     this.artifactPages = fields.artifactPages
     this.personalPages = new PersonalPages(fields.repositories, fields.appOrigin)
     this.titleTranslator = fields.titleTranslator
+    this.mailLimits = new MailLimits(fields.repositories.outboundMail)
     this.#localeSignals = fields.localeSignals
   }
 

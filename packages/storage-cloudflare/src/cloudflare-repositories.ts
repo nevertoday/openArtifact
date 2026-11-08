@@ -6,6 +6,7 @@ import { CloudflareAuditLog } from './cloudflare-audit-log.ts'
 import { CloudflareCommentRepository } from './cloudflare-comment-repository.ts'
 import { CloudflareNotificationRepository } from './cloudflare-notification-repository.ts'
 import { CloudflareInviteRepository } from './cloudflare-invite-repository.ts'
+import { CloudflareOutboundMailLog } from './cloudflare-outbound-mail-log.ts'
 import { CloudflareProfileRepository } from './cloudflare-profile-repository.ts'
 import { CloudflareShareCardImages } from './cloudflare-share-card-images.ts'
 import { CloudflareSharedDataRepository } from './cloudflare-shared-data-repository.ts'
@@ -27,5 +28,6 @@ export function cloudflareRepositories(db: D1Database, files: R2Bucket): Reposit
     auditLog: new CloudflareAuditLog(db),
     signInCodeFailures: new CloudflareSignInCodeFailures(db),
     shareCardImages: new CloudflareShareCardImages(files),
+    outboundMail: new CloudflareOutboundMailLog(db),
   }
 }

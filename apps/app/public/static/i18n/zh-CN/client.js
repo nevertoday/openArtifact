@@ -30,6 +30,7 @@ export default {
     version_conflict: '刚有人发布了新版本。刷新页面后再试。',
     not_listable: '只有不设密码的公开链接才能列在主页上。',
     share_text_too_long: '这段文案加上链接超过了 X 的 280 字限制，请删短一些。',
+    mail_limit_reached: '今天发出的邀请或分享邮件已经到上限，这次没有发出，也没有保存。请明天再试。',
   }),
   /** takeDown is an admin removing someone else's artifact; delete is the author removing their own. */
   removal: {

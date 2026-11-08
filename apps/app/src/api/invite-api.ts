@@ -41,6 +41,7 @@ export class InviteApi {
     const memberEmails = new Set(members.map(member => Admission.normalizedEmail(member.email)))
     const alreadyMembers = requestedEmails.filter(email => memberEmails.has(email))
     const newEmails = requestedEmails.filter(email => !memberEmails.has(email))
+    await this.#context.mailLimits.take('invite', { senderId: admin.userId, workspaceId: admin.membership.workspace.workspaceId }, newEmails.length, Date.now())
     const invites = await Promise.all(newEmails.map(email => this.#issue(admin, email)))
     await this.#mail(admin, invites)
     return Response.json({ invites: await this.#invitesJson(invites), alreadyMembers }, { status: 201 })
