@@ -119,6 +119,14 @@ export class ArtifactGate {
     return Promise.all(summaries.map(summary => this.#opened(summary, identity, grantRoleByArtifact.get(summary.artifactId) ?? null, false)))
   }
 
+  /** The artifacts granted to the identity one by one that it may view, from every workspace. */
+  async listSharedWith(identity: Identity): Promise<OpenedArtifact[]> {
+    const [summaries, grantsOfUser] = await Promise.all([this.#repositories.artifacts.listGrantedTo(identity.userId), this.#repositories.artifactAccess.listGrantsOfUser(identity.userId)])
+    const grantRoleByArtifact = new Map(grantsOfUser.map(grant => [grant.artifactId, grant.role]))
+    const openedArtifacts = await Promise.all(summaries.map(summary => this.#opened(summary, identity, grantRoleByArtifact.get(summary.artifactId) ?? null, false)))
+    return openedArtifacts.filter(openedArtifact => openedArtifact.permissions.canView)
+  }
+
   /** A cookie that proves the public link's password was entered; changing the password invalidates it. */
   async unlockCookieValue(summary: ArtifactSummary): Promise<string> {
     return this.#signingKey.sign(ArtifactGate.#unlockMessage(summary))

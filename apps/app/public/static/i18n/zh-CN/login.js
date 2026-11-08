@@ -22,7 +22,7 @@ export default {
   emailLabel: '邮箱',
   errorRequired: '输入邮箱',
   errorInvalid: '请输入有效的邮箱，比如 name@example.com',
-  errorNotAdmitted: '这个邮箱不能登录 Open Artifact。请用公司邮箱，或请管理员邀请你。',
+  errorNotAdmitted: '这个邮箱还不能注册。请让管理员邀请你。',
   sendCode: '发送验证码',
   invitation: {
     /** @param {{ inviter: string, workspace: string }} p */

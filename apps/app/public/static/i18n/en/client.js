@@ -4,6 +4,10 @@ const plural = (/** @type {number} */ count, /** @type {string} */ one, /** @typ
 
 export default /** @satisfies {import('../messages').Messages['client']} */ ({
   dialog: { cancel: 'Cancel', close: 'Close' },
+  workspaces: {
+    createFailed: message => `Couldn't create it: ${message}`,
+    restoreFailed: message => `Couldn't restore it: ${message}`,
+  },
   errorFallback: "That didn't work. Please try again.",
   errors: {
     network: "Can't reach Open Artifact. Check your connection and try again.",
@@ -16,7 +20,6 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
     browser_session_required: 'Sign in on the web to do that.',
     outside_token_scope: 'This token can only publish. To do this, create a token with full access, or do it on the web.',
     cross_site_request: 'Please do this from an Open Artifact page.',
-    removed_from_workspace: 'You were removed from this workspace. Contact an admin.',
     not_found: "It's gone, and may have been deleted. Try refreshing the page.",
     field_required: "This can't be empty.",
     field_too_long: ({ maxLength }) => `Use ${plural(maxLength, 'character', 'characters')} or fewer.`,
@@ -30,6 +33,8 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
     share_text_too_long: 'With the link, this text is over the 280 X allows. Make it shorter.',
     workspace_changed: 'You switched workspace in another tab. Reload this page and try again.',
     mail_limit_reached: "You've reached today's limit on invite and share emails, so nothing was sent or saved. Try again tomorrow.",
+    workspace_deleted: 'This workspace was deleted.',
+    personal_workspace: "A personal workspace can't be left or deleted, and its owner always stays its admin.",
   },
   removal: {
     takeDown: {
@@ -119,6 +124,13 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
       open: 'Open',
     },
     profile: { saved: 'Saved' },
+    lifecycle: {
+      leaveTitle: name => `Leave “${name}”?`,
+      leaveMessage: "You lose access to its artifacts at once, and your tokens here stop working. Anyone's invite brings you back.",
+      deleteTitle: name => `Delete “${name}”?`,
+      deleteMessage: 'Every member loses access at once, and its artifacts, public links and tokens stop working. You can restore it from “Recently deleted” in the workspace menu for 30 days.',
+      failed: message => `That didn't work: ${message}`,
+    },
     publicLinks: {
       offTitle: 'Turn off public links?',
       offMessage: count => `${count === 1 ? 'The public link stops' : `All ${count} public links stop`} working right away.`,
@@ -139,7 +151,7 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
       none: 'No pending invites.',
       heading: count => `Pending invites (${count})`,
       anyoneLink: 'Invite link · anyone can use it',
-      meta: ({ inviter, expiry }) => `Invited by ${inviter} · expires ${expiry}`,
+      meta: ({ inviter, expiry }) => `Invited by ${inviter} · ${expiry === null ? 'never expires' : `expires ${expiry}`}`,
       copy: 'Copy link',
       copyDone: 'Copied the invite link',
       revoke: 'Revoke',

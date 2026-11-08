@@ -1,7 +1,8 @@
-import { LOCALES, type Locale } from '@open-artifact/core'
+import { LOCALES, WorkspaceDeletion, type DeletedWorkspace, type Locale, type Membership, type Workspace } from '@open-artifact/core'
 import type { Identity } from '../auth/request-identity.ts'
 import { messagesFor, type Messages } from '../i18n/messages.ts'
 import { fullTimeText, relativeTimeText } from '../../public/static/time-text.js'
+import { ArtifactLabels } from './artifact-labels.ts'
 import { html, SafeHtml } from './html.ts'
 import { SETTINGS_SECTION_ICONS, SETTINGS_SECTIONS } from './settings-sections.ts'
 
@@ -202,13 +203,55 @@ ${options.description ? html`<meta name="twitter:description" content="${options
     return html`<div class="app-frame">${sidebar}<main class="app-main" id="main" tabindex="-1">${main}</main></div>`
   }
 
-  static workspaceSwitcher(m: Messages, identity: Identity): SafeHtml {
-    if (identity.memberships.length < 2) return html`<span class="xxd-text app-workspace-name" data-variant="secondary">${identity.membership.workspace.name}</span>`
-    const currentWorkspaceId = identity.membership.workspace.workspaceId
-    return html`<label class="xxd-select app-workspace-switcher" data-size="sm"><span class="xxd-sr-only">${m.shell.switchWorkspace}</span>
-<select id="workspace-switcher" data-switch-workspace>
-  ${identity.memberships.map(membership => html`<option value="${membership.workspace.workspaceId}" ${membership.workspace.workspaceId === currentWorkspaceId ? new SafeHtml('selected') : ''}>${membership.workspace.name}</option>`)}
-</select></label>`
+  /**
+   * The workspace menu: every workspace the person is in, the current one checked and the personal one marked, then
+   * a way to create one and, for an admin with deleted workspaces still restorable, a way to bring them back.
+   */
+  static workspaceSwitcher(m: Messages, identity: Identity, deletedWorkspaces: DeletedWorkspace[], now: number): SafeHtml {
+    const current = identity.membership.workspace
+    const isPersonal = (workspace: Workspace) => workspace.personalOf === identity.userId
+    const workspaceItem = ({ workspace }: Membership) => {
+      const isCurrent = workspace.workspaceId === current.workspaceId
+      return html`<button type="button" class="xxd-menu__item app-workspace-menu__item" role="menuitemradio" aria-checked="${String(isCurrent)}" data-switch-workspace="${workspace.workspaceId}">${PageShell.icon(isPersonal(workspace) ? 'UserRound' : 'Users', 14)}<span class="app-workspace-menu__name">${workspace.name}</span>${isPersonal(workspace) ? html`<span class="xxd-badge" data-size="sm">${m.shell.personal}</span>` : ''}</button>`
+    }
+    return html`<button type="button" class="xxd-btn app-workspace-switcher" data-variant="ghost" data-size="sm" data-xxd-menu="workspace-menu" aria-label="${m.shell.workspaceMenu(current.name)}">${PageShell.icon(isPersonal(current) ? 'UserRound' : 'Users', 16)}<span class="app-workspace-switcher__name">${current.name}</span>${PageShell.icon('ChevronDown', 14)}</button>
+<div class="xxd-menu app-workspace-menu" id="workspace-menu" role="menu" popover>
+  <div class="xxd-menu__label">${m.shell.workspaces}</div>
+  ${identity.memberships.map(workspaceItem)}
+  <div class="xxd-menu__sep" role="separator"></div>
+  <button type="button" class="xxd-menu__item" role="menuitem" data-xxd-dialog-open="new-workspace-dialog">${PageShell.icon('Plus', 14)}${m.shell.newWorkspace}</button>
+  ${deletedWorkspaces.length > 0 ? html`<button type="button" class="xxd-menu__item" role="menuitem" data-xxd-dialog-open="deleted-workspaces-dialog">${PageShell.icon('RotateCcw', 14)}${m.shell.deletedWorkspaces}</button>` : ''}
+</div>
+${PageShell.#newWorkspaceDialog(m)}
+${deletedWorkspaces.length > 0 ? PageShell.#deletedWorkspacesDialog(m, deletedWorkspaces, now) : ''}`
+  }
+
+  static #newWorkspaceDialog(m: Messages): SafeHtml {
+    const naming = m.shell.newWorkspaceDialog
+    return html`<dialog class="xxd-dialog" data-size="sm" id="new-workspace-dialog" aria-labelledby="new-workspace-title">
+  <form id="new-workspace-form" novalidate>
+    <div class="xxd-dialog__head"><h2 class="xxd-dialog__title" id="new-workspace-title">${naming.title}</h2></div>
+    <div class="xxd-dialog__body"><div class="xxd-field">
+      <label class="xxd-label" for="new-workspace-name">${naming.nameLabel}</label>
+      <input class="xxd-input" id="new-workspace-name" name="name" required maxlength="40" autocomplete="off" aria-describedby="new-workspace-help" data-error-required="${naming.nameRequired}">
+      <p class="xxd-help" id="new-workspace-help">${naming.nameHelp}</p>
+    </div></div>
+    <div class="xxd-dialog__actions"><button type="button" class="xxd-btn" data-xxd-dialog-close>${m.shell.cancel}</button><button type="submit" class="xxd-btn" data-variant="primary">${naming.create}</button></div>
+  </form>
+</dialog>`
+  }
+
+  static #deletedWorkspacesDialog(m: Messages, deletedWorkspaces: DeletedWorkspace[], now: number): SafeHtml {
+    const naming = m.shell.deletedWorkspacesDialog
+    const row = ({ workspace, deletedAt }: DeletedWorkspace) => html`<li class="xxd-list__item">
+    <span class="xxd-list__main"><span class="xxd-list__title">${workspace.name}</span><span class="xxd-list__meta">${ArtifactLabels.purgeIn(m, WorkspaceDeletion.purgeAt(deletedAt), now)}</span></span>
+    <button type="button" class="xxd-btn" data-size="xs" data-restore-workspace="${workspace.workspaceId}">${PageShell.icon('RotateCcw', 14)}${naming.restore}</button>
+  </li>`
+    return html`<dialog class="xxd-dialog" data-size="sm" id="deleted-workspaces-dialog" aria-labelledby="deleted-workspaces-title" aria-describedby="deleted-workspaces-description">
+  <div class="xxd-dialog__head"><h2 class="xxd-dialog__title" id="deleted-workspaces-title">${naming.title}</h2></div>
+  <div class="xxd-dialog__body xxd-stack"><p class="xxd-text" data-variant="secondary" id="deleted-workspaces-description">${naming.description}</p><ul class="xxd-list">${deletedWorkspaces.map(row)}</ul></div>
+  <div class="xxd-dialog__actions"><button type="button" class="xxd-btn" data-xxd-dialog-close>${m.shell.close}</button></div>
+</dialog>`
   }
 
   /** How long ago, with the full time on hover; common.js re-renders it in the reader's time zone. */

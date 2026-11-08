@@ -49,6 +49,19 @@ describe('CloudflareInviteRepository', () => {
     expect(await inviteRepository.listPendingForEmail('again@example.com', now)).toEqual([secondInvite])
   })
 
+  it('keeps a link that never expires pending until it is revoked, and no invite of a deleted workspace', async () => {
+    const workspaceId = await newWorkspace()
+    const deletedWorkspaceId = await newWorkspace()
+    const lastingLink = await inviteRepository.create({ workspaceId, email: null, code: crypto.randomUUID(), invitedBy: 'user-admin', createdAt: now, expiresAt: null })
+    const linkOfDeleted = await inviteInto(deletedWorkspaceId, null)
+    await workspaceRepository.delete(deletedWorkspaceId, now)
+
+    expect(await inviteRepository.findPendingByCode(lastingLink.code, now + 3650 * DAY)).toEqual(lastingLink)
+    expect(await inviteRepository.findPendingByCode(linkOfDeleted.code, now)).toBeNull()
+    await inviteRepository.revoke(workspaceId, lastingLink.inviteId, now)
+    expect(await inviteRepository.findPendingByCode(lastingLink.code, now)).toBeNull()
+  })
+
   it('revokes only a pending invite of the given workspace', async () => {
     const workspaceId = await newWorkspace()
     const otherWorkspaceId = await newWorkspace()

@@ -6,8 +6,9 @@ import { TestApp } from './test-app.ts'
 const app = new TestApp()
 const english = { 'Accept-Language': 'en' }
 const anyChinese = /[一-鿿]/
-// The language switch names Chinese in Chinese, and a new workspace is stored as 我的团队; neither is page wording.
-const withoutOwnNames = (markup: string) => markup.replaceAll('>中文<', '><').replaceAll('>我的团队<', '><')
+// The language switch names Chinese in Chinese, and the team and the personal workspaces are stored with Chinese
+// names; none of it is page wording.
+const withoutOwnNames = (markup: string) => markup.replaceAll('>中文<', '><').replaceAll('我的团队', '').replaceAll(/[a-z]+的工作区/g, '')
 let authorCookie = ''
 let readerCookie = ''
 
@@ -32,7 +33,7 @@ describe('the server-rendered pages in English', () => {
     expect(markup).toContain('<title>Sign in · Open Artifact</title>')
     expect(markup).toContain('Any agent publishes,<br>your whole team uses it.')
     expect(markup).toContain('After you sign in, the page you were on opens.')
-    expect(markup).toContain('data-error-not-admitted="This email can&#39;t sign in to Open Artifact.')
+    expect(markup).toContain('data-error-not-admitted="This email can&#39;t sign up yet. Ask an admin to invite you."')
     expect(markup).toContain('Send code')
     expect(markup).not.toMatch(anyChinese)
   })

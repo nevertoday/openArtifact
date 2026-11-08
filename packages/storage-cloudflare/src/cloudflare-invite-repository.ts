@@ -1,7 +1,8 @@
 import type { Invite, InviteRepository, NewInvite } from '@open-artifact/core'
 
 // The one definition of a pending invite; every read below goes through it.
-const PENDING = 'invites.revoked_at IS NULL AND invites.accepted_at IS NULL AND invites.expires_at > ?'
+const PENDING = `invites.revoked_at IS NULL AND invites.accepted_at IS NULL AND (invites.expires_at IS NULL OR invites.expires_at > ?)
+  AND invites.workspace_id IN (SELECT id FROM workspaces WHERE deleted_at IS NULL)`
 
 interface InviteRow {
   id: string
@@ -10,7 +11,7 @@ interface InviteRow {
   code: string
   invited_by: string
   created_at: number
-  expires_at: number
+  expires_at: number | null
 }
 
 export class CloudflareInviteRepository implements InviteRepository {

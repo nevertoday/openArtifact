@@ -7,6 +7,8 @@ import type { ApiContext } from './api-context.ts'
 import { JsonBody } from './json-body.ts'
 
 export const INVITE_LIFETIME_DAYS = 7
+/** What an admin may choose for a link; null never expires, for a link pinned in a team's chat or onboarding doc. */
+export const LINK_LIFETIME_DAYS = [7, 30, null] as const
 const DAY = 24 * 60 * 60 * 1000
 const MAX_EMAILS_PER_REQUEST = 50
 
@@ -24,10 +26,11 @@ export class InviteApi {
     return Response.json({ invites: await this.#invitesJson(invites) })
   }
 
-  /** A reusable link anyone may open to join, until it expires or is revoked. */
-  async createLink(): Promise<Response> {
+  /** A reusable link anyone may open to join, until it expires, if it does, or is revoked. */
+  async createLink(request: Request): Promise<Response> {
     const admin = await this.#context.requireWorkspaceAdmin('invite people')
-    const invite = await this.#issue(admin, null)
+    const lifetimeDays = InviteApi.#linkLifetimeOf(request.headers.get('Content-Type')?.includes('json') ? await JsonBody.of(request) : null)
+    const invite = await this.#issue(admin, null, lifetimeDays)
     const [inviteJson] = await this.#invitesJson([invite])
     return Response.json({ invite: inviteJson }, { status: 201 })
   }
@@ -41,7 +44,7 @@ export class InviteApi {
     const alreadyMembers = requestedEmails.filter(email => memberEmails.has(email))
     const newEmails = requestedEmails.filter(email => !memberEmails.has(email))
     await this.#context.mailLimits.take('invite', { senderId: admin.userId, workspaceId: admin.membership.workspace.workspaceId }, newEmails.length, Date.now())
-    const invites = await Promise.all(newEmails.map(email => this.#issue(admin, email)))
+    const invites = await Promise.all(newEmails.map(email => this.#issue(admin, email, INVITE_LIFETIME_DAYS)))
     await this.#mail(admin, invites)
     return Response.json({ invites: await this.#invitesJson(invites), alreadyMembers }, { status: 201 })
   }
@@ -55,10 +58,12 @@ export class InviteApi {
     return new Response(null, { status: 204 })
   }
 
-  async #issue(admin: Identity, email: string | null): Promise<Invite> {
+  // `lifetimeDays` is null for a link that never expires.
+  async #issue(admin: Identity, email: string | null, lifetimeDays: number | null): Promise<Invite> {
     const now = Date.now()
     const workspaceId = admin.membership.workspace.workspaceId
-    const invite = await this.#context.repositories.invites.create({ workspaceId, email, code: InviteCode.generate(), invitedBy: admin.userId, createdAt: now, expiresAt: now + INVITE_LIFETIME_DAYS * DAY })
+    const expiresAt = lifetimeDays === null ? null : now + lifetimeDays * DAY
+    const invite = await this.#context.repositories.invites.create({ workspaceId, email, code: InviteCode.generate(), invitedBy: admin.userId, createdAt: now, expiresAt })
     await this.#context.repositories.auditLog.record({ workspaceId, actorId: admin.userId, action: 'member.invited', targetType: 'invite', targetId: invite.inviteId, detail: { email } })
     return invite
   }
@@ -93,6 +98,15 @@ export class InviteApi {
       createdAt: invite.createdAt,
       expiresAt: invite.expiresAt,
     }))
+  }
+
+  // A link without a body keeps the lifetime links always had.
+  static #linkLifetimeOf(requestBody: JsonBody | null): number | null {
+    if (requestBody === null || !requestBody.has('expiresInDays')) return INVITE_LIFETIME_DAYS
+    const expiresInDays = requestBody.raw('expiresInDays')
+    const offered = LINK_LIFETIME_DAYS.find(lifetime => lifetime === expiresInDays)
+    if (offered === undefined) throw HttpError.fieldInvalid('expiresInDays', `expiresInDays must be one of ${LINK_LIFETIME_DAYS.join(', ')}`)
+    return offered
   }
 
   static #addressOf(invite: Invite): string {

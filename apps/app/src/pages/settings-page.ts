@@ -154,7 +154,12 @@ ${isAdmin ? SettingsPage.#inviteSection(m) : ''}
     </div>
     <div class="xxd-cluster invite-form__actions">
       <button type="submit" class="xxd-btn" data-variant="primary">${invite.send}</button>
-      <button type="button" class="xxd-btn" id="create-invite-link">${PageShell.icon('Link', 14)}${invite.createLink}</button>
+      <span class="xxd-cluster invite-form__link">
+        <button type="button" class="xxd-btn" id="create-invite-link">${PageShell.icon('Link', 14)}${invite.createLink}</button>
+        <label class="xxd-select" data-size="sm"><span class="xxd-sr-only">${invite.linkExpiry}</span><select id="invite-link-expiry">
+          <option value="7">${invite.linkExpiries[7]}</option><option value="30">${invite.linkExpiries[30]}</option><option value="never">${invite.linkExpiries.never}</option>
+        </select></label>
+      </span>
     </div>
   </form>
   <div class="xxd-stack" id="pending-invites" aria-live="polite"></div>
@@ -192,7 +197,31 @@ ${administration ? SettingsPage.#workspaceNameForm(m, identity) : ''}
   </div>
 </section>
 ${administration ? SettingsPage.#contentSection(model.m, administration, identity, model.now) : ''}
-${administration ? SettingsPage.#auditSection(model.m, administration, model.now) : ''}`
+${administration ? SettingsPage.#auditSection(model.m, administration, model.now) : ''}
+${SettingsPage.#lifecycleSection(m, identity)}`
+  }
+
+  // Last on the page, since it ends the person's or everyone's access; a personal workspace only says why it has none.
+  static #lifecycleSection(m: Messages, identity: Identity): SafeHtml {
+    const { lifecycle } = m.settings.workspace
+    const workspace = identity.membership.workspace
+    if (workspace.personalOf === identity.userId) {
+      return html`<section class="xxd-group" aria-labelledby="lifecycle-title"><h2 class="xxd-group__title" id="lifecycle-title">${lifecycle.title}</h2><div class="xxd-group__body"><div class="xxd-row"><div class="xxd-row__text"><span class="xxd-row__desc">${lifecycle.personalNote}</span></div></div></div></section>`
+    }
+    const deleteRow = html`<div class="xxd-row">
+      <div class="xxd-row__text"><span class="xxd-row__title">${lifecycle.deleteLabel}</span><span class="xxd-row__desc">${lifecycle.deleteHelp}</span></div>
+      <div class="xxd-row__control"><button type="button" class="xxd-btn" data-variant="danger" data-size="sm" data-delete-workspace data-name="${workspace.name}">${PageShell.icon('Trash2', 14)}${lifecycle.delete}</button></div>
+    </div>`
+    return html`<section class="xxd-group" aria-labelledby="lifecycle-title">
+  <h2 class="xxd-group__title" id="lifecycle-title">${lifecycle.title}</h2>
+  <div class="xxd-group__body">
+    <div class="xxd-row">
+      <div class="xxd-row__text"><span class="xxd-row__title">${lifecycle.leaveLabel}</span><span class="xxd-row__desc">${lifecycle.leaveHelp}</span></div>
+      <div class="xxd-row__control"><button type="button" class="xxd-btn" data-variant="danger-outline" data-size="sm" data-leave-workspace data-name="${workspace.name}">${PageShell.icon('LogOut', 14)}${lifecycle.leave}</button></div>
+    </div>
+    ${identity.membership.role === 'admin' ? deleteRow : ''}
+  </div>
+</section>`
   }
 
   static #workspaceNameForm(m: Messages, identity: Identity): SafeHtml {
@@ -299,6 +328,10 @@ ${administration ? SettingsPage.#auditSection(model.m, administration, model.now
         return events[auditEvent.action]({ actor, viaLink: auditEvent.detail.via === 'link' })
       case 'workspace.renamed':
         return events[auditEvent.action]({ actor, from: auditEvent.detail.from, to: auditEvent.detail.to })
+      case 'member.left':
+      case 'workspace.deleted':
+      case 'workspace.restored':
+        return events[auditEvent.action]({ actor })
     }
   }
 }

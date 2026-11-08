@@ -49,7 +49,7 @@ function route(method: string, pathname: string, respond: ApiRoute['respond']): 
   return { method, pattern: new URLPattern({ pathname }), respond, changesCurrentWorkspace: false }
 }
 
-// Switching workspaces is left out: it names its target in the body, and a stale tab switching is harmless.
+// Switching, creating and restoring workspaces are left out: each names its target itself, or makes a new one.
 function workspaceWrite(method: string, pathname: string, respond: ApiRoute['respond']): ApiRoute {
   return { ...route(method, pathname, respond), changesCurrentWorkspace: true }
 }
@@ -69,8 +69,13 @@ const API_ROUTES: ApiRoute[] = [
   workspaceWrite('PATCH', '/api/workspace/members/:userId', (apis, request, params) => apis.workspace.changeRole(request, param(params, 'userId'))),
   workspaceWrite('DELETE', '/api/workspace/members/:userId', (apis, _request, params) => apis.workspace.removeMember(param(params, 'userId'))),
   workspaceWrite('PATCH', '/api/workspace', (apis, request) => apis.workspace.updateSettings(request)),
+  workspaceWrite('DELETE', '/api/workspace', (apis, request) => apis.workspace.deleteWorkspace(request)),
+  workspaceWrite('POST', '/api/workspace/leave', (apis, request) => apis.workspace.leave(request)),
+  route('POST', '/api/workspaces', (apis, request) => apis.workspace.create(request)),
+  route('GET', '/api/workspaces/deleted', apis => apis.workspace.listRestorable()),
+  route('POST', '/api/workspaces/:workspaceId/restore', (apis, request, params) => apis.workspace.restore(request, param(params, 'workspaceId'))),
   route('GET', '/api/workspace/invites', apis => apis.invites.list()),
-  workspaceWrite('POST', '/api/workspace/invites/link', apis => apis.invites.createLink()),
+  workspaceWrite('POST', '/api/workspace/invites/link', (apis, request) => apis.invites.createLink(request)),
   workspaceWrite('POST', '/api/workspace/invites/email', (apis, request) => apis.invites.inviteByEmail(request)),
   workspaceWrite('DELETE', '/api/workspace/invites/:inviteId', (apis, _request, params) => apis.invites.revoke(param(params, 'inviteId'))),
   route('GET', '/api/tokens', apis => apis.tokens.list()),

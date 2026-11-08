@@ -8,6 +8,7 @@ Any AI agent publishes HTML pages ("artifacts"); the whole team opens, comments 
 - **Comment on the page itself.** Pin a comment to a spot or a selected passage, and hand open comments to an agent with one copy. Each comment has its own link that opens the page at it.
 - **Versions, sharing and public links.** Private, named people, the whole workspace, or a public link with an expiry and an optional password.
 - **A personal page.** Authors list public artifacts at `/@name`, with share cards and search-engine indexing for those pages only.
+- **Workspaces.** Everyone gets a personal workspace; create more, invite people, and belong to several. See [Workspaces](#workspaces).
 
 The interface speaks Chinese and English; see [Languages](#languages).
 
@@ -23,9 +24,20 @@ pnpm dev:setup   # writes .dev.vars with local secrets, applies the D1 migration
 pnpm dev         # usercontent :8789, app :8787, MCP :8788
 ```
 
-Open http://localhost:8787 and sign in with an `@example.com` address (local setup allows that domain; change `ALLOWED_EMAIL_DOMAINS` in `apps/app/.dev.vars`). Locally the sign-in code is printed in the terminal running `pnpm dev` (look for `[mail]`). The first person to sign in becomes the admin of the workspace; everyone after joins it as a member.
+Open http://localhost:8787 and sign in with an `@example.com` address (local setup allows that domain; change `ALLOWED_EMAIL_DOMAINS` in `apps/app/.dev.vars`). Locally the sign-in code is printed in the terminal running `pnpm dev` (look for `[mail]`). Everyone who signs in gets a personal workspace and is its admin; invite others from 设置 › 成员, or create a shared workspace from the workspace menu at the top left of the home page.
 
 Stop the servers with Ctrl-C. If a port is still taken afterwards, `pkill -f workerd`.
+
+## Workspaces
+
+Artifacts live in workspaces. A workspace can hold one person or many, and a person can belong to several and switch between them from the workspace menu. Sharing, tokens and the admin log all work per workspace; an agent's token publishes into the workspace it was created in.
+
+- **Personal workspace.** Created at a person's first sign-in, named after them, with them as admin. It can be renamed and others invited in, but it cannot be left or deleted, so everyone always has somewhere to land.
+- **Joining.** People join a workspace only through an invite: an email invite (valid 7 days) or an invite link that lasts 7 days, 30 days or never. Someone who signs up through an invite gets their personal workspace and the invited one, and lands in the invited one. There is no automatic joining by email domain.
+- **Leaving and deleting.** Members and all but the last admin can leave; any later invite brings them back. Someone an admin removed comes back only through an email invite addressed to them. Admins can delete a workspace: every member, page, public link and token loses access at once (tokens answer `workspace_deleted`), admins can restore it for 30 days from 最近删除 in the workspace menu, and the daily job then deletes it with its artifacts and files.
+- **分享给我的** lists every artifact shared with a person one by one, from any workspace, labeled with the workspace it comes from.
+
+**Upgrading a self-hosted deployment.** Earlier versions put every new account into the deployment's first workspace. That no longer happens: new colleagues land in their personal workspace. After upgrading, have an admin create a never-expiring invite link under 设置 › 成员 and post it where colleagues find it, such as the team chat or onboarding doc. Existing members keep their workspace and get a personal one on their next visit.
 
 ## Connect an agent
 
@@ -59,7 +71,7 @@ pnpm run check   # storage boundary, type checks, all tests (Workers runtime, lo
 | Variable | Worker | Purpose |
 |---|---|---|
 | `BETTER_AUTH_SECRET` | app | Session signing |
-| `ALLOWED_EMAIL_DOMAINS` | app | Comma-separated domains whose people may create an account, or `*` to let any address sign up and join the workspace. Unset: only the first person (the founder) can sign up |
+| `ALLOWED_EMAIL_DOMAINS` | app | Who may create an account: `*` for any address, or comma-separated domains such as `example.com, example.cn`. Unset: only the first person (the founder). People with an invite may always sign up. Every new account gets a personal workspace; it joins other workspaces only through invites. When deploying from GitHub, set the repository variable of the same name (see [docs/deploy.md](docs/deploy.md#deploy-from-github)) |
 | `MAILER` | app | `console` prints mail to the log for local development. `cloudflare` sends through Cloudflare Email Service with the `EMAIL` binding. Unset: sign-in mail fails loudly instead of leaking codes into logs. Any other value, or `cloudflare` without `EMAIL` or `MAIL_FROM`, fails every request with a configuration error |
 | `MAIL_FROM` | app | Sender for `MAILER=cloudflare`, such as `Open Artifact <noreply@example.com>` or `noreply@example.com`. Its domain must be onboarded and verified in Cloudflare Email Service. Sending to any recipient needs the Workers Paid plan, and the service is in public beta |
 | `USERCONTENT_SIGNING_KEY` | app, usercontent | Must be the same in both; signs artifact file URLs |

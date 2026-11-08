@@ -87,7 +87,7 @@ cd ../mcp && npx wrangler deploy
 
 ## 7. 第一次登录
 
-打开 app 的地址并登录。第一个人成为 workspace 管理员；`ALLOWED_EMAIL_DOMAINS` 里的域名的人作为成员加入，管理员也可以在 设置 里用邮件邀请别人。
+打开 app 的地址并登录。每个登录的人都有一个个人工作区。要一起协作，在首页左上角的工作区菜单里新建工作区，再到 设置 › 成员 里用邮件或邀请链接邀请别人；永不过期的邀请链接适合贴在团队群或入职文档里。
 
 检查是否全部通了：
 
@@ -99,12 +99,15 @@ cd ../mcp && npx wrangler deploy
 `.github/workflows/deploy.yml` 会跑检查、执行数据库迁移、部署三个 Worker。它只在你点 **Actions › Deploy › Run workflow** 时运行，不会自动触发。只需要设置一次：在 **Settings › Environments** 里建一个名为 `production` 的环境，填入：
 
 - Secret `CLOUDFLARE_API_TOKEN`：你账户的 API token，需要 Workers Scripts、Workers Routes、D1 和 Workers Custom Domains 的编辑权限；
-- 变量 `CLOUDFLARE_ACCOUNT_ID`、`D1_DATABASE_ID`、`APP_HOST`、`APP_ZONE`、`USERCONTENT_HOST`，需要发登录邮件时再加 `MAIL_FROM`。
+- 变量 `CLOUDFLARE_ACCOUNT_ID`、`D1_DATABASE_ID`、`APP_HOST`、`APP_ZONE`、`USERCONTENT_HOST`，需要发登录邮件时再加 `MAIL_FROM`；
+- 可选的变量 `ALLOWED_EMAIL_DOMAINS`（仓库或环境变量都行），例如 `*` 表示任何人都能注册。设置后，部署会把它写进 app 的配置；不设置时 app 保持原样。如果你在第 3 步把它设成了 Worker 密钥，第一次带这个变量部署前，先在 `apps/app` 里运行 `npx wrangler secret delete ALLOWED_EMAIL_DOMAINS`，因为变量和密钥不能同名。
 
 在自己电脑上部署用同样两条命令：设好这些变量后运行 `pnpm deploy:config`，生成不进 git 的 `wrangler.production.jsonc`；再运行 `pnpm deploy:production`，执行迁移并部署。第 3 步设置的 Worker 密钥只需设置一次，之后每次部署都会保留。
 
 ## 运营
 
-- **谁能注册。** `ALLOWED_EMAIL_DOMAINS` 只放你自己的域名；设为 `*` 时，互联网上任何人都能加入 workspace，看到团队在里面共享的内容。管理员可以为整个 workspace 关闭公开链接，也可以下架任何 artifact。
+- **谁能注册。** `ALLOWED_EMAIL_DOMAINS` 决定谁能建账号；没有邀请，谁都进不了别人的工作区，所以设为 `*` 只是开放注册，不会让外人看到团队的工作区。管理员可以为自己的工作区关闭公开链接，也可以下架其中任何 artifact。
+- **从没有个人工作区的版本升级。** 新账号不再自动加入第一个工作区。升级后，在 设置 › 成员 里生成一个永不过期的邀请链接发给同事。已有成员保留原来的工作区，下次访问时会多一个个人工作区。
 - **公开链接上是别人发布的内容。** 作为运营者，你要对自己域名上提供的内容负责。遇到滥用，在 artifact 页面上下架；被删除的 artifact 30 天后由每日任务彻底清除（`apps/app/wrangler.jsonc` 里的 `triggers.crons`）。
 - **升级。** 拉取代码，执行 `pnpm install`，执行数据库迁移（第 5 步），再重新部署三个 Worker（第 6 步）。
+- **回滚。** 一旦有人离开或删除过工作区，就不要把 Worker 回滚到迁移 `0017_personal_workspaces.sql` 之前的版本：旧代码不认识 `left_at` 和 `deleted_at`，离开的人和删除的工作区会重新获得访问权，新账号也会重新加入第一个工作区。出了问题请修复后重新发布，不要回滚。

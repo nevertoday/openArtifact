@@ -20,7 +20,7 @@ export default /** @satisfies {import('../messages').Messages['login']} */ ({
   emailLabel: 'Email',
   errorRequired: 'Enter your email',
   errorInvalid: 'Enter a valid email, like name@example.com',
-  errorNotAdmitted: 'This email can\'t sign in to Open Artifact. Use your work email, or ask an admin to invite you.',
+  errorNotAdmitted: "This email can't sign up yet. Ask an admin to invite you.",
   sendCode: 'Send code',
   invitation: {
     title: ({ inviter, workspace }) => `${inviter} invited you to join ${workspace}`,

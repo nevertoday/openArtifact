@@ -23,10 +23,13 @@ async function addUser(name: string): Promise<string> {
   return userId
 }
 
-async function joinedFirstWorkspace(userId: string, newWorkspaceName = 'Design team') {
-  const membership = await workspaceRepository.joinFirstWorkspace(userId, newWorkspaceName)
-  if (!membership) throw new Error(`${userId} was not let into a workspace`)
-  return membership
+// The team a test works in: the first person to join a name creates the workspace as its admin, later people join it.
+async function joinedTeam(userId: string, teamName = 'Design team') {
+  const teamId = await env.DB.prepare('SELECT id FROM workspaces WHERE name = ? AND personal_of IS NULL AND deleted_at IS NULL ORDER BY created_at LIMIT 1').bind(teamName).first<string>('id')
+  if (teamId === null) return workspaceRepository.create(teamName, userId, Date.now())
+  const joinResult = await workspaceRepository.join(teamId, userId, Date.now(), { readmitsRemoved: false })
+  if (joinResult.status === 'removed') throw new Error(`${userId} was not let into ${teamName}`)
+  return joinResult.membership
 }
 
 async function createArtifactIn(workspaceId: string, authorId: string) {
@@ -48,43 +51,96 @@ async function createArtifactIn(workspaceId: string, authorId: string) {
 }
 
 describe('CloudflareWorkspaceRepository', () => {
-  it('makes the first person the admin of a new workspace and adds later people as members', async () => {
+  it('makes the creator of a workspace its admin and adds people who join as members', async () => {
     const founderId = await addUser('Lin')
     const colleagueId = await addUser('Zhou')
 
-    const founderMembership = await joinedFirstWorkspace(founderId, 'Design team')
-    const colleagueMembership = await joinedFirstWorkspace(colleagueId, 'Ignored name')
+    const founderMembership = await workspaceRepository.create('Founders', founderId, Date.now())
+    const colleagueJoin = await workspaceRepository.join(founderMembership.workspace.workspaceId, colleagueId, Date.now(), { readmitsRemoved: false })
     const members = await workspaceRepository.listMembers(founderMembership.workspace.workspaceId)
 
-    expect(founderMembership).toMatchObject({ role: 'admin', workspace: { name: 'Design team', publicLinksEnabled: true } })
-    expect(colleagueMembership).toMatchObject({ role: 'member', workspace: { workspaceId: founderMembership.workspace.workspaceId } })
+    expect(founderMembership).toMatchObject({ role: 'admin', workspace: { name: 'Founders', publicLinksEnabled: true, personalOf: null } })
+    expect(colleagueJoin).toMatchObject({ status: 'joined', membership: { role: 'member', workspace: { workspaceId: founderMembership.workspace.workspaceId } } })
     expect(members.map(member => [member.name, member.role])).toEqual([
       ['Lin', 'admin'],
       ['Zhou', 'member'],
     ])
   })
 
-  it('keeps a removed member out, even when they would join again', async () => {
+  it('keeps a removed member out unless the join readmits them, and lets a person who left back through any join', async () => {
     const adminId = await addUser('Lin')
-    const leaverId = await addUser('Wang')
-    const { workspace } = await joinedFirstWorkspace(adminId)
-    await joinedFirstWorkspace(leaverId)
+    const removedId = await addUser('Wang')
+    const leaverId = await addUser('Sun')
+    const { workspace } = await workspaceRepository.create('Leavers', adminId, Date.now())
+    await workspaceRepository.join(workspace.workspaceId, removedId, Date.now(), { readmitsRemoved: false })
+    await workspaceRepository.join(workspace.workspaceId, leaverId, Date.now(), { readmitsRemoved: false })
 
-    const removal = await workspaceRepository.removeMember(workspace.workspaceId, leaverId, Date.now())
-    const rejoin = await workspaceRepository.joinFirstWorkspace(leaverId, 'Design team')
-    const secondRemoval = await workspaceRepository.removeMember(workspace.workspaceId, leaverId, Date.now())
+    const removal = await workspaceRepository.removeMember(workspace.workspaceId, removedId, Date.now())
+    const leaving = await workspaceRepository.leave(workspace.workspaceId, leaverId, Date.now())
+    const removedRejoin = await workspaceRepository.join(workspace.workspaceId, removedId, Date.now(), { readmitsRemoved: false })
+    const leaverRejoin = await workspaceRepository.join(workspace.workspaceId, leaverId, Date.now(), { readmitsRemoved: false })
+    const secondRemoval = await workspaceRepository.removeMember(workspace.workspaceId, removedId, Date.now())
+    const readmission = await workspaceRepository.join(workspace.workspaceId, removedId, Date.now(), { readmitsRemoved: true })
 
-    expect(removal).toBe('changed')
-    expect(rejoin).toBeNull()
-    expect(await workspaceRepository.membershipsOf(leaverId)).toEqual([])
+    expect([removal, leaving]).toEqual(['changed', 'changed'])
+    expect(removedRejoin).toEqual({ status: 'removed' })
+    expect(leaverRejoin).toMatchObject({ status: 'joined', membership: { role: 'member' } })
     expect(secondRemoval).toBe('not_member')
+    expect(readmission).toMatchObject({ status: 'joined', membership: { role: 'member' } })
+  })
+
+  it('creates one personal workspace however many requests ask at once, and lists it first', async () => {
+    const ownerId = await addUser('Gao')
+    await workspaceRepository.create('Earlier team', ownerId, Date.now() - 1000)
+
+    const personalMemberships = await Promise.all(Array.from({ length: 6 }, () => workspaceRepository.ensurePersonal(ownerId, 'Gao 的工作区', Date.now())))
+    const memberships = await workspaceRepository.membershipsOf(ownerId)
+
+    expect(new Set(personalMemberships.map(membership => membership.workspace.workspaceId)).size).toBe(1)
+    expect(memberships.map(membership => [membership.workspace.name, membership.workspace.personalOf, membership.role])).toEqual([
+      ['Gao 的工作区', ownerId, 'admin'],
+      ['Earlier team', null, 'admin'],
+    ])
+  })
+
+  it('keeps a person admin of their personal workspace: they cannot leave, be removed, be demoted, or delete it', async () => {
+    const ownerId = await addUser('He')
+    const guestId = await addUser('Xu')
+    const { workspace } = await workspaceRepository.ensurePersonal(ownerId, 'He 的工作区', Date.now())
+    await workspaceRepository.join(workspace.workspaceId, guestId, Date.now(), { readmitsRemoved: false })
+    await workspaceRepository.changeRole(workspace.workspaceId, guestId, 'admin')
+
+    expect(await workspaceRepository.leave(workspace.workspaceId, ownerId, Date.now())).toBe('personal_workspace')
+    expect(await workspaceRepository.removeMember(workspace.workspaceId, ownerId, Date.now())).toBe('personal_workspace')
+    expect(await workspaceRepository.changeRole(workspace.workspaceId, ownerId, 'member')).toBe('personal_workspace')
+    expect(await workspaceRepository.delete(workspace.workspaceId, Date.now())).toBe(false)
+    expect(await workspaceRepository.leave(workspace.workspaceId, guestId, Date.now())).toBe('changed')
+  })
+
+  it('hides a deleted workspace from everyone until an admin restores it within the window', async () => {
+    const adminId = await addUser('Ma')
+    const memberId = await addUser('Lu')
+    const { workspace } = await workspaceRepository.create('Short lived', adminId, Date.now())
+    await workspaceRepository.join(workspace.workspaceId, memberId, Date.now(), { readmitsRemoved: false })
+    const deletedAt = Date.now()
+
+    expect(await workspaceRepository.delete(workspace.workspaceId, deletedAt)).toBe(true)
+    expect(await workspaceRepository.findWorkspace(workspace.workspaceId)).toBeNull()
+    expect((await workspaceRepository.membershipsOf(memberId)).map(membership => membership.workspace.workspaceId)).not.toContain(workspace.workspaceId)
+    expect(await workspaceRepository.listRestorable(adminId, deletedAt - 1)).toEqual([{ workspace: { ...workspace }, deletedAt }])
+    expect(await workspaceRepository.listRestorable(memberId, deletedAt - 1)).toEqual([])
+    expect(await workspaceRepository.restore(workspace.workspaceId, memberId, deletedAt - 1)).toBe(false)
+    expect(await workspaceRepository.restore(workspace.workspaceId, adminId, deletedAt)).toBe(false)
+
+    expect(await workspaceRepository.restore(workspace.workspaceId, adminId, deletedAt - 1)).toBe(true)
+    expect(await workspaceRepository.findWorkspace(workspace.workspaceId)).toMatchObject({ name: 'Short lived' })
   })
 
   it('lets only one of two admins step down when both try at once', async () => {
     const firstAdminId = await addUser('Lin')
     const secondAdminId = await addUser('Qian')
-    const { workspace } = await joinedFirstWorkspace(firstAdminId)
-    await joinedFirstWorkspace(secondAdminId)
+    const { workspace } = await joinedTeam(firstAdminId)
+    await joinedTeam(secondAdminId)
     await workspaceRepository.changeRole(workspace.workspaceId, secondAdminId, 'admin')
 
     const outcomes = await Promise.all([
@@ -99,11 +155,11 @@ describe('CloudflareWorkspaceRepository', () => {
 
   it('switches public links off for a whole workspace', async () => {
     const adminId = await addUser('Lin')
-    const { workspace } = await joinedFirstWorkspace(adminId)
+    const { workspace } = await joinedTeam(adminId)
 
     await workspaceRepository.setPublicLinksEnabled(workspace.workspaceId, false)
 
-    const [membership] = await workspaceRepository.membershipsOf(adminId)
+    const membership = (await workspaceRepository.membershipsOf(adminId)).find(candidate => candidate.workspace.workspaceId === workspace.workspaceId)
     expect(membership?.workspace.publicLinksEnabled).toBe(false)
     expect(await workspaceRepository.findWorkspace(workspace.workspaceId)).toMatchObject({ name: 'Design team', publicLinksEnabled: false })
     expect(await workspaceRepository.findWorkspace('workspace-unknown')).toBeNull()
@@ -134,7 +190,7 @@ describe('artifact access, comments and shared data', () => {
   beforeAll(async () => {
     authorId = await addUser('Lin')
     reviewerId = await addUser('Chen')
-    workspaceId = (await joinedFirstWorkspace(authorId)).workspace.workspaceId
+    workspaceId = (await joinedTeam(authorId)).workspace.workspaceId
   })
 
   it('stores sharing settings and grants', async () => {
@@ -254,7 +310,7 @@ describe('pending grants', () => {
   it('become grants for the account that signs up with the address, once, keeping a grant the person already has', async () => {
     const accessRepository = new CloudflareArtifactAccessRepository(env.DB)
     const authorId = await addUser('PendingAuthor')
-    const membership = await joinedFirstWorkspace(authorId)
+    const membership = await joinedTeam(authorId)
     const draft = await createArtifactIn(membership.workspace.workspaceId, authorId)
     const notes = await createArtifactIn(membership.workspace.workspaceId, authorId)
     const sharing = { visibility: 'specified' as const, publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false, listed: false }
@@ -288,7 +344,7 @@ describe('CloudflareProfileRepository', () => {
 
   it('changes the bio and the pinned artifact separately', async () => {
     const authorId = await addUser('Pinner')
-    const workspaceId = (await joinedFirstWorkspace(authorId)).workspace.workspaceId
+    const workspaceId = (await joinedTeam(authorId)).workspace.workspaceId
     const { artifactId } = await createArtifactIn(workspaceId, authorId)
     await profileRepository.claim(authorId, ['pinner'])
 
@@ -307,7 +363,7 @@ describe('listing on a personal page', () => {
   it('lists the author’s listed, active artifacts with the summary they wrote or the page’s opening words', async () => {
     const accessRepository = new CloudflareArtifactAccessRepository(env.DB)
     const authorId = await addUser('Lister')
-    const workspaceId = (await joinedFirstWorkspace(authorId)).workspace.workspaceId
+    const workspaceId = (await joinedTeam(authorId)).workspace.workspaceId
     const publicSharing = { visibility: 'public_link', publicLinkExpiresAt: null, publicLinkPasswordHash: null, anonymousWriteEnabled: false, publicLinkShowsComments: false } as const
     const withOpening = await artifactRepository.create({ workspaceId, authorId, title: 'Opening', slug: 'opening', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: '页面开头的话', listed: true, summary: null, shareText: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
     const withSummary = await artifactRepository.create({ workspaceId, authorId, title: 'Summarized', slug: 'summarized', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: '页面开头的话', listed: true, summary: '作者写的摘要', shareText: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })

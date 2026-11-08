@@ -116,12 +116,17 @@ export interface ArtifactRepository extends ArtifactFileSource {
   publishOnTopOf(artifactId: string, baseVersion: number, publication: Publication): Promise<PublishResult>
   readCurrentVersion(artifactId: string): Promise<ArtifactVersionContent | null>
   readVersion(artifactId: string, version: number): Promise<ArtifactVersionContent | null>
-  /** Finds removed artifacts too; access rules decide who may still act on them. */
+  /**
+   * Finds removed artifacts too; access rules decide who may still act on them. Every read leaves out the artifacts
+   * of a deleted workspace, files included.
+   */
   findSummary(artifactId: string): Promise<ArtifactSummary | null>
   /** Like findSummary, by the short id in the artifact's address. */
   findSummaryByShortId(shortId: string): Promise<ArtifactSummary | null>
   /** Every artifact of the workspace, removed ones included, most recently updated first. */
   listRecentlyUpdated(workspaceId: string): Promise<ArtifactSummary[]>
+  /** The active artifacts granted to the user one by one, in every workspace, most recently updated first. */
+  listGrantedTo(userId: string): Promise<ArtifactSummary[]>
   /** The author's active artifacts they put on their personal page, in every workspace, most recently updated first. */
   listListedBy(authorId: string): Promise<ArtifactSummary[]>
   /** null goes back to the page's opening words. */
@@ -136,8 +141,9 @@ export interface ArtifactRepository extends ArtifactFileSource {
   /** Returns false when the artifact is missing or not removed. */
   restore(artifactId: string): Promise<boolean>
   /**
-   * Deletes the artifacts removed at or before `cutoff` with their versions, files, comments, grants and
-   * shared data. Safe to run again after a crash part way through.
+   * Deletes the artifacts removed at or before `cutoff`, and every artifact of a workspace deleted at or before it,
+   * with their versions, files, comments, grants and shared data. Safe to run again after a crash part way through.
+   * Purges at most `limit` artifacts; the next call takes the rest.
    */
-  purgeRemovedBefore(cutoff: number): Promise<void>
+  purgeRemovedBefore(cutoff: number, limit: number): Promise<void>
 }

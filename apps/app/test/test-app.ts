@@ -88,6 +88,7 @@ export class TestApp {
   readonly cardRenderer = new RecordingCardRenderer()
   readonly repositories = cloudflareRepositories(env.DB, env.FILES)
   readonly routes: AppRoutes
+  #teamWorkspaceId: string | null = null
 
   /**
    * Tests sign the same people in many times a minute, so sign-in codes are limited loosely unless
@@ -157,10 +158,36 @@ export class TestApp {
   }
 
   /**
+   * Signs `email` in as a colleague on the team most tests work in, and returns their browser's cookies with the team
+   * chosen. The first person signed in this way creates the team as its admin, named "My team" when their browser asks
+   * for English and "我的团队" otherwise; everyone after joins it as a
+   * member, as an invite would add them. A person an admin removed is kept out and stays in their personal workspace.
+   */
+  async signIn(email: string, headers?: Record<string, string>): Promise<string> {
+    const sessionCookie = await this.signInAlone(email, undefined, headers)
+    const me = await this.json<{ user: { userId: string } }>('/api/me', { cookie: sessionCookie })
+    const userId = me.body.user.userId
+    if (this.#teamWorkspaceId === null) {
+      const teamName = headers?.['Accept-Language']?.startsWith('en') ? 'My team' : '我的团队'
+      this.#teamWorkspaceId = (await this.repositories.workspaces.create(teamName, userId, Date.now())).workspace.workspaceId
+    } else {
+      const joinResult = await this.repositories.workspaces.join(this.#teamWorkspaceId, userId, Date.now(), { readmitsRemoved: false })
+      if (joinResult.status === 'removed') return sessionCookie
+    }
+    return `${sessionCookie}; oa_workspace=${this.#teamWorkspaceId}`
+  }
+
+  /** The workspace of the team `signIn` puts people on; set once the first person signed in. */
+  get teamWorkspaceId(): string {
+    if (this.#teamWorkspaceId === null) throw new Error('nobody has signed in to the team yet')
+    return this.#teamWorkspaceId
+  }
+
+  /**
    * Signs in with the mailed code, exactly as a person does, and returns the session cookie.
    * `browserCookie` is what the browser already holds, such as the cookie an invite link set.
    */
-  async signIn(email: string, browserCookie?: string, headers?: Record<string, string>): Promise<string> {
+  async signInAlone(email: string, browserCookie?: string, headers?: Record<string, string>): Promise<string> {
     const browser = { ...(browserCookie ? { cookie: browserCookie } : {}), ...(headers ? { headers } : {}) }
     const sendResponse = await this.sendCode(email, browser)
     if (!sendResponse.ok) throw new Error(`asking for a sign-in code failed: ${sendResponse.status} ${await sendResponse.text()}`)

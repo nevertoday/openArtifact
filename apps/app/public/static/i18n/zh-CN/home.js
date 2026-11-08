@@ -9,9 +9,9 @@ export default {
     waiting_for_my_agent: '等我的 agent 处理',
   },
   filterDescriptions: {
-    all: '团队成员和他们的 agent 发布的 artifact，默认 workspace 内可见。',
+    all: '团队成员和他们的 agent 发布的 artifact，默认工作区内可见。',
     mine: '你发布的，和你的 agent 代你发布的。',
-    shared: '作者把你加进分享名单的 artifact。',
+    shared: '作者把你加进分享名单的 artifact，不论它在哪个工作区。',
     removed: '删除后所有人都看不到。30 天内可以恢复，之后彻底删除。',
     waiting_for_me: '有评论在等你回复。',
     waiting_for_my_agent: '有给 agent 的评论还没解决，等你的 agent 处理。',
@@ -51,6 +51,8 @@ export default {
     /** @param {number} count */
     countTitle: count => `${count} 个 artifact`,
   },
+  /** @param {string} workspace */
+  fromWorkspace: workspace => `来自工作区「${workspace}」`,
   /** @param {{ count: number, forAgent: number }} p */
   unresolvedComments: ({ count, forAgent }) => `${count} 条未解决评论${forAgent > 0 ? ` · 其中 ${forAgent} 条给 agent` : ''}`,
   empty: {
@@ -62,6 +64,7 @@ export default {
     agentTitle: agent => `没有来自 ${agent} 的 artifact`,
     viewAll: '查看全部',
     connectAgent: '连接 agent',
+    inviteMembers: '邀请成员',
     filters: {
       all: { title: '还没有 artifact', text: '在「Agent 接入」里连接你的 agent，然后让它把设计文档、报告或看板发布到这里。' },
       mine: { title: '你还没有发布 artifact', text: '连接你的 agent，让它把页面发布到这里。' },

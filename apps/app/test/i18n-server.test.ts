@@ -8,7 +8,7 @@ let linCookie = ''
 let zhouCookie = ''
 
 beforeAll(async () => {
-  linCookie = await app.signIn('lin@example.com', undefined, ENGLISH)
+  linCookie = await app.signIn('lin@example.com', ENGLISH)
   await app.request('/locale', { method: 'POST', form: { locale: 'en' }, cookie: linCookie })
   zhouCookie = await app.signIn('zhou@example.com')
 })
@@ -20,10 +20,10 @@ async function comment(cookie: string, artifactId: string, body: Record<string, 
 }
 
 describe('server text in the reader’s language', () => {
-  it('names the first workspace in the language of the browser that signed up', async () => {
-    const me = await app.json<{ workspace: { name: string } }>('/api/me', { cookie: linCookie })
+  it('names the personal workspace in the language of the browser that signed up', async () => {
+    const me = await app.json<{ user: { userId: string }; workspaces: { name: string; personalOf: string | null }[] }>('/api/me', { cookie: linCookie })
 
-    expect(me.body.workspace.name).toBe('My team')
+    expect(me.body.workspaces.find(workspace => workspace.personalOf === me.body.user.userId)?.name).toBe("lin's workspace")
   })
 
   it('mails a person who chose English in English, and a Chinese reader in Chinese', async () => {

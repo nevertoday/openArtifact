@@ -1,5 +1,5 @@
 import type { Messages } from '../i18n/messages.ts'
-import { ArtifactPath, type CommentThread } from '@open-artifact/core'
+import { ArtifactPath, type CommentThread, type DeletedWorkspace } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
@@ -19,22 +19,23 @@ export interface HomeQuery {
 
 /**
  * The artifacts the home page shows for one query, and the counts its side navigation needs. 最近删除 holds the
- * removed artifacts the person may restore; every other filter holds only the ones they can view.
+ * removed artifacts the person may restore; 与我共享 follows the person, holding what was granted to them in any
+ * workspace; every other filter holds the current workspace's artifacts they can view.
  */
 export class HomeListing {
   readonly #visibleArtifacts: OpenedArtifact[]
   readonly #restorableArtifacts: OpenedArtifact[]
   readonly #identity: Identity
   readonly #openThreadsByArtifact: Map<string, CommentThread[]>
-  readonly #grantedArtifactIds: Set<string>
+  readonly #sharedArtifacts: OpenedArtifact[]
 
-  constructor(workspaceArtifacts: OpenedArtifact[], identity: Identity, openThreads: CommentThread[], grantedArtifactIds: Set<string>) {
+  constructor(workspaceArtifacts: OpenedArtifact[], identity: Identity, openThreads: CommentThread[], sharedArtifacts: OpenedArtifact[]) {
     this.#visibleArtifacts = workspaceArtifacts.filter(openedArtifact => openedArtifact.permissions.canView)
     this.#restorableArtifacts = workspaceArtifacts.filter(openedArtifact => openedArtifact.permissions.canRestore)
     this.#identity = identity
     this.#openThreadsByArtifact = new Map()
     for (const thread of openThreads) this.#openThreadsByArtifact.set(thread.root.artifactId, [...this.#openThreadsOf(thread.root.artifactId), thread])
-    this.#grantedArtifactIds = grantedArtifactIds
+    this.#sharedArtifacts = sharedArtifacts
   }
 
   unresolvedCount(artifactId: string): number {
@@ -56,7 +57,7 @@ export class HomeListing {
 
   /** Everyone named on the page: authors, and who removed what. */
   peopleIds(): (string | null)[] {
-    return [...this.#visibleArtifacts, ...this.#restorableArtifacts].flatMap(({ summary }) => [summary.authorId, summary.removal?.removedBy ?? null])
+    return [...this.#visibleArtifacts, ...this.#restorableArtifacts, ...this.#sharedArtifacts].flatMap(({ summary }) => [summary.authorId, summary.removal?.removedBy ?? null])
   }
 
   agentCounts(): { agent: string; count: number }[] {
@@ -92,8 +93,21 @@ export class HomeListing {
     })
   }
 
+  /** The workspaces of shared artifacts outside the current one, whose cards name where they come from. */
+  otherWorkspaceIds(): string[] {
+    const currentWorkspaceId = this.#identity.membership.workspace.workspaceId
+    return [...new Set(this.#sharedArtifacts.map(({ summary }) => summary.workspaceId))].filter(workspaceId => workspaceId !== currentWorkspaceId)
+  }
+
   #artifactsFor(filter: HomeFilter): OpenedArtifact[] {
-    return filter === 'removed' ? this.#restorableArtifacts : this.#visibleArtifacts
+    switch (filter) {
+      case 'removed':
+        return this.#restorableArtifacts
+      case 'shared':
+        return this.#sharedArtifacts
+      default:
+        return this.#visibleArtifacts
+    }
   }
 
   #matchesFilter(openedArtifact: OpenedArtifact, filter: HomeFilter): boolean {
@@ -103,7 +117,7 @@ export class HomeListing {
       case 'mine':
         return openedArtifact.summary.authorId === this.#identity.userId
       case 'shared':
-        return this.#grantedArtifactIds.has(openedArtifact.summary.artifactId)
+        return true
       case 'waiting_for_me':
         return this.#openThreadsOf(openedArtifact.summary.artifactId).some(thread => thread.isWaitingFor(this.#identity.userId, openedArtifact.summary.authorId))
       case 'waiting_for_my_agent':
@@ -124,6 +138,10 @@ export interface HomeModel {
   listing: HomeListing
   query: HomeQuery
   authorNames: Map<string, string>
+  /** The deleted workspaces the person may restore as their admin. */
+  deletedWorkspaces: DeletedWorkspace[]
+  /** Names of the workspaces, other than the current one, that shared artifacts come from. */
+  workspaceNames: Map<string, string>
   /** Signed preview addresses of the cards that show a live thumbnail. */
   previewUrls: Map<string, string>
   /** Removed on the viewer page a moment ago; the page offers to undo it. */
@@ -145,13 +163,13 @@ interface EmptyState {
   icon: IconName
   title: string
   text: string
-  action: { label: string; href: string; primary: boolean } | null
+  actions: { label: string; href: string; primary: boolean }[]
 }
 
 export class HomePage {
   static render(model: HomeModel): Response {
     const shownArtifacts = model.listing.matching(model.m, model.query, model.authorNames)
-    const topBarMiddle = html`${PageShell.workspaceSwitcher(model.m, model.identity)}${HomePage.#searchBox(model.m, model.query)}<a class="xxd-btn app-topbar__action" data-variant="ghost" data-size="sm" href="/settings/agents">${PageShell.icon('Bot')}${model.m.home.connectAgents}</a>`
+    const topBarMiddle = html`${PageShell.workspaceSwitcher(model.m, model.identity, model.deletedWorkspaces, model.now)}${HomePage.#searchBox(model.m, model.query)}<a class="xxd-btn app-topbar__action" data-variant="ghost" data-size="sm" href="/settings/agents">${PageShell.icon('Bot')}${model.m.home.connectAgents}</a>`
     const main = model.query.filter === 'removed' ? HomePage.#removedSection(shownArtifacts, model) : HomePage.#artifactsSection(shownArtifacts, model)
     const body = html`${PageShell.topBar(model.m, model.identity, topBarMiddle)}${PageShell.withSidebar(HomePage.#sidebar(model), main)}
 ${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(model.justRemoved) })}`
@@ -167,7 +185,7 @@ ${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(mod
   <p class="xxd-page-header__desc">${HomePage.#description(model.m, model.query)}</p>
 </header>
 ${HomePage.#resultLine(model.m, shownArtifacts.length, model.query)}
-${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#emptyState(HomePage.#emptyStateOf(model.m, model.query))}`
+${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#emptyState(HomePage.#emptyStateOf(model.m, model.query, model.identity))}`
   }
 
   static #nameNudge(m: Messages, identity: Identity): SafeHtml {
@@ -201,7 +219,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
   <div class="xxd-page-header__row"><h1 class="xxd-page-header__title">${m.home.filters.removed}</h1></div>
   <p class="xxd-page-header__desc">${m.home.filterDescriptions.removed}</p>
 </header>`
-    if (removedArtifacts.length === 0) return html`${header}${HomePage.#emptyState({ icon: 'Trash2', ...m.home.empty.filters.removed, action: null })}`
+    if (removedArtifacts.length === 0) return html`${header}${HomePage.#emptyState({ icon: 'Trash2', ...m.home.empty.filters.removed, actions: [] })}`
     const row = ({ summary }: OpenedArtifact) => {
       const removal = summary.removal
       if (removal === null) throw new Error(`Artifact ${summary.artifactId} is listed as removed but has no removal`)
@@ -295,6 +313,8 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     // Visible to the workspace is the default, which the 全部 description states, so only a different reach gets a badge.
     const sharingBadge = summary.sharing.visibility === 'workspace' ? '' : html`<span class="xxd-badge">${ArtifactLabels.sharingBadge(model.m, summary.sharing, model.now)}</span>`
     const commentBadge = unresolvedCount > 0 ? html`<span class="xxd-badge" data-appearance="dot" data-tone="warning">${model.m.home.unresolvedComments({ count: unresolvedCount, forAgent: forAgentCount })}</span>` : ''
+    const otherWorkspace = model.workspaceNames.get(summary.workspaceId)
+    const workspaceBadge = otherWorkspace === undefined ? '' : html`<span class="xxd-badge" data-tone="action" title="${model.m.home.fromWorkspace(otherWorkspace)}">${PageShell.icon('Users', 14)}${otherWorkspace}</span>`
     return html`<a class="xxd-card artifact-card" href="${ArtifactPath.of(summary)}">
   <div class="xxd-card__media artifact-cover" aria-hidden="true">
     <span class="artifact-cover__title"></span><span class="artifact-cover__line"></span><span class="artifact-cover__line"></span>
@@ -304,7 +324,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
   <div class="xxd-card__body">
     <p class="xxd-card__title artifact-card__title" title="${summary.title}">${summary.title}</p>
     <p class="xxd-card__meta artifact-meta" title="${publishedBy} · ${ArtifactLabels.updatedAgo(model.m, summary.updatedAt, model.now)}${summary.version > 1 ? ` · v${summary.version}` : ''}"><span>${publishedBy}</span>${PageShell.relativeTime(model.m, summary.updatedAt, model.now)}${summary.version > 1 ? html`<span class="xxd-mono">v${summary.version}</span>` : ''}</p>
-    ${sharingBadge || commentBadge ? html`<div class="xxd-cluster artifact-card__badges">${sharingBadge}${commentBadge}</div>` : ''}
+    ${workspaceBadge || sharingBadge || commentBadge ? html`<div class="xxd-cluster artifact-card__badges">${workspaceBadge}${sharingBadge}${commentBadge}</div>` : ''}
   </div>
 </a>`
   }
@@ -316,36 +336,39 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
   }
 
   // A search that finds nothing is undone by clearing the search alone; each filter says what would fill it.
-  static #emptyStateOf(m: Messages, query: HomeQuery): EmptyState {
+  static #emptyStateOf(m: Messages, query: HomeQuery, identity: Identity): EmptyState {
     const { empty } = m.home
     const searchText = query.search.trim()
     if (searchText !== '') {
-      return { icon: 'SearchX', title: empty.searchTitle(searchText), text: empty.searchText, action: { label: empty.clearSearch, href: HomePage.#homePath({ ...query, search: '' }), primary: false } }
+      return { icon: 'SearchX', title: empty.searchTitle(searchText), text: empty.searchText, actions: [{ label: empty.clearSearch, href: HomePage.#homePath({ ...query, search: '' }), primary: false }] }
     }
-    if (query.agent !== null) return { icon: 'SearchX', title: empty.agentTitle(HomeListing.sourceLabel(m, query.agent)), text: '', action: { label: empty.viewAll, href: '/', primary: false } }
+    if (query.agent !== null) return { icon: 'SearchX', title: empty.agentTitle(HomeListing.sourceLabel(m, query.agent)), text: '', actions: [{ label: empty.viewAll, href: '/', primary: false }] }
+    const connectAgent = { label: empty.connectAgent, href: '/settings/agents', primary: true }
+    // An empty workspace is the moment to bring people in; only its admins can invite them.
+    const inviteMembers = identity.membership.role === 'admin' ? [{ label: empty.inviteMembers, href: '/settings/members', primary: false }] : []
     switch (query.filter) {
       case 'all':
-        return { icon: 'Inbox', ...empty.filters.all, action: { label: empty.connectAgent, href: '/settings/agents', primary: true } }
+        return { icon: 'Inbox', ...empty.filters.all, actions: [connectAgent, ...inviteMembers] }
       case 'mine':
-        return { icon: 'UserRound', ...empty.filters.mine, action: { label: empty.connectAgent, href: '/settings/agents', primary: true } }
+        return { icon: 'UserRound', ...empty.filters.mine, actions: [connectAgent] }
       case 'shared':
-        return { icon: 'Users', ...empty.filters.shared, action: null }
+        return { icon: 'Users', ...empty.filters.shared, actions: [] }
       case 'waiting_for_me':
-        return { icon: 'MessageSquareText', ...empty.filters.waiting_for_me, action: null }
+        return { icon: 'MessageSquareText', ...empty.filters.waiting_for_me, actions: [] }
       case 'waiting_for_my_agent':
-        return { icon: 'Bot', ...empty.filters.waiting_for_my_agent, action: null }
+        return { icon: 'Bot', ...empty.filters.waiting_for_my_agent, actions: [] }
       case 'removed':
-        return { icon: 'Trash2', title: empty.filters.removed.title, text: '', action: null }
+        return { icon: 'Trash2', title: empty.filters.removed.title, text: '', actions: [] }
     }
   }
 
   static #emptyState(emptyState: EmptyState): SafeHtml {
-    const { icon, title, text, action } = emptyState
+    const { icon, title, text, actions } = emptyState
     return html`<section class="xxd-empty">
   ${PageShell.icon(icon, 24)}
   <h2 class="xxd-empty__title">${title}</h2>
   ${text ? html`<p class="xxd-empty__text">${text}</p>` : ''}
-  ${action ? html`<div class="xxd-empty__actions"><a class="xxd-btn" ${action.primary ? html`data-variant="primary"` : ''} href="${action.href}">${action.label}</a></div>` : ''}
+  ${actions.length > 0 ? html`<div class="xxd-empty__actions xxd-cluster">${actions.map(action => html`<a class="xxd-btn" ${action.primary ? html`data-variant="primary"` : ''} href="${action.href}">${action.label}</a>`)}</div>` : ''}
 </section>`
   }
 }

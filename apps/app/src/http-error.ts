@@ -12,7 +12,6 @@ export type ErrorCode =
   | 'browser_session_required'
   | 'outside_token_scope'
   | 'cross_site_request'
-  | 'removed_from_workspace'
   | 'not_found'
   | 'method_not_allowed'
   | 'invalid_request'
@@ -30,6 +29,8 @@ export type ErrorCode =
   | 'rate_limited'
   | 'mail_limit_reached'
   | 'workspace_changed'
+  | 'workspace_deleted'
+  | 'personal_workspace'
 
 /** Which request field an error is about, so a page can show it under that field. */
 export interface FieldDetail {
@@ -100,12 +101,5 @@ export class HttpError extends Error {
 
   toResponse(): Response {
     return Response.json({ error: this.message, code: this.code, ...this.fieldDetail }, { status: this.status })
-  }
-}
-
-/** The person signed in, but an admin removed them from every workspace they belonged to. */
-export class RemovedFromWorkspaceError extends HttpError {
-  constructor() {
-    super(403, 'removed_from_workspace', 'you were removed from this workspace; ask a workspace admin')
   }
 }
