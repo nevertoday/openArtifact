@@ -34,9 +34,12 @@ export class PersonalPages {
     return this.#repositories.profiles.findByHandle(handle)
   }
 
-  /** What the page lists now, most recently updated first; an artifact that stopped being public drops out by itself. */
+  /** What the page lists now, most recently updated first; an artifact that stopped being public, or whose author left its workspace, drops out by itself. */
   async entriesOf(userId: string, now: number): Promise<ArtifactSummary[]> {
-    const listedSummaries = await this.#repositories.artifacts.listListedBy(userId)
+    const [listedByAuthor, memberships] = await Promise.all([this.#repositories.artifacts.listListedBy(userId), this.#repositories.workspaces.membershipsOf(userId)])
+    // An author who left a workspace no longer speaks for what they published there.
+    const memberOf = new Set(memberships.map(membership => membership.workspace.workspaceId))
+    const listedSummaries = listedByAuthor.filter(summary => memberOf.has(summary.workspaceId))
     const workspaceIds = [...new Set(listedSummaries.map(summary => summary.workspaceId))]
     const workspaces = await Promise.all(workspaceIds.map(workspaceId => this.#repositories.workspaces.findWorkspace(workspaceId)))
     const publicLinksAllowed = new Map(workspaces.flatMap(workspace => (workspace ? [[workspace.workspaceId, workspace.publicLinksEnabled] as const] : [])))

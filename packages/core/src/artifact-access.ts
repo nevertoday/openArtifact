@@ -155,8 +155,9 @@ export class ArtifactAccess {
     return ArtifactAccess.#isAdmin(viewer) || authorMayRestore
   }
 
+  // Author rights follow membership: an author who left or was removed keeps only what grants and the link give.
   #isAuthor(viewer: ArtifactViewer): boolean {
-    return viewer.userId !== null && viewer.userId === this.#summary.authorId
+    return viewer.userId !== null && viewer.userId === this.#summary.authorId && viewer.workspaceRole !== null
   }
 
   static #isAdmin(viewer: ArtifactViewer): boolean {

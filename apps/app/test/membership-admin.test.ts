@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:workers'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { TestApp } from './test-app.ts'
 
@@ -139,6 +140,48 @@ describe('removing a member', () => {
     expect(selfRemoval.body.error).toContain('yourself')
     expect(byMember.status).toBe(403)
     expect(unknownPerson.status).toBe(404)
+  })
+})
+
+describe('an author removed from the workspace', () => {
+  // A second workspace keeps the removed author signed in, so only the rule about their old pages is left to see.
+  async function alsoMemberElsewhere(userId: string): Promise<void> {
+    await env.DB.prepare("INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES ('workspace-elsewhere', 'Elsewhere', ?)").bind(Date.now()).run()
+    await env.DB.prepare("INSERT INTO memberships (workspace_id, user_id, role, created_at) VALUES ('workspace-elsewhere', ?, 'member', ?)").bind(userId, Date.now()).run()
+  }
+
+  async function personalPageMarkup(handlePath: string): Promise<string> {
+    return (await app.request(handlePath)).text()
+  }
+
+  it('loses control of the pages they left behind, while an author who stays keeps it', async () => {
+    const formerCookie = await app.signIn('former-author@example.com')
+    const formerId = await userIdOf(formerCookie)
+    await alsoMemberElsewhere(formerId)
+    const stayingCookie = await app.signIn('staying-author@example.com')
+    const teamPage = await app.publish({ cookie: formerCookie }, 'Team-only roadmap')
+    const publicPage = await app.publish({ cookie: formerCookie }, 'Public changelog', '<h1>log</h1>', 'public_link')
+    await app.request(`/api/artifacts/${publicPage.artifactId}/sharing`, { method: 'PUT', cookie: formerCookie, body: { publicLinkExpiresAt: null, listed: true } })
+    const stayingPage = await app.publish({ cookie: stayingCookie }, 'Staying notes')
+    const handlePath = (await app.request('/@me', { cookie: formerCookie })).headers.get('Location') ?? ''
+    const listedBefore = await personalPageMarkup(handlePath)
+    const editBefore = await app.request(`/api/artifacts/${teamPage.artifactId}`, { method: 'PUT', cookie: formerCookie, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+
+    await app.request(`/api/workspace/members/${formerId}`, { method: 'DELETE', cookie: adminCookie })
+    const viewAfter = await app.request(`/api/artifacts/${teamPage.artifactId}`, { cookie: formerCookie })
+    const editAfter = await app.request(`/api/artifacts/${teamPage.artifactId}`, { method: 'PUT', cookie: formerCookie, body: { baseVersion: 2, files: [{ path: 'index.html', content: '<h1>v3</h1>' }] } })
+    const sharingAfter = await app.request(`/api/artifacts/${teamPage.artifactId}/sharing`, { method: 'PUT', cookie: formerCookie, body: { visibility: 'public_link' } })
+    const publicViewAfter = await app.request(`/api/artifacts/${publicPage.artifactId}`, { cookie: formerCookie })
+    const publicSharingAfter = await app.request(`/api/artifacts/${publicPage.artifactId}/sharing`, { cookie: formerCookie })
+    const stayingEdit = await app.request(`/api/artifacts/${stayingPage.artifactId}`, { method: 'PUT', cookie: stayingCookie, body: { baseVersion: 1, files: [{ path: 'index.html', content: '<h1>v2</h1>' }] } })
+    const stayingSharing = await app.request(`/api/artifacts/${stayingPage.artifactId}/sharing`, { cookie: stayingCookie })
+
+    expect(editBefore.status).toBe(200)
+    expect(listedBefore).toContain('Public changelog')
+    expect([viewAfter.status, editAfter.status, sharingAfter.status]).toEqual([404, 404, 404])
+    expect([publicViewAfter.status, publicSharingAfter.status]).toEqual([200, 403])
+    expect([stayingEdit.status, stayingSharing.status]).toEqual([200, 200])
+    expect(await personalPageMarkup(handlePath)).not.toContain('Public changelog')
   })
 })
 
