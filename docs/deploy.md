@@ -87,7 +87,7 @@ cd ../mcp && npx wrangler deploy
 
 ## 7. First sign-in
 
-Open the app's address and sign in. The first person becomes the admin of the workspace; people from `ALLOWED_EMAIL_DOMAINS` join as members, and an admin can invite others by email under 设置.
+Open the app's address and sign in. Everyone who signs in gets a personal workspace. To work together, create a workspace from the workspace menu at the top left and invite people under 设置 › 成员, by email or with an invite link; a link that never expires suits a team chat or onboarding doc.
 
 Check that it works end to end:
 
@@ -99,12 +99,14 @@ Check that it works end to end:
 `.github/workflows/deploy.yml` runs the checks, applies the migrations and deploys the three Workers when you click **Actions › Deploy › Run workflow**. It never runs on its own. Once, under **Settings › Environments**, create the environment `production` with:
 
 - the secret `CLOUDFLARE_API_TOKEN`: an API token for your account with Workers Scripts, Workers Routes, D1 and Workers Custom Domains edit permissions;
-- the variables `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`, `APP_HOST`, `APP_ZONE`, `USERCONTENT_HOST` and, for sign-in mail, `MAIL_FROM`.
+- the variables `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`, `APP_HOST`, `APP_ZONE`, `USERCONTENT_HOST` and, for sign-in mail, `MAIL_FROM`;
+- optionally the variable `ALLOWED_EMAIL_DOMAINS` (repository or environment), such as `*` to let anyone sign up. When it is set the deploy writes it into the app's configuration; left unset, the app keeps what it had. If you set it earlier as a Worker secret (step 3), run `npx wrangler secret delete ALLOWED_EMAIL_DOMAINS` in `apps/app` before the first deploy with the variable, since a variable and a secret cannot share a name.
 
 The same two commands deploy from your own machine: `pnpm deploy:config` with those variables set writes the `wrangler.production.jsonc` files (kept out of git), and `pnpm deploy:production` applies the migrations and deploys. The Workers' secrets from step 3 are set once and kept across deployments.
 
 ## Running it
 
-- **Who can sign up.** Keep `ALLOWED_EMAIL_DOMAINS` to your own domains; `*` lets anyone on the internet join the workspace and read what the team shares inside it. Admins can switch public links off for the whole workspace and take down any artifact.
+- **Who can sign up.** `ALLOWED_EMAIL_DOMAINS` decides who may create an account; nobody joins a workspace without an invite, so `*` opens sign-up without exposing any team's workspace. Admins can switch public links off for their workspace and take down any artifact in it.
+- **Upgrading from a version without personal workspaces.** New accounts no longer join the first workspace on their own. After upgrading, create a never-expiring invite link under 设置 › 成员 and share it with colleagues. Existing members keep their workspace and get a personal one on their next visit.
 - **Public links host whatever people publish.** As the operator you are responsible for what is served from your domains. Take down abuse from the artifact's page; removed artifacts are purged after 30 days by the daily job (`triggers.crons` in `apps/app/wrangler.jsonc`).
 - **Upgrades.** Pull, run `pnpm install`, apply the migrations (step 5), then deploy the three Workers again (step 6).
