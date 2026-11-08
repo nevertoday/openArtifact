@@ -17,6 +17,8 @@ interface ApiRoute {
   method: string
   pattern: URLPattern
   respond: (apis: Apis, request: Request, params: RouteParams) => Promise<Response>
+  /** A write to the current workspace, which a browser must name; see ApiContext.requireNamedWorkspace. */
+  changesCurrentWorkspace: boolean
 }
 
 class Apis {
@@ -44,7 +46,12 @@ class Apis {
 }
 
 function route(method: string, pathname: string, respond: ApiRoute['respond']): ApiRoute {
-  return { method, pattern: new URLPattern({ pathname }), respond }
+  return { method, pattern: new URLPattern({ pathname }), respond, changesCurrentWorkspace: false }
+}
+
+// Switching workspaces is left out: it names its target in the body, and a stale tab switching is harmless.
+function workspaceWrite(method: string, pathname: string, respond: ApiRoute['respond']): ApiRoute {
+  return { ...route(method, pathname, respond), changesCurrentWorkspace: true }
 }
 
 function param(params: RouteParams, name: string): string {
@@ -59,16 +66,16 @@ const API_ROUTES: ApiRoute[] = [
   route('PATCH', '/api/me/profile', (apis, request) => apis.profile.update(request)),
   route('POST', '/api/me/workspace', (apis, request) => apis.workspace.switchWorkspace(request)),
   route('GET', '/api/workspace/members', apis => apis.workspace.members()),
-  route('PATCH', '/api/workspace/members/:userId', (apis, request, params) => apis.workspace.changeRole(request, param(params, 'userId'))),
-  route('DELETE', '/api/workspace/members/:userId', (apis, _request, params) => apis.workspace.removeMember(param(params, 'userId'))),
-  route('PATCH', '/api/workspace', (apis, request) => apis.workspace.updateSettings(request)),
+  workspaceWrite('PATCH', '/api/workspace/members/:userId', (apis, request, params) => apis.workspace.changeRole(request, param(params, 'userId'))),
+  workspaceWrite('DELETE', '/api/workspace/members/:userId', (apis, _request, params) => apis.workspace.removeMember(param(params, 'userId'))),
+  workspaceWrite('PATCH', '/api/workspace', (apis, request) => apis.workspace.updateSettings(request)),
   route('GET', '/api/workspace/invites', apis => apis.invites.list()),
-  route('POST', '/api/workspace/invites/link', apis => apis.invites.createLink()),
-  route('POST', '/api/workspace/invites/email', (apis, request) => apis.invites.inviteByEmail(request)),
-  route('DELETE', '/api/workspace/invites/:inviteId', (apis, _request, params) => apis.invites.revoke(param(params, 'inviteId'))),
+  workspaceWrite('POST', '/api/workspace/invites/link', apis => apis.invites.createLink()),
+  workspaceWrite('POST', '/api/workspace/invites/email', (apis, request) => apis.invites.inviteByEmail(request)),
+  workspaceWrite('DELETE', '/api/workspace/invites/:inviteId', (apis, _request, params) => apis.invites.revoke(param(params, 'inviteId'))),
   route('GET', '/api/tokens', apis => apis.tokens.list()),
-  route('POST', '/api/tokens', (apis, request) => apis.tokens.create(request)),
-  route('DELETE', '/api/tokens/:tokenId', (apis, _request, params) => apis.tokens.revoke(param(params, 'tokenId'))),
+  workspaceWrite('POST', '/api/tokens', (apis, request) => apis.tokens.create(request)),
+  workspaceWrite('DELETE', '/api/tokens/:tokenId', (apis, _request, params) => apis.tokens.revoke(param(params, 'tokenId'))),
   route('GET', '/api/workspace/artifacts', apis => apis.artifacts.listWorkspace()),
   route('GET', '/api/workspace/audit', apis => apis.workspace.audit()),
   route('GET', '/api/artifacts', (apis, request) => apis.artifacts.list(request)),
@@ -119,6 +126,7 @@ export class ApiRoutes {
       if (pathMatches.length === 0) throw HttpError.notFound(`API route ${requestUrl.pathname}`)
       const methodMatch = pathMatches.find(candidate => candidate.apiRoute.method === request.method)
       if (!methodMatch) throw HttpError.methodNotAllowed(request.method)
+      if (methodMatch.apiRoute.changesCurrentWorkspace) await context.requireNamedWorkspace(request)
       const params = await ApiRoutes.#withArtifactId(methodMatch.match?.pathname.groups ?? {}, context)
       return await methodMatch.apiRoute.respond(new Apis(context), request, params)
     } catch (error) {

@@ -28,6 +28,7 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
     version_conflict: 'Someone just published a new version. Refresh the page and try again.',
     not_listable: 'Only public links without a password can be listed on your page.',
     share_text_too_long: 'With the link, this text is over the 280 X allows. Make it shorter.',
+    workspace_changed: 'You switched workspace in another tab. Reload this page and try again.',
     mail_limit_reached: "You've reached today's limit on invite and share emails, so nothing was sent or saved. Try again tomorrow.",
   },
   removal: {

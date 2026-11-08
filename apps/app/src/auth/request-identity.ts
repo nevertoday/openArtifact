@@ -7,6 +7,8 @@ import { INVITE_COOKIE, type Admission } from './admission.ts'
 import type { OpenArtifactAuth, SignedInUser } from './open-artifact-auth.ts'
 
 export const WORKSPACE_COOKIE = 'oa_workspace'
+/** A page names the workspace it shows on every write, so a tab left behind by a switch elsewhere cannot act on another one. */
+export const WORKSPACE_HEADER = 'X-Open-Artifact-Workspace'
 /** Agent clients name themselves in this header; the MCP Worker fills it from the client's MCP handshake. */
 export const AGENT_CLIENT_HEADER = 'X-Open-Artifact-Client'
 const DIRECT_API_CLIENT = 'API'

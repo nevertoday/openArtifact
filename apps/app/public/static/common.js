@@ -29,9 +29,13 @@ export function userMessageOf(error) {
   return typeof message === 'function' ? message(error) : message
 }
 
+// The workspace this page was rendered for; writes to a workspace name it, and the server refuses them once another tab switched away.
+const currentWorkspaceId = document.querySelector('[data-current-workspace]')?.getAttribute('data-current-workspace') ?? null
+
 /** Calls the app's JSON API with the session cookie; throws ApiError with the server's English message and its code. */
 export async function api(path, { method = 'GET', body } = {}) {
   const init = { method, credentials: 'same-origin', headers: {} }
+  if (currentWorkspaceId !== null) init.headers['X-Open-Artifact-Workspace'] = currentWorkspaceId
   if (body !== undefined) {
     init.headers['Content-Type'] = 'application/json'
     init.body = JSON.stringify(body)

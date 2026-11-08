@@ -9,6 +9,7 @@ import { cloudflareRepositories } from '@open-artifact/storage-cloudflare'
 export const APP_ORIGIN = 'http://app.test'
 export const USERCONTENT_ORIGIN = 'http://usercontent.test'
 export const SIGNING_KEY = 'test-signing-key-that-is-long-enough'
+const WORKSPACE_WRITE = /^\/api\/(workspace|tokens)(\/|$)/
 
 /** Keeps sent mail in memory, so tests can read the sign-in code. */
 export class RecordingMailer implements Mailer {
@@ -67,6 +68,11 @@ export interface Caller {
   agentClient?: string
   /** Defaults to the app's origin for writes, as a browser on our own page would send. */
   origin?: string | null
+  /**
+   * The workspace a browser's page names on a write to the current workspace. Left out, it is the one the cookie
+   * selects, as a page that is up to date sends; null sends none.
+   */
+  workspaceId?: string | null
 }
 
 export interface RequestOptions extends Caller {
@@ -113,6 +119,8 @@ export class TestApp {
     if (options.agentClient) headers.set('X-Open-Artifact-Client', options.agentClient)
     const origin = options.origin === undefined ? (method === 'GET' ? null : APP_ORIGIN) : options.origin
     if (origin) headers.set('Origin', origin)
+    const workspaceId = options.workspaceId === undefined ? await this.#pageWorkspaceId(path, method, options) : options.workspaceId
+    if (workspaceId) headers.set('X-Open-Artifact-Workspace', workspaceId)
     let body: BodyInit | null = null
     if (options.body !== undefined) {
       headers.set('Content-Type', 'application/json')
@@ -122,6 +130,15 @@ export class TestApp {
       headers.set('Content-Type', 'application/x-www-form-urlencoded')
     }
     return this.routes.respond(new Request(`${APP_ORIGIN}${path}`, { method, headers, body, redirect: 'manual' }))
+  }
+
+  // What common.js reads off a fresh page: only browser writes to the current workspace need it.
+  async #pageWorkspaceId(path: string, method: string, options: RequestOptions): Promise<string | null> {
+    if (method === 'GET' || !options.cookie || options.token || !WORKSPACE_WRITE.test(path)) return null
+    const me = await this.request('/api/me', { cookie: options.cookie })
+    if (!me.ok) return null
+    const { workspace } = (await me.json()) as { workspace: { workspaceId: string } }
+    return workspace.workspaceId
   }
 
   async json<Body>(path: string, options: RequestOptions = {}): Promise<{ status: number; body: Body }> {

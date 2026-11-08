@@ -235,3 +235,45 @@ describe('public links setting', () => {
     expect(adminMarkup).toMatch(/data-public-link-count="[1-9]\d*"/)
   })
 })
+
+describe('writes that name their workspace', () => {
+  it('refuses a browser write that names no workspace or another one, and takes one that names the current workspace', async () => {
+    const tabCookie = await app.signIn('two-tabs@example.com')
+    const tabId = await userIdOf(tabCookie)
+    const current = await app.json<{ workspace: { workspaceId: string } }>('/api/me', { cookie: adminCookie })
+
+    const unnamed = await app.json<{ code: string; error: string }>(`/api/workspace/members/${tabId}`, { method: 'PATCH', cookie: adminCookie, body: { role: 'admin' }, workspaceId: null })
+    const stale = await app.json<{ code: string }>('/api/workspace', { method: 'PATCH', cookie: adminCookie, body: { name: 'Stale tab' }, workspaceId: 'workspace-switched-away' })
+    const staleToken = await app.json<{ code: string }>('/api/tokens', { method: 'POST', cookie: adminCookie, body: { name: 'stale', expiresInDays: 30 }, workspaceId: 'workspace-switched-away' })
+    const staleRemoval = await app.request(`/api/workspace/members/${tabId}`, { method: 'DELETE', cookie: adminCookie, workspaceId: 'workspace-switched-away' })
+    const roleAfterRefusals = (await members()).find(member => member.userId === tabId)?.role
+    const named = await app.request(`/api/workspace/members/${tabId}`, { method: 'PATCH', cookie: adminCookie, body: { role: 'admin' }, workspaceId: current.body.workspace.workspaceId })
+
+    expect([unnamed.status, stale.status, staleToken.status, staleRemoval.status]).toEqual([409, 409, 409, 409])
+    expect(unnamed.body.code).toBe('workspace_changed')
+    expect(unnamed.body.error).toContain('reload the page')
+    expect(roleAfterRefusals).toBe('member')
+    expect(named.status).toBe(200)
+  })
+
+  it('does not ask a token, a workspace switch or a write to an artifact to name one', async () => {
+    const adminToken = await app.createToken(adminCookie, 'full')
+    const workspaceId = (await app.json<{ workspace: { workspaceId: string } }>('/api/me', { cookie: adminCookie })).body.workspace.workspaceId
+    const page = await app.publish({ cookie: adminCookie }, 'No header needed')
+
+    const tokenRevoke = await app.request('/api/tokens/no-such-token', { method: 'DELETE', token: adminToken })
+    const switching = await app.request('/api/me/workspace', { method: 'POST', cookie: adminCookie, body: { workspaceId }, workspaceId: null })
+    const sharing = await app.request(`/api/artifacts/${page.artifactId}/sharing`, { method: 'PUT', cookie: adminCookie, body: { visibility: 'private' }, workspaceId: null })
+
+    expect(tokenRevoke.status).toBe(403)
+    expect([switching.status, sharing.status]).toEqual([200, 200])
+  })
+
+  it('renders the current workspace into the page, for the page script to send', async () => {
+    const workspaceId = (await app.json<{ workspace: { workspaceId: string } }>('/api/me', { cookie: adminCookie })).body.workspace.workspaceId
+
+    const settingsMarkup = await (await app.request('/settings/members', { cookie: adminCookie })).text()
+
+    expect(settingsMarkup).toContain(`data-current-workspace="${workspaceId}"`)
+  })
+})
