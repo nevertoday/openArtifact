@@ -176,3 +176,44 @@ describe('the card picture X shows', () => {
     expect(app.cardRenderer.drawn.at(-1)).toMatchObject({ kind: 'profile', titles: expect.arrayContaining(['Open Artifact 使用指南']) })
   })
 })
+
+describe('the share buttons', () => {
+  const decoded = (markup: string) => markup.replaceAll('&amp;', '&')
+
+  it('sends a reader straight to X with the post written, and gives the author the share panel', async () => {
+    const published = await publishByAgent({ title: '别把编译器的活交给 prompt', visibility: 'public_link', listed: true, shareText: '能用编译器保证的，就别交给 prompt' })
+    const path = new URL(published.body.url).pathname
+    const memberCookie = await app.signIn('share-member@example.com')
+
+    const readersView = decoded(await (await app.request(path)).text())
+    const authorsView = await (await app.request(path, { cookie })).text()
+    const membersView = await (await app.request(path, { cookie: memberCookie })).text()
+
+    expect(readersView).toContain(`class="xxd-btn viewer-byline__share" data-size="sm" href="${published.body.share.x.intentUrl}" target="_blank"`)
+    expect(readersView).toContain('分享到 X')
+    expect(readersView).not.toContain('id="share-x-dialog"')
+    expect(authorsView).toContain('data-open-share-x')
+    expect(authorsView).toContain('id="share-x-dialog"')
+    expect(authorsView).toContain('data-share-to-x')
+    expect(membersView).not.toContain('viewer-byline__share')
+  })
+
+  it('puts X and copy-link on every entry of the personal page and names the titles in the page post', async () => {
+    const pageCookie = await app.signIn('share-page@example.com')
+    const pageToken = await app.createToken(pageCookie, 'full')
+    for (const title of ['第一篇', '第二篇']) {
+      await app.request('/api/artifacts', { method: 'POST', token: pageToken, body: { title, visibility: 'public_link', listed: true, files: [{ path: 'index.html', content: `<p>${title}</p>` }] } })
+    }
+    const pagePath = (await app.request('/@me', { cookie: pageCookie })).headers.get('Location') ?? ''
+    const markup = decoded(await (await app.request(pagePath)).text())
+    const headerPost = new URL(/class="xxd-btn personal-head__share" data-size="sm" href="([^"]+)"/.exec(markup)?.[1] ?? 'https://x.invalid')
+    const entryPosts = [...markup.matchAll(/class="xxd-btn personal-share__action"[^>]*href="([^"]+)"/g)].map(match => new URL(match[1]!).searchParams.get('text'))
+    const copiedLinks = [...markup.matchAll(/data-copy="([^"]+)"/g)].map(match => match[1])
+
+    expect(headerPost.searchParams.get('text')).toBe('share-page 在 Open Artifact 上的 2 篇文章：《第二篇》《第一篇》')
+    expect(headerPost.searchParams.get('url')).toBe(`http://app.test${pagePath}`)
+    expect(entryPosts).toEqual(['第二篇', '第一篇'])
+    expect(copiedLinks).toHaveLength(2)
+    expect(copiedLinks.every(link => link?.startsWith('http://app.test/a/'))).toBe(true)
+  })
+})

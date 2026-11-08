@@ -189,3 +189,6 @@
   .login-story__pitch > p, .login-story__pitch > .xxd-cluster, .login-story > footer { display: none; }
   .login-panel { padding-top: var(--space-6); }
 }
+
+/* X's mark sits on the text baseline like the kit's icons, in whatever colour the control's text is. */
+.app-x-logo { flex: none; vertical-align: -2px; }

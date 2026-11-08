@@ -291,4 +291,47 @@ export default {
     keepOldPassword: '保留原密码',
     saved: '分享设置已保存',
   },
+  shareX: {
+    readiness: {
+      ready: '可以分享。公开、已列在主页、永不过期。',
+      /** @param {string} date */
+      expires: date => `链接会在 ${date} 过期，过期后推文里的链接就打不开了。`,
+      not_listed: '公开了，但没有列在主页上，所以 X 上不会出现卡片图。',
+      not_public: '只有能打开这篇文章的人看得到，X 上的读者打不开。',
+      has_password: '链接设了密码，X 上的读者打不开，也不会出现卡片图。',
+      public_links_off: '工作区管理员关闭了公开链接，现在不能分享到 X。',
+      removed: '这篇文章已删除。',
+    },
+    fix: {
+      expires: '改为永不过期',
+      not_listed: '列在主页上',
+      not_public: '公开并列在主页',
+      has_password: '去掉密码并列在主页',
+    },
+    fixConfirm: {
+      title: '公开这篇文章？',
+      message: '任何拿到链接的人都能打开它，它也会出现在你的主页上，链接永不过期。',
+      confirm: '公开并列在主页',
+    },
+    fixed: '已公开并列在主页',
+    styles: {
+      label: '文案样式',
+      title_summary: '标题 + 摘要',
+      title_only: '只放标题',
+      custom: '我自己写',
+    },
+    textLabel: '发帖文案',
+    /** @param {{ used: number, max: number }} p */
+    counter: ({ used, max }) => `${used} / ${max}`,
+    counterHint: '中文按 2 计，链接固定按 23 计',
+    /** @param {number} over */
+    overLimit: over => `超出 ${over}，删短一些才能发`,
+    saveCustom: '保存为默认文案',
+    customSaved: '已保存。读者点「分享到 X」时也会用这段文案。',
+    usesSaved: '读者点「分享到 X」时用的是你保存的文案。',
+    useGenerated: '改回自动文案',
+    generatedRestored: '已改回自动文案',
+    previewLabel: '卡片预览',
+    previewMissing: '列在主页上之后才会生成卡片图。',
+  },
 }

@@ -1,7 +1,9 @@
 import type { Messages } from '../i18n/messages.ts'
 import { ArtifactPath, type ArtifactSummary, type Profile } from '@open-artifact/core'
+import { composePageShareText } from '../../public/static/share-text.js'
 import { dayText } from '../../public/static/time-text.js'
 import { PersonalPages } from '../personal-pages.ts'
+import { ShareCard } from '../share/share-card.ts'
 import { html, type SafeHtml } from './html.ts'
 import { PageShell } from './page-shell.ts'
 
@@ -13,6 +15,8 @@ export interface PersonalPageModel {
   entries: ArtifactSummary[]
   /** Signed addresses of the entries' pages, shown small beside an entry the pointer rests on. */
   previewUrls: Map<string, string>
+  /** How each entry goes out on X, by artifact id. */
+  shareCards: Map<string, ShareCard>
   /** The person looking is the page's owner, who may change the line about them, the pin and the summaries. */
   isOwner: boolean
   pageUrl: string
@@ -60,8 +64,9 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
 
   static #header(model: PersonalPageModel): SafeHtml {
     const { m, profile, name, isOwner } = model
-    const shareText = m.personal.shareText(name)
-    const shareOnX = `https://x.com/intent/post?url=${encodeURIComponent(model.pageUrl)}&text=${encodeURIComponent(shareText)}`
+    const lead = m.personal.shareLead({ name, count: model.entries.length })
+    const shareText = composePageShareText(lead, model.entries.map(entry => entry.title), m.personal.shareQuote)
+    const shareOnX = ShareCard.intentUrl(shareText, model.pageUrl)
     return html`<header class="personal-head">
   <span class="personal-head__avatar" aria-hidden="true">${PageShell.initialOf(name)}</span>
   <h1 class="personal-head__name">${name}<small>${m.personal.entryCount(model.entries.length)}</small></h1>
@@ -85,6 +90,7 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
     ${entry.summary ? html`<p class="personal-cover__summary" data-summary>${entry.summary}</p>` : ''}
     <p class="personal-cover__meta"><b>${model.m.personal.read} ${PageShell.icon('ArrowRight', 14)}</b>${PersonalPage.#day(model.m, entry)}<span>${model.m.personal.version(entry.version)}</span></p>
   </a>
+  ${PersonalPage.#shareActions(entry, model)}
   ${model.isOwner ? PersonalPage.#ownerTools(model.m, entry, true) : ''}
 </section>`
   }
@@ -112,8 +118,20 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
     ${entry.summary ? html`<p class="personal-entry__summary" data-summary>${entry.summary}</p>` : ''}
     <p class="personal-entry__meta">${PersonalPage.#day(model.m, entry)}<span>${model.m.personal.version(entry.version)}</span></p>
   </a>
+  ${PersonalPage.#shareActions(entry, model)}
   ${model.isOwner ? PersonalPage.#ownerTools(model.m, entry, false) : ''}
 </li>`
+  }
+
+  // Outside the entry's link, since a link may not hold other controls; shown on hover where there is one.
+  static #shareActions(entry: ArtifactSummary, model: PersonalPageModel): SafeHtml | '' {
+    const shareCard = model.shareCards.get(entry.artifactId)
+    if (!shareCard) return ''
+    const { m } = model
+    return html`<div class="personal-share">
+  <a class="xxd-btn personal-share__action" data-variant="ghost" data-size="xs" data-icon-only href="${shareCard.intentUrl}" target="_blank" rel="noopener noreferrer" aria-label="${m.personal.shareEntryOnX}" data-tooltip="${m.personal.shareEntryOnX}">${PageShell.xLogo(14)}</a>
+  <button type="button" class="xxd-btn personal-share__action" data-variant="ghost" data-size="xs" data-icon-only data-copy="${shareCard.url}" data-copy-done="${m.personal.linkCopied}" aria-label="${m.personal.copyEntryLink}" data-tooltip="${m.personal.copyEntryLink}">${PageShell.icon('Link', 14)}</button>
+</div>`
   }
 
   static #ownerTools(m: Messages, entry: ArtifactSummary, isPinned: boolean): SafeHtml {

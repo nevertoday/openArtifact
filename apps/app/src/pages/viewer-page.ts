@@ -16,7 +16,7 @@ export interface OlderVersion {
   publishedAt: number
 }
 
-/** Under an artifact listed on its author's personal page, for the strangers who read it there. */
+/** Under an artifact listed on its author's personal page, for the strangers who read it there and for its author. */
 export interface Byline {
   authorName: string
   personalPagePath: string
@@ -31,7 +31,7 @@ export interface ViewerModel {
   openedArtifact: OpenedArtifact
   identity: Identity | null
   authorName: string
-  /** Shown to a visitor of a listed artifact; null otherwise. */
+  /** Shown under a listed artifact to its visitors and its author; null otherwise. */
   byline: Byline | null
   /** The version on screen; older than the current one when the viewer picked it from the history. */
   shownVersion: number
@@ -68,6 +68,7 @@ ${model.byline ? ViewerPage.#byline(model, model.byline) : ''}
 ${permissions.canComment ? ViewerPage.#coachMark(model.m) : ''}
 </div>
 ${permissions.canManageSharing ? ViewerPage.#shareDialog(model.m) : ''}
+${permissions.canManageSharing ? ViewerPage.#shareXDialog(model.m) : ''}
 ${ViewerPage.#shortcutSheet(model)}
 ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     return PageShell.render({
@@ -88,7 +89,15 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   <a class="viewer-byline__avatar" href="${byline.personalPagePath}" aria-label="${model.m.viewer.byline.authorPage(byline.authorName)}">${PageShell.initialOf(byline.authorName)}</a>
   <p class="viewer-byline__who"><a href="${byline.personalPagePath}">${byline.authorName}</a><span>${model.m.viewer.byline.updated({ version: summary.version, time: PageShell.relativeTime(model.m, summary.currentVersionAt, model.now) })}</span></p>
   ${byline.next ? html`<p class="viewer-byline__next"><span>${model.m.viewer.byline.next}</span><a href="${byline.next.path}">${byline.next.title} ${PageShell.icon('ArrowRight', 14)}</a></p>` : html`<p class="viewer-byline__next"><a href="${byline.personalPagePath}">${model.m.viewer.byline.more} ${PageShell.icon('ArrowRight', 14)}</a></p>`}
+  ${ViewerPage.#shareOnX(model, byline)}
 </footer>`
+  }
+
+  // A reader goes straight to X with the post written; the author first sees the share panel, where the post can change.
+  static #shareOnX(model: ViewerModel, byline: Byline): SafeHtml {
+    const label = html`${PageShell.xLogo(14)}<span>${model.m.viewer.byline.shareOnX}</span>`
+    if (model.openedArtifact.permissions.canManageSharing) return html`<button type="button" class="xxd-btn viewer-byline__share" data-size="sm" data-open-share-x>${label}</button>`
+    return html`<a class="xxd-btn viewer-byline__share" data-size="sm" href="${byline.share.intentUrl}" target="_blank" rel="noopener noreferrer">${label}</a>`
   }
 
   /** The artifact alone, filling the tab; the page still proxies its shared data. */
@@ -302,6 +311,22 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
 </dialog>`
   }
 
+  // share-x-panel.js fills the body from the sharing API; the actions are drawn here so they keep their place while it loads.
+  static #shareXDialog(m: Messages): SafeHtml {
+    return html`<dialog class="xxd-dialog share-x" data-size="lg" id="share-x-dialog" aria-labelledby="share-x-title">
+  <div class="xxd-dialog__head">
+    <div class="xxd-text-pair share-dialog__heading"><h2 class="xxd-dialog__title" id="share-x-title">${PageShell.xLogo(16)} ${m.viewer.shareX.title}</h2><p class="xxd-text" data-variant="caption" data-share-x-subtitle></p></div>
+    <button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" aria-label="${m.viewer.shareX.close}" data-xxd-dialog-close>${PageShell.icon('X')}</button>
+  </div>
+  <div class="xxd-dialog__body share-x__body" data-share-x-body><p class="viewer-drawer__status"><span class="xxd-spinner" aria-hidden="true"></span>${m.viewer.shareX.loading}</p></div>
+  <div class="xxd-dialog__actions share-x__actions">
+    <button type="button" class="xxd-btn" data-share-x-copy-text data-copy-done="${m.viewer.shareX.textCopied}" disabled>${PageShell.icon('Copy', 14)}${m.viewer.shareX.copyText}</button>
+    <button type="button" class="xxd-btn" data-share-x-copy-link data-copy-done="${m.viewer.shareX.linkCopied}" disabled>${PageShell.icon('Link', 14)}${m.viewer.shareX.copyLink}</button>
+    <a class="xxd-btn" data-variant="primary" data-share-x-open target="_blank" rel="noopener noreferrer" aria-disabled="true">${PageShell.xLogo(14)}${m.viewer.shareX.openOnX}${PageShell.icon('ExternalLink', 14)}</a>
+  </div>
+</dialog>`
+  }
+
   static #shareDialog(m: Messages): SafeHtml {
     return html`<dialog class="xxd-dialog" data-size="lg" id="share-dialog" aria-labelledby="share-title">
   <form id="share-form">
@@ -312,6 +337,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     <div class="xxd-dialog__body share-dialog__body" data-share-body><p class="viewer-drawer__status"><span class="xxd-spinner" aria-hidden="true"></span>${m.viewer.share.loading}</p></div>
     <div class="xxd-dialog__actions">
       <span class="xxd-text share-dialog__url" data-variant="mono-secondary" data-share-url></span>
+      <button type="button" class="xxd-btn" data-share-to-x>${PageShell.xLogo(14)}${m.viewer.share.toX}</button>
       <button type="button" class="xxd-btn" data-copy-link data-copy-done="${m.viewer.share.linkCopied}">${PageShell.icon('Copy', 14)}${m.viewer.share.copyLink}</button>
       <button type="submit" class="xxd-btn" data-variant="primary" data-save-sharing disabled>${m.viewer.share.save}</button>
     </div>

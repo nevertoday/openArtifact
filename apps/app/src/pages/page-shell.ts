@@ -172,6 +172,11 @@ ${options.description ? html`<meta name="twitter:description" content="${options
     return html`<i data-xxd-icon="${name}" data-size="${size}" aria-hidden="true"></i>`
   }
 
+  /** X's mark, which the kit's icon set does not carry; drawn in the text colour beside a label that names it. */
+  static xLogo(size: IconSize = 14): SafeHtml {
+    return html`<svg class="app-x-logo" width="${String(size)}" height="${String(size)}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`
+  }
+
   static brandLink(): SafeHtml {
     return html`<a class="app-brand" href="/">${PageShell.icon('LayoutTemplate', 20)}<span>Open Artifact</span></a>`
   }

@@ -10,6 +10,7 @@ export default {
     updated: ({ version, time }) => [`第 ${version} 版 · `, time, '更新'],
     next: '下一篇',
     more: '更多文章',
+    shareOnX: '分享到 X',
   },
   full: { back: '返回查看页' },
   bar: {
@@ -79,5 +80,16 @@ export default {
     linkCopied: '已复制链接',
     copyLink: '复制链接',
     save: '保存',
+    toX: '发到 X',
+  },
+  shareX: {
+    title: '发到 X',
+    close: '关闭',
+    loading: '正在加载…',
+    copyText: '复制文案',
+    textCopied: '已复制文案',
+    copyLink: '复制链接',
+    linkCopied: '已复制链接',
+    openOnX: '在 X 中打开',
   },
 }
