@@ -4,7 +4,7 @@ export type { ArtifactAccessRepository, ArtifactGrant, GrantRole, PersonGrant } 
 export { ArtifactPath, ArtifactSlug, ShortId } from './artifact-address.ts'
 export type { AddressedArtifact, ArtifactPage, ArtifactReference } from './artifact-address.ts'
 export { ArtifactAccess } from './artifact-access.ts'
-export type { ArtifactPermission, ArtifactPermissions, ArtifactViewer } from './artifact-access.ts'
+export type { ArtifactPermission, ArtifactPermissions, ArtifactViewer, ShareReadiness } from './artifact-access.ts'
 export type {
   ArtifactFile,
   ArtifactFileSource,
@@ -29,6 +29,7 @@ export type { NewNotification, Notification, NotificationKind, NotificationRepos
 export type { Invite, InviteRepository, NewInvite } from './invite-repository.ts'
 export { AccessTokenSecret, InviteCode, PublicLinkPassword, SigningKey, UsercontentSignature } from './secrets.ts'
 export type { UsercontentRequest } from './secrets.ts'
+export type { ShareCardImages } from './share-card-images.ts'
 export type { SharedCollection, SharedDataRepository, SharedDocument } from './shared-data-repository.ts'
 export type { SignInCodeFailures } from './sign-in-code-failures.ts'
 export { WORKSPACE_ROLES } from './workspace-repository.ts'

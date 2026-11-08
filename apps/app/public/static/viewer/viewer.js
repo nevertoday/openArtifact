@@ -9,6 +9,7 @@ import { CommentThreads } from './comment-threads.js'
 import { DataView } from './data-view.js'
 import { LiveUpdates } from './live-updates.js'
 import { ShareDialog } from './share-dialog.js'
+import { ShareXPanel } from './share-x-panel.js'
 import { ViewerTopBar } from './top-bar.js'
 import { VersionCompare, VersionHistory, VersionOverwrite } from './versions.js'
 import { ViewerDrawer } from './viewer-drawer.js'
@@ -97,14 +98,22 @@ if (commentMode) {
 
 const shareDialogElement = document.getElementById('share-dialog')
 const shareDialog = shareDialogElement ? new ShareDialog(shareDialogElement, config, stage) : null
+const shareXElement = document.getElementById('share-x-dialog')
+const shareXPanel = shareXElement ? new ShareXPanel(shareXElement, config) : null
 topBar.addEventListener('renamed', event => {
   frame.setTitle(event.detail.title)
   shareDialog?.showTitle(event.detail.title)
+  shareXPanel?.showTitle(event.detail.title)
 })
 
 if (shareDialog) {
   for (const shareOpener of document.querySelectorAll('[data-open-share]')) shareOpener.addEventListener('click', () => shareDialog.open())
   shareDialog.addEventListener('saved', event => topBar.showVisibility(event.detail.label))
+  shareXPanel.addEventListener('saved', event => topBar.showVisibility(event.detail.label))
+  for (const shareXOpener of document.querySelectorAll('[data-open-share-x]')) shareXOpener.addEventListener('click', () => shareXPanel.open())
+  shareDialogElement.querySelector('[data-share-to-x]').addEventListener('click', async () => {
+    if (await shareDialog.close()) shareXPanel.open()
+  })
   shareDialog.openFromLink()
   window.addEventListener('hashchange', () => shareDialog.openFromLink())
 }

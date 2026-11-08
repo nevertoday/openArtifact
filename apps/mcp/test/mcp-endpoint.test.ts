@@ -126,6 +126,20 @@ describe('McpEndpoint', () => {
     expect(result.tools.filter(tool => tool.inputSchema.properties.slug?.type === 'string').map(tool => tool.name)).toEqual(['publish', 'update'])
   })
 
+  it('passes the words for X on publish and update, and hands back the ready X post', async () => {
+    const share = { readiness: { kind: 'ready' }, x: { text: '一句话', weightedLength: 30, intentUrl: 'https://x.com/intent/post?text=%E4%B8%80&url=http%3A%2F%2Fapp.test%2Fa%2Fk7f3q9x2m4ab' } }
+    const fakeApp = new FakeApp(Response.json({ artifactId: 'a1', version: 1, url: 'http://app.test/a/k7f3q9x2m4ab', share }, { status: 201 }), Response.json({ artifactId: 'a1', version: 2, url: 'http://app.test/a/k7f3q9x2m4ab', share }))
+    const endpoint = mcpEndpoint(fakeApp)
+    const files = [{ path: 'index.html', content: '<h1>Plan</h1>' }]
+
+    const published = await callTool(endpoint, 'publish', { title: 'Plan', files, visibility: 'public_link', listed: true, shareText: '一句话' })
+    await callTool(endpoint, 'update', { artifactId: 'a1', baseVersion: 1, files, shareText: '第二句' })
+
+    expect(fakeApp.calls.map(call => (call.body as { shareText?: string }).shareText)).toEqual(['一句话', '第二句'])
+    expect(published.content[0]?.text).toContain('"intentUrl": "https://x.com/intent/post?text=')
+    expect(published.content[0]?.text).toContain('"kind": "ready"')
+  })
+
   it('passes the public link expiry the person chose, and leaves it out otherwise', async () => {
     const created = () => Response.json({ artifactId: 'a1', version: 1, url: 'http://app.test/a/plan-k7f3q9x2m4ab' }, { status: 201 })
     const fakeApp = new FakeApp(created(), created())

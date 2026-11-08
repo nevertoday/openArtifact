@@ -7,6 +7,7 @@ export default /** @satisfies {import('../messages').Messages['viewer']} */ ({
     updated: ({ version, time }) => [`Version ${version} · updated `, time],
     next: 'Next',
     more: 'More writing',
+    shareOnX: 'Share on X',
   },
   full: { back: 'Back to the page' },
   bar: {
@@ -75,5 +76,16 @@ export default /** @satisfies {import('../messages').Messages['viewer']} */ ({
     linkCopied: 'Link copied',
     copyLink: 'Copy link',
     save: 'Save',
+    toX: 'Post to X',
+  },
+  shareX: {
+    title: 'Post to X',
+    close: 'Close',
+    loading: 'Loading…',
+    copyText: 'Copy text',
+    textCopied: 'Text copied',
+    copyLink: 'Copy link',
+    linkCopied: 'Link copied',
+    openOnX: 'Open in X',
   },
 })

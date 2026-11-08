@@ -2,6 +2,8 @@ import { ArtifactRemoval, ArtifactSlug, type ArtifactFile, type ArtifactSummary,
 import { ArtifactGate, type OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { HttpError, type ErrorCode } from '../http-error.ts'
+import { MAX_POST_WEIGHT, postWeight } from '../../public/static/share-text.js'
+import { ShareCard } from '../share/share-card.ts'
 import type { ApiContext } from './api-context.ts'
 import { ArtifactFileJson } from './artifact-file-json.ts'
 import { JsonBody } from './json-body.ts'
@@ -14,6 +16,8 @@ const MAX_TITLE_LENGTH = 200
 const MAX_SLUG_INPUT_LENGTH = 200
 const MAX_NOTE_LENGTH = 200
 export const MAX_SUMMARY_LENGTH = 300
+// Links in it may be long, as each weighs 23 whatever its length; the weight is the real limit.
+const MAX_SHARE_TEXT_LENGTH = 1000
 const LIST_ON_PERSONAL_PAGE = 'list it on your personal page'
 const BASE_VERSION_HINT = 'pass the version you read; pass force: true only when told to overwrite'
 
@@ -48,6 +52,7 @@ export class ArtifactApi {
       publicLinkExpiresAt: publicLinkExpiry.expiresAt,
       listed,
       summary: requestBody.optionalText('summary', MAX_SUMMARY_LENGTH),
+      shareText: ArtifactApi.#shareTextFrom(requestBody),
       files,
     })
     const createdSummary = { artifactId: createdArtifact.artifactId, shortId: createdArtifact.shortId, slug, title, authorId: identity.userId }
@@ -55,7 +60,8 @@ export class ArtifactApi {
     if (publicLinkExpiry.agentDefaultExpiresAt !== null) {
       await this.#context.notifier.notify(identity, createdSummary, { kind: 'public_link_opened_by_agent', expiresAt: publicLinkExpiry.agentDefaultExpiresAt })
     }
-    const createdJson = { ...createdArtifact, slug, url: this.#context.artifactUrl(createdSummary), visibility, publicLinkExpiresAt: publicLinkExpiry.expiresAt, listed }
+    const share = await this.#shareJson(createdArtifact.artifactId, identity, request)
+    const createdJson = { ...createdArtifact, slug, url: this.#context.artifactUrl(createdSummary), visibility, publicLinkExpiresAt: publicLinkExpiry.expiresAt, listed, share }
     return Response.json(createdJson, { status: 201 })
   }
 
@@ -102,6 +108,7 @@ export class ArtifactApi {
     const files = ArtifactFileJson.filesFrom(requestBody.raw('files'))
     const newName = { title: requestBody.optionalText('title', MAX_TITLE_LENGTH), slug: requestBody.optionalText('slug', MAX_SLUG_INPUT_LENGTH) }
     const newSummary = requestBody.optionalText('summary', MAX_SUMMARY_LENGTH)
+    const newShareText = requestBody.has('shareText') ? { shareText: ArtifactApi.#shareTextFrom(requestBody) } : null
     const baseVersion = requestBody.boolean('force', false) ? openedArtifact.summary.version : requestBody.positiveInteger('baseVersion', BASE_VERSION_HINT)
     const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
       authorId: identity.userId,
@@ -111,31 +118,35 @@ export class ArtifactApi {
       excerpt: await PageExcerpt.of(files),
       files,
     })
-    if (publishResult.status !== 'published') return this.#publishResponse(identity, openedArtifact.summary, publishResult)
+    if (publishResult.status !== 'published') return this.#publishResponse(request, identity, openedArtifact.summary, publishResult)
     const renamedSummary = await this.#rename(identity, openedArtifact.summary, newName)
     if (newSummary !== null) await this.#context.repositories.artifacts.setSummary(artifactId, newSummary)
-    return this.#publishResponse(identity, renamedSummary, publishResult)
+    if (newShareText !== null) await this.#context.repositories.artifacts.setShareText(artifactId, newShareText.shareText)
+    return this.#publishResponse(request, identity, renamedSummary, publishResult)
   }
 
   /**
-   * Changes the title, the words in the address, the summary on the personal page, or any of them; a summary
-   * of null goes back to the page's opening words.
+   * Changes the title, the words in the address, the summary on the personal page, the words for X, or any of
+   * them; a summary of null goes back to the page's opening words, a shareText of null to words made from both.
    */
   async rename(request: Request, artifactId: string): Promise<Response> {
     const identity = await this.#context.requireIdentity()
     const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canRename', 'rename this artifact')
     const requestBody = await JsonBody.of(request)
     const changesSummary = requestBody.has('summary')
-    if (!requestBody.has('title') && !requestBody.has('slug') && !changesSummary) throw HttpError.badRequest('send a title, a slug, a summary, or several of them')
+    const changesShareText = requestBody.has('shareText')
+    if (!requestBody.has('title') && !requestBody.has('slug') && !changesSummary && !changesShareText) throw HttpError.badRequest('send a title, a slug, a summary, a shareText, or several of them')
     const newName = {
       title: requestBody.has('title') ? requestBody.text('title', MAX_TITLE_LENGTH) : null,
       slug: requestBody.optionalText('slug', MAX_SLUG_INPUT_LENGTH),
     }
     const renamedSummary = await this.#rename(identity, summary, newName)
     if (changesSummary) await this.#context.repositories.artifacts.setSummary(artifactId, requestBody.optionalText('summary', MAX_SUMMARY_LENGTH))
+    if (changesShareText) await this.#context.repositories.artifacts.setShareText(artifactId, ArtifactApi.#shareTextFrom(requestBody))
     const savedSummary = await this.#context.repositories.artifacts.findSummary(artifactId)
     const { title, shortId, slug } = renamedSummary
-    return Response.json({ artifactId, title, shortId, slug, url: this.#context.artifactUrl(renamedSummary), summary: savedSummary?.summary ?? null })
+    const share = await this.#shareJson(artifactId, identity, request)
+    return Response.json({ artifactId, title, shortId, slug, url: this.#context.artifactUrl(renamedSummary), summary: savedSummary?.summary ?? null, share })
   }
 
   /** Hides the artifact from everyone at once; it can be restored for 30 days, then it is purged. */
@@ -218,7 +229,7 @@ export class ArtifactApi {
       excerpt: await PageExcerpt.of(olderVersion.files),
       files: olderVersion.files,
     })
-    return this.#publishResponse(identity, openedArtifact.summary, publishResult)
+    return this.#publishResponse(request, identity, openedArtifact.summary, publishResult)
   }
 
   static #originJson(origin: VersionOrigin): { origin: VersionOrigin['kind']; restoredFrom: number | null } {
@@ -230,17 +241,36 @@ export class ArtifactApi {
     }
   }
 
-  async #publishResponse(publisher: Identity, summary: ArtifactSummary, publishResult: PublishResult): Promise<Response> {
+  async #publishResponse(request: Request, publisher: Identity, summary: ArtifactSummary, publishResult: PublishResult): Promise<Response> {
     const { artifactId, shortId, slug } = summary
     switch (publishResult.status) {
       case 'published':
         await this.#context.notifier.notify(publisher, summary, { kind: 'version_published' })
-        return Response.json({ artifactId, shortId, slug, version: publishResult.version, url: this.#context.artifactUrl(summary) })
+        return Response.json({ artifactId, shortId, slug, version: publishResult.version, url: this.#context.artifactUrl(summary), share: await this.#shareJson(artifactId, publisher, request) })
       case 'conflict':
         return this.#conflict(artifactId, publishResult.currentVersion)
       case 'not_found':
         throw HttpError.notFound(`artifact ${artifactId}`)
     }
+  }
+
+  // Read again after the write, so the card names the new version and the words just saved.
+  async #shareJson(artifactId: string, identity: Identity, request: Request) {
+    const openedArtifact = await this.#context.gate.open(artifactId, identity, request)
+    if (!openedArtifact) throw new Error(`artifact ${artifactId} disappeared while it was being saved`)
+    return ShareCard.of(openedArtifact.summary, openedArtifact.shareReadiness, this.#context.appOrigin).toJson()
+  }
+
+  // Blank goes back to the words made from the title and summary.
+  static #shareTextFrom(requestBody: JsonBody): string | null {
+    const shareText = requestBody.optionalText('shareText', MAX_SHARE_TEXT_LENGTH)
+    if (shareText === null) return null
+    const weight = postWeight(shareText)
+    if (weight > MAX_POST_WEIGHT) {
+      const message = `shareText weighs ${weight} on X with the link, over the ${MAX_POST_WEIGHT} a post may weigh; CJK characters and emoji count 2, each link 23`
+      throw new HttpError(400, 'share_text_too_long', message, { field: 'shareText' })
+    }
+    return shareText
   }
 
   // The agent merges its change into the latest files and publishes again on top of currentVersion.

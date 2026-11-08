@@ -24,6 +24,7 @@ function artifactWith(sharing: Partial<ArtifactSharing>, removal: ArtifactRemova
     summary: null,
     currentVersionNote: null,
     currentVersionAt: now,
+    shareText: null,
   }
 }
 
@@ -155,5 +156,37 @@ describe('ArtifactAccess', () => {
     const memberAgent: ArtifactViewer = { ...member, tokenScope: 'publish' }
 
     expect(new ArtifactAccess(artifactWith({ visibility: 'workspace' }), true, now).withheldByTokenScope(memberAgent)).toEqual([])
+  })
+})
+
+describe('ArtifactAccess#shareReadiness', () => {
+  const listedPublic: Partial<ArtifactSharing> = { visibility: 'public_link', listed: true }
+  const readiness = (sharing: Partial<ArtifactSharing>, { publicLinksEnabled = true, removal = null as ArtifactRemoval | null } = {}) =>
+    new ArtifactAccess(artifactWith(sharing, removal), publicLinksEnabled, now).shareReadiness
+
+  it('names every reason a link cannot go out, and when a shareable one stops working', () => {
+    expect(readiness(listedPublic)).toEqual({ kind: 'ready' })
+    expect(readiness({ ...listedPublic, publicLinkExpiresAt: now + 5 * DAY })).toEqual({ kind: 'expires', at: now + 5 * DAY })
+    expect(readiness({ visibility: 'public_link' })).toEqual({ kind: 'not_listed' })
+    expect(readiness({ visibility: 'workspace' })).toEqual({ kind: 'not_public' })
+    expect(readiness({ ...listedPublic, publicLinkExpiresAt: now - 1 })).toEqual({ kind: 'not_public' })
+    expect(readiness({ ...listedPublic, publicLinkPasswordHash: 'hash' })).toEqual({ kind: 'has_password' })
+    expect(readiness(listedPublic, { publicLinksEnabled: false })).toEqual({ kind: 'public_links_off' })
+    expect(readiness(listedPublic, { removal: new ArtifactRemoval(now, authorId, false) })).toEqual({ kind: 'removed' })
+  })
+
+  it('is shareable exactly when the artifact is on the personal page', () => {
+    const removed = new ArtifactRemoval(now, authorId, false)
+    for (const visibility of ['private', 'specified', 'workspace', 'public_link'] as const)
+      for (const listed of [true, false])
+        for (const publicLinkPasswordHash of [null, 'hash'])
+          for (const publicLinkExpiresAt of [null, now - 1, now + DAY])
+            for (const publicLinksEnabled of [true, false])
+              for (const removal of [null, removed]) {
+                const access = new ArtifactAccess(artifactWith({ visibility, listed, publicLinkPasswordHash, publicLinkExpiresAt }, removal), publicLinksEnabled, now)
+                const shareable = access.shareReadiness.kind === 'ready' || access.shareReadiness.kind === 'expires'
+                const state = JSON.stringify({ visibility, listed, publicLinkPasswordHash, publicLinkExpiresAt, publicLinksEnabled, removed: removal !== null })
+                expect(shareable, state).toBe(access.onPersonalPage)
+              }
   })
 })

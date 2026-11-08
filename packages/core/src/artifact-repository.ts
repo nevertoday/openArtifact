@@ -48,6 +48,8 @@ export interface NewArtifact extends Omit<Publication, 'origin'> {
   listed: boolean
   /** The publisher's own summary; null leaves it to the page's opening words. */
   summary: string | null
+  /** Already checked to fit in a post on X with the link; null leaves the post to the title and summary. */
+  shareText: string | null
 }
 
 export interface CreatedArtifact {
@@ -76,6 +78,8 @@ export interface ArtifactSummary {
   /** The current version's note and when it was published. */
   currentVersionNote: string | null
   currentVersionAt: number
+  /** What the author wrote to go before the link when it is shared on X; null leaves it to the title and summary. */
+  shareText: string | null
 }
 
 export interface ArtifactVersionRecord {
@@ -122,6 +126,8 @@ export interface ArtifactRepository extends ArtifactFileSource {
   listListedBy(authorId: string): Promise<ArtifactSummary[]>
   /** null goes back to the page's opening words. */
   setSummary(artifactId: string, summary: string | null): Promise<void>
+  /** null goes back to the words made from the title and summary. */
+  setShareText(artifactId: string, shareText: string | null): Promise<void>
   listVersions(artifactId: string): Promise<ArtifactVersionRecord[]>
   /** Changes the title and the words of the address together; the short id never changes. */
   rename(artifactId: string, name: { title: string; slug: string }): Promise<void>

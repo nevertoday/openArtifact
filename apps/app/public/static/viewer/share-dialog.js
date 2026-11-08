@@ -131,16 +131,16 @@ export class ShareDialog extends EventTarget {
     this.#sharingPath = `/api/artifacts/${encodeURIComponent(config.artifactId)}/sharing`
     this.#visibilityLabels = config.visibilityLabels
     submitOnce(dialog.querySelector('#share-form'), () => this.#save())
-    dialog.querySelector('[data-close-share]').addEventListener('click', () => this.#close())
+    dialog.querySelector('[data-close-share]').addEventListener('click', () => this.close())
     // Chrome may ignore preventDefault on a dialog's cancel event, so Escape is caught before it becomes one.
     dialog.addEventListener('keydown', event => {
       if (event.key !== 'Escape') return
       event.preventDefault()
-      this.#close()
+      this.close()
     })
     dialog.addEventListener('cancel', event => {
       event.preventDefault()
-      this.#close()
+      this.close()
     })
     dialog.querySelector('[data-copy-link]').dataset.copy = location.origin + location.pathname
     this.showTitle(config.title)
@@ -194,7 +194,8 @@ export class ShareDialog extends EventTarget {
     this.#saveButton.disabled = !this.#draft?.hasChanges
   }
 
-  async #close() {
+  /** Closes the dialog, asking first when there are unsaved changes; false when the author chose to stay. */
+  async close() {
     const hasUnsavedChanges = this.#draft?.hasChanges ?? false
     if (hasUnsavedChanges) {
       const discardConfirmed = await Xxd.confirmDialog({
@@ -205,9 +206,10 @@ export class ShareDialog extends EventTarget {
         closeLabel: m.viewerClient.actions.close,
         tone: 'danger',
       })
-      if (!discardConfirmed) return
+      if (!discardConfirmed) return false
     }
     Xxd.closeDialog(this.#dialog)
+    return true
   }
 
   #visibilityChoices() {

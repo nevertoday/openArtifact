@@ -36,6 +36,20 @@ export interface ArtifactPermissions {
   needsPublicLinkPassword: boolean
 }
 
+/**
+ * Whether a link to the artifact may go out to strangers, on X or anywhere else, and if not, why. Only `ready` and
+ * `expires` are on the author's personal page; a link that has already expired reads as `not_public`, since it no
+ * longer opens.
+ */
+export type ShareReadiness =
+  | { kind: 'ready' }
+  | { kind: 'expires'; at: number }
+  | { kind: 'not_listed' }
+  | { kind: 'not_public' }
+  | { kind: 'has_password' }
+  | { kind: 'public_links_off' }
+  | { kind: 'removed' }
+
 /** Something a viewer may or may not do; the password prompt is a state, not a permission. */
 export type ArtifactPermission = Exclude<keyof ArtifactPermissions, 'needsPublicLinkPassword'>
 
@@ -94,6 +108,18 @@ export class ArtifactAccess {
   get onPersonalPage(): boolean {
     const { listed, publicLinkPasswordHash } = this.#summary.sharing
     return listed && this.publicLinkActive && publicLinkPasswordHash === null && this.#summary.removal === null
+  }
+
+  // Asked in the order an author would fix them, so the first answer names the first thing to change.
+  get shareReadiness(): ShareReadiness {
+    const { visibility, publicLinkPasswordHash, publicLinkExpiresAt, listed } = this.#summary.sharing
+    if (this.#summary.removal !== null) return { kind: 'removed' }
+    if (visibility !== 'public_link') return { kind: 'not_public' }
+    if (!this.#publicLinksEnabled) return { kind: 'public_links_off' }
+    if (publicLinkPasswordHash !== null) return { kind: 'has_password' }
+    if (!this.publicLinkActive) return { kind: 'not_public' }
+    if (!listed) return { kind: 'not_listed' }
+    return publicLinkExpiresAt === null ? { kind: 'ready' } : { kind: 'expires', at: publicLinkExpiresAt }
   }
 
   /** Only a public link anyone can open may be listed; a password or another visibility rules it out. */

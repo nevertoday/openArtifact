@@ -47,6 +47,17 @@
   .personal-entry__link:hover .personal-entry__arrow { opacity: 1; translate: 0 0; }
 }
 
+.personal-share { position: absolute; right: 0; bottom: 18px; display: flex; gap: var(--space-0-5); }
+.personal-cover { position: relative; }
+.personal-cover .personal-share { bottom: clamp(36px, 5vw, 64px); }
+.personal-share__action { --btn-fg: var(--muted); --btn-bg-hover: var(--wash-strong); }
+@media (hover: hover) {
+  .personal-share { opacity: 0; transition: opacity .2s ease; }
+  :is(.personal-entry, .personal-cover):is(:hover, :focus-within) .personal-share { opacity: 1; }
+  .personal-share__action:hover { color: var(--ink); }
+}
+@media (hover: none) { .personal-share { opacity: .6; } }
+
 .personal-tools { display: flex; gap: var(--space-1); margin: calc(-1 * var(--space-4)) 0 var(--space-3) calc(-1 * var(--space-2)); }
 .personal-cover .personal-tools { margin-top: var(--space-4); }
 .personal-tool { --btn-fg: var(--muted); --btn-bg-hover: var(--wash-strong); font-weight: var(--weight-regular); }

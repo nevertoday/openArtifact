@@ -10,6 +10,7 @@ import {
 import { ArtifactGate } from '../access/artifact-gate.ts'
 import { HttpError } from '../http-error.ts'
 import { People } from '../people.ts'
+import { ShareCard } from '../share/share-card.ts'
 import type { ApiContext } from './api-context.ts'
 import { JsonBody } from './json-body.ts'
 import { PublicLinkExpiry } from './public-link-expiry.ts'
@@ -127,6 +128,7 @@ export class SharingApi {
       this.#context.repositories.profiles.findByUser(summary.authorId),
     ])
     const deletedPersonName = (await this.#context.messages()).server.deletedPerson
+    const shareReadiness = new ArtifactAccess(summary, workspace?.publicLinksEnabled ?? false, Date.now()).shareReadiness
     return {
       visibility: summary.sharing.visibility,
       peopleApplyUnder: VISIBILITIES.filter(visibility => ArtifactAccess.grantsApplyUnder(visibility)),
@@ -145,6 +147,7 @@ export class SharingApi {
         return { userId: grant.userId, role: grant.role, name: profile ? People.displayName(profile) : deletedPersonName, email: profile?.email ?? null }
       }),
       members: members.map(member => ({ userId: member.userId, name: People.displayName(member), email: member.email })),
+      share: ShareCard.of(summary, shareReadiness, this.#context.appOrigin).toJson(),
     }
   }
 

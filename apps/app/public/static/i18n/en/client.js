@@ -28,6 +28,7 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
     public_links_off: 'An admin has turned off public links.',
     version_conflict: 'Someone just published a new version. Refresh the page and try again.',
     not_listable: 'Only public links without a password can be listed on your page.',
+    share_text_too_long: 'With the link, this text is over the 280 X allows. Make it shorter.',
   },
   removal: {
     takeDown: {

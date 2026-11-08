@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers'
-import type { ArtifactFile } from '@open-artifact/core'
+import { ArtifactRemoval, type ArtifactFile } from '@open-artifact/core'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { CloudflareArtifactRepository } from '../src/index.ts'
+import { CloudflareArtifactRepository, CloudflareShareCardImages } from '../src/index.ts'
 
 const workspaceId = 'workspace-design-team'
 const authorId = 'user-author'
@@ -44,6 +44,7 @@ describe('CloudflareArtifactRepository', () => {
       excerpt: null,
       listed: false,
       summary: null,
+      shareText: null,
       files: [htmlPage('draft'), { path: 'assets/app.css', contentType: 'text/css', body: new TextEncoder().encode('h1{}') }],
     })
   }
@@ -207,5 +208,33 @@ describe('CloudflareArtifactRepository', () => {
     expect(publishResult).toEqual({ status: 'not_found' })
     expect(await storedObjectCount(unknownArtifactId)).toBe(0)
     expect(await artifactRepository.readCurrentVersion(unknownArtifactId)).toBeNull()
+  })
+
+  it('keeps the words an author wrote for sharing on X, and lets them go back to none', async () => {
+    const designDoc = await createDesignDoc()
+
+    await artifactRepository.setShareText(designDoc.artifactId, '读完这篇就知道怎么做了')
+    const written = await artifactRepository.findSummary(designDoc.artifactId)
+    await artifactRepository.setShareText(designDoc.artifactId, null)
+    const cleared = await artifactRepository.findSummary(designDoc.artifactId)
+
+    expect(written?.shareText).toBe('读完这篇就知道怎么做了')
+    expect(cleared?.shareText).toBeNull()
+  })
+
+  it('keeps each drawn share card, and deletes an artifact\'s cards when it is purged', async () => {
+    const shareCardImages = new CloudflareShareCardImages(env.FILES)
+    const designDoc = await createDesignDoc()
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
+
+    const beforeDrawing = await shareCardImages.read(designDoc.artifactId, '1.1')
+    await shareCardImages.write(designDoc.artifactId, '1.1', png)
+    const drawn = await shareCardImages.read(designDoc.artifactId, '1.1')
+    await artifactRepository.remove(designDoc.artifactId, new ArtifactRemoval(1, authorId, false))
+    await artifactRepository.purgeRemovedBefore(2)
+
+    expect(beforeDrawing).toBeNull()
+    expect(drawn).toEqual(png)
+    expect(await shareCardImages.read(designDoc.artifactId, '1.1')).toBeNull()
   })
 })

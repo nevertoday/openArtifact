@@ -79,7 +79,12 @@ export interface PageOptions {
 export interface PublicCard {
   url: string
   kind: 'article' | 'profile'
+  /** The 1200 × 630 picture with the title drawn in it; `alt` says in words what it shows. */
+  image: { url: string; alt: string }
 }
+
+const CARD_IMAGE_WIDTH = 1200
+const CARD_IMAGE_HEIGHT = 630
 
 export class PageShell {
   static render(options: PageOptions): Response {
@@ -119,15 +124,22 @@ ${(options.styles ?? []).map(style => html`<link rel="stylesheet" href="/static/
     })
   }
 
-  // A small summary card: the title and description carry it, so no picture has to be made for each page.
+  // A large picture card: X may show only the picture and the site's name, so the title is drawn into the picture.
   static #publicCardMeta(options: PageOptions): SafeHtml {
     if (!options.publicCard) return html`<meta name="robots" content="noindex">`
-    const { url, kind } = options.publicCard
+    const { url, kind, image } = options.publicCard
     return html`<link rel="canonical" href="${url}">
 <meta property="og:url" content="${url}">
 <meta property="og:type" content="${kind}">
 <meta property="og:locale" content="${options.m.meta.ogLocale}">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="${image.url}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="${String(CARD_IMAGE_WIDTH)}">
+<meta property="og:image:height" content="${String(CARD_IMAGE_HEIGHT)}">
+<meta property="og:image:alt" content="${image.alt}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${image.url}">
+<meta name="twitter:image:alt" content="${image.alt}">
 <meta name="twitter:title" content="${options.title}">
 ${options.description ? html`<meta name="twitter:description" content="${options.description}">` : ''}`
   }
@@ -158,6 +170,11 @@ ${options.description ? html`<meta name="twitter:description" content="${options
 
   static icon(name: IconName, size: IconSize = 16): SafeHtml {
     return html`<i data-xxd-icon="${name}" data-size="${size}" aria-hidden="true"></i>`
+  }
+
+  /** X's mark, which the kit's icon set does not carry; drawn in the text colour beside a label that names it. */
+  static xLogo(size: IconSize = 14): SafeHtml {
+    return html`<svg class="app-x-logo" width="${String(size)}" height="${String(size)}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`
   }
 
   static brandLink(): SafeHtml {

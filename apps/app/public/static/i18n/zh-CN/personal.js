@@ -8,8 +8,13 @@ export default {
     text: '这是你的主页，别人看到的就是这样。在文档的「分享」里打开「列在我的主页」，它就会出现在这里。',
     back: '回到工作台',
   },
-  /** @param {string} name */
-  shareText: name => `${name} 的文章`,
+  /** @param {{ name: string, count: number }} p */
+  shareLead: ({ name, count }) => `${name} 在 Open Artifact 上的 ${count} 篇文章：`,
+  /** Each title as the list of the page's titles shows it; the place in the list matters to languages that separate them. @param {string} title @param {number} _index */
+  shareQuote: (title, _index) => `《${title}》`,
+  shareEntryOnX: '发到 X',
+  copyEntryLink: '复制链接',
+  linkCopied: '已复制链接',
   /** @param {number} count */
   entryCount: count => `${count} 篇`,
   sharePage: '分享主页',

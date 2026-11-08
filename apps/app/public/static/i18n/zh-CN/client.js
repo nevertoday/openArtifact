@@ -29,6 +29,7 @@ export default {
     public_links_off: '管理员已关闭公开链接。',
     version_conflict: '刚有人发布了新版本。刷新页面后再试。',
     not_listable: '只有不设密码的公开链接才能列在主页上。',
+    share_text_too_long: '这段文案加上链接超过了 X 的 280 字限制，请删短一些。',
   }),
   /** takeDown is an admin removing someone else's artifact; delete is the author removing their own. */
   removal: {

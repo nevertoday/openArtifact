@@ -236,7 +236,7 @@ button.viewer-visibility { cursor: pointer; }
 }
 
 /* Under an artifact listed on its author's personal page: who wrote it, and where to read on. */
-.viewer-byline { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 10px max(var(--space-4), calc(50% - 560px)); border-top: 1px solid var(--line); background: var(--paper); font-size: var(--text-sm); }
+.viewer-byline { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 10px max(var(--space-4), calc(50% - 560px)); border-top: 1px solid var(--line); background: var(--paper); font-size: var(--text-sm); }
 .viewer-byline__avatar { display: grid; place-items: center; width: 30px; height: 30px; background: var(--ink); color: var(--paper); font-weight: 700; text-decoration: none; }
 .viewer-byline__who { display: grid; margin: 0; min-width: 0; }
 .viewer-byline__who a { color: var(--ink); font-weight: var(--weight-strong); text-decoration: none; }
@@ -245,3 +245,39 @@ button.viewer-visibility { cursor: pointer; }
 .viewer-byline__next a { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; overflow: hidden; color: var(--ink); font-weight: var(--weight-strong); text-decoration: none; white-space: nowrap; text-overflow: ellipsis; }
 @media (hover: hover) { .viewer-byline a:hover { text-decoration: underline; text-underline-offset: 3px; } }
 @media (max-width: 560px) { .viewer-byline__next span { display: none; } .viewer-byline__next a { max-width: 44vw; } }
+.viewer-byline__share { gap: var(--space-1-5); }
+@media (max-width: 420px) { .viewer-byline__share span { display: none; } }
+
+/* Posting to X: whether the link can go out, the words before it with X's count, and the card X will show. */
+.share-x__body { display: grid; align-content: start; gap: var(--space-4); padding-top: var(--space-4); color: var(--ink); }
+.share-x__body > * + * { margin-top: 0; }
+.xxd-dialog__title .app-x-logo { vertical-align: -1px; }
+.share-x__styles { justify-self: start; max-width: 100%; flex-wrap: wrap; }
+.share-x__field { display: grid; gap: var(--space-1-5); }
+.share-x__text { min-height: 7.5em; resize: vertical; font-size: var(--text-sm); line-height: 1.6; }
+.share-x__url { margin: 0; color: var(--muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.share-x__counter { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--muted); }
+.share-x__ring { display: inline-grid; }
+.share-x__ring svg { rotate: -90deg; }
+.share-x__ring circle { fill: none; stroke-width: 2.5; stroke-linecap: round; }
+.share-x__ring-track { stroke: var(--line); }
+.share-x__ring-fill { stroke: var(--action); transition: stroke-dasharray var(--motion-quick) ease; }
+.share-x__counter[data-level="near"] .share-x__ring-fill { stroke: var(--warning); }
+.share-x__counter[data-level="over"] .share-x__ring-fill { stroke: var(--danger); }
+.share-x__count { color: var(--ink); font-variant-numeric: tabular-nums; }
+.share-x__counter[data-level="over"] .share-x__count { color: var(--danger-text); }
+.share-x__hint { margin-inline-start: auto; text-align: end; }
+.share-x__over { margin: 0; color: var(--danger-text); font-size: var(--text-xs); }
+.share-x__saved { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.share-x__saved:empty { display: none; }
+.share-x__preview { display: grid; gap: var(--space-1-5); margin: 0; }
+.share-x__preview img { display: block; width: 100%; height: auto; aspect-ratio: 1200 / 630; border: 1px solid var(--line); border-radius: var(--r-md, 8px); background: var(--wash); }
+.share-x__preview-missing { display: grid; place-items: center; margin: 0; aspect-ratio: 1200 / 630; padding: var(--space-4); border: 1px dashed var(--line-strong); border-radius: var(--r-md, 8px); color: var(--muted); font-size: var(--text-sm); text-align: center; }
+.share-x__actions { flex-wrap: wrap; }
+.share-x__actions [data-share-x-open][aria-disabled="true"] { opacity: .5; pointer-events: none; }
+
+/* A phone: the panel rises from the bottom like the comment drawer. */
+@media (max-width: 640px) {
+  .xxd-dialog.share-x { width: 100%; max-width: 100%; max-height: 92dvh; margin: auto 0 0; padding-bottom: max(var(--space-4), env(safe-area-inset-bottom, 0px)); border-bottom-left-radius: 0; border-bottom-right-radius: 0; animation: viewer-sheet-in var(--motion-sheet) var(--ease-out-expo); }
+  .share-x__hint { display: none; }
+}

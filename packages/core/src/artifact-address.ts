@@ -6,10 +6,10 @@ export type AddressedArtifact = Pick<ArtifactSummary, 'shortId' | 'slug'>
 /** What the address segment of a link names: an artifact id in links sent before short ids existed, or a short id. */
 export type ArtifactReference = { kind: 'artifact_id'; artifactId: string } | { kind: 'short_id'; shortId: string }
 
-/** The pages under an artifact's address. */
-export type ArtifactPage = 'viewer' | 'full' | 'unlock'
+/** The pages under an artifact's address, and the picture shown when it is shared. */
+export type ArtifactPage = 'viewer' | 'full' | 'unlock' | 'card'
 
-const PAGE_SUFFIXES: Record<ArtifactPage, string> = { viewer: '', full: '/full', unlock: '/unlock' }
+const PAGE_SUFFIXES: Record<ArtifactPage, string> = { viewer: '', full: '/full', unlock: '/unlock', card: '/card.png' }
 const SHORT_ID_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz'
 const SHORT_ID_LENGTH = 12
 const SHORT_ID_PATTERN = new RegExp(`^[${SHORT_ID_ALPHABET}]{${SHORT_ID_LENGTH}}$`)

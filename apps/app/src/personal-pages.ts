@@ -1,5 +1,6 @@
 import { ArtifactAccess, ProfileHandle, type ArtifactSummary, type Profile, type Repositories } from '@open-artifact/core'
 import { People } from './people.ts'
+import { ShareCard } from './share/share-card.ts'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const REVISION_SHOWN_DAYS = 7
@@ -40,6 +41,11 @@ export class PersonalPages {
     const workspaces = await Promise.all(workspaceIds.map(workspaceId => this.#repositories.workspaces.findWorkspace(workspaceId)))
     const publicLinksAllowed = new Map(workspaces.flatMap(workspace => (workspace ? [[workspace.workspaceId, workspace.publicLinksEnabled] as const] : [])))
     return listedSummaries.filter(summary => new ArtifactAccess(summary, publicLinksAllowed.get(summary.workspaceId) ?? false, now).onPersonalPage)
+  }
+
+  /** How an entry goes out on X; being listed already proved its workspace allows public links. */
+  shareCardOf(entry: ArtifactSummary, now: number): ShareCard {
+    return ShareCard.of(entry, new ArtifactAccess(entry, true, now).shareReadiness, this.#appOrigin)
   }
 
   url(handle: string): string {

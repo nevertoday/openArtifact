@@ -6,7 +6,11 @@ export default /** @satisfies {import('../messages').Messages['personal']} */ ({
     text: 'This is your page, exactly as others see it. Turn on “List on my page” in a document\'s “Share” panel and it shows up here.',
     back: 'Back to workspace',
   },
-  shareText: name => `Writing by ${name}`,
+  shareLead: ({ name, count }) => `${count} ${count === 1 ? 'piece' : 'pieces'} by ${name} on Open Artifact: `,
+  shareQuote: (title, index) => `${index === 0 ? '' : ', '}“${title}”`,
+  shareEntryOnX: 'Post to X',
+  copyEntryLink: 'Copy link',
+  linkCopied: 'Link copied',
   entryCount: count => `${count} ${count === 1 ? 'document' : 'documents'}`,
   sharePage: 'Share page',
   bio: {
