@@ -1,6 +1,6 @@
 // @ts-check
 export default {
-  sections: { profile: '个人资料', agents: 'Agent 接入', members: '成员', workspace: 'workspace 设置' },
+  sections: { profile: '个人资料', agents: 'Agent 接入', members: '成员', workspace: '工作区设置' },
   topBarContext: '/ 设置',
   sidebar: { label: '设置分类', personal: '个人' },
   save: '保存',
@@ -86,33 +86,45 @@ export default {
     columns: { name: '名字', email: '邮箱', role: '角色' },
     /** @param {string} name */
     roleOf: name => `${name} 的角色`,
-    lastAdmin: 'workspace 至少要有一位管理员',
+    lastAdmin: '工作区至少要有一位管理员',
     remove: '移除',
     cannotRemoveSelf: '不能移除自己',
   },
   invite: {
     title: '邀请同事',
     /** @param {number} days */
-    description: days => `收到邀请的人登录后就会加入，不受邮箱域名限制。邀请 ${days} 天后失效。`,
+    description: days => `收到邀请的人登录后就会加入，不受邮箱域名限制。邮件邀请 ${days} 天后失效；邀请链接可以设为 7 天、30 天或永不过期，适合贴在团队群或入职文档里。`,
     emailsLabel: '用邮箱邀请',
     emailsHelp: '可以一次填多个，用逗号或换行分开。每人会收到一封带链接的邮件。',
     send: '发送邀请',
     createLink: '生成邀请链接',
+    linkExpiry: '链接有效期',
+    linkExpiries: { 7: '7 天', 30: '30 天', never: '永不过期' },
   },
   workspace: {
     nameLabel: '名称',
     nameRequired: '写一个名称，比如团队或项目的名字',
-    nameHelp: '成员在侧栏和切换 workspace 时看到它。最多 40 个字。',
+    nameHelp: '成员在侧栏和切换工作区时看到它。最多 40 个字。',
     publicLinks: {
       title: '公开链接',
       label: '允许成员把 artifact 分享为公开链接',
-      help: '关闭后，现有的公开链接立即失效；成员仍然可以在 workspace 内查看。',
+      help: '关闭后，现有的公开链接立即失效；成员仍然可以在工作区内查看。',
       /** @param {boolean} enabled */
       state: enabled => `${enabled ? '已允许' : '已关闭'} · 只有管理员可以修改`,
     },
+    lifecycle: {
+      title: '离开或删除',
+      personalNote: '这是你的个人工作区，不能离开或删除，你一直是它的管理员。可以改名，也可以邀请别人进来一起用。',
+      leaveLabel: '离开工作区',
+      leaveHelp: '离开后你看不到这里的 artifact，你在这里的 token 也会失效；你发布的 artifact 留在工作区里。之后有人邀请你，你还能回来。',
+      leave: '离开',
+      deleteLabel: '删除工作区',
+      deleteHelp: '所有成员立即失去访问，其中的 artifact、公开链接和 token 都停止工作。30 天内管理员可以在工作区菜单的「最近删除」里恢复，之后彻底删除。',
+      delete: '删除工作区',
+    },
     content: {
       title: '内容管理',
-      description: 'workspace 里的全部 artifact。下架后所有人都看不到，作者也不能自己恢复；30 天内管理员可以恢复。私有 artifact 只显示标题，管理员也不能打开。',
+      description: '工作区里的全部 artifact。下架后所有人都看不到，作者也不能自己恢复；30 天内管理员可以恢复。私有 artifact 只显示标题，管理员也不能打开。',
       columns: { title: '标题', author: '作者', state: '状态', updated: '更新' },
       /** @param {boolean} takenDown */
       removedBadge: takenDown => `已${takenDown ? '下架' : '删除'}`,
@@ -133,7 +145,7 @@ export default {
         /** @param {{ actor: string, from: string, to: string }} p */
         'artifact.renamed': ({ actor, from, to }) => `${actor} 把「${from}」重命名为「${to}」`,
         /** @param {{ actor: string, target: string }} p */
-        'member.removed': ({ actor, target }) => `${actor} 把 ${target} 移出了 workspace`,
+        'member.removed': ({ actor, target }) => `${actor} 把 ${target} 移出了工作区`,
         /** @param {{ actor: string, target: string, role: string }} p */
         'member.role_changed': ({ actor, target, role }) => `${actor} 把 ${target} 设为${role}`,
         /** @param {{ actor: string, email: string | null }} p */
@@ -141,9 +153,9 @@ export default {
         /** @param {{ actor: string, email: string | null }} p */
         'invite.revoked': ({ actor, email }) => (email === null ? `${actor} 撤销了一个邀请链接` : `${actor} 撤销了给 ${email} 的邀请`),
         /** @param {{ actor: string, viaLink: boolean }} p */
-        'member.joined': ({ actor, viaLink }) => (viaLink ? `${actor} 通过邀请链接加入了 workspace` : `${actor} 接受邀请加入了 workspace`),
+        'member.joined': ({ actor, viaLink }) => (viaLink ? `${actor} 通过邀请链接加入了工作区` : `${actor} 接受邀请加入了工作区`),
         /** @param {{ actor: string, from: string, to: string }} p */
-        'workspace.renamed': ({ actor, from, to }) => `${actor} 把 workspace 从「${from}」改名为「${to}」`,
+        'workspace.renamed': ({ actor, from, to }) => `${actor} 把工作区从「${from}」改名为「${to}」`,
         /** @param {{ actor: string }} p */
         'member.left': ({ actor }) => `${actor} 离开了工作区`,
         /** @param {{ actor: string }} p */

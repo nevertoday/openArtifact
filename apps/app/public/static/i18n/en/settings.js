@@ -86,11 +86,13 @@ export default /** @satisfies {import('../messages').Messages['settings']} */ ({
   },
   invite: {
     title: 'Invite colleagues',
-    description: days => `People you invite join when they sign in, whatever their email domain. Invites expire after ${days} ${days === 1 ? 'day' : 'days'}.`,
+    description: days => `People you invite join when they sign in, whatever their email domain. Email invites expire after ${days} ${days === 1 ? 'day' : 'days'}; an invite link can last 7 days, 30 days or never expire, for your team chat or onboarding doc.`,
     emailsLabel: 'Invite by email',
     emailsHelp: 'Add several at once, separated by commas or new lines. Each person gets an email with a link.',
     send: 'Send invites',
     createLink: 'Create invite link',
+    linkExpiry: 'Link expires',
+    linkExpiries: { 7: 'In 7 days', 30: 'In 30 days', never: 'Never' },
   },
   workspace: {
     nameLabel: 'Name',
@@ -101,6 +103,16 @@ export default /** @satisfies {import('../messages').Messages['settings']} */ ({
       label: 'Let members share artifacts as public links',
       help: 'Turning this off ends every existing public link at once. Members can still view artifacts inside the workspace.',
       state: enabled => `${enabled ? 'Allowed' : 'Off'} · Only admins can change this`,
+    },
+    lifecycle: {
+      title: 'Leave or delete',
+      personalNote: "This is your personal workspace. It can't be left or deleted, and you always stay its admin. You can rename it and invite others into it.",
+      leaveLabel: 'Leave workspace',
+      leaveHelp: "You lose access to its artifacts and your tokens here stop working; the artifacts you published stay in the workspace. Anyone's invite brings you back.",
+      leave: 'Leave',
+      deleteLabel: 'Delete workspace',
+      deleteHelp: 'Every member loses access at once, and its artifacts, public links and tokens stop working. Admins can restore it from “Recently deleted” in the workspace menu for 30 days; after that it is deleted for good.',
+      delete: 'Delete workspace',
     },
     content: {
       title: 'Content',

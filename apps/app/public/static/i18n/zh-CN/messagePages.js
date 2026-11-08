@@ -33,8 +33,8 @@ export default {
   },
   removedFromWorkspace: {
     pageTitle: '已被移出 · Open Artifact',
-    title: '你已被移出这个 workspace，请联系管理员',
-    text: '管理员把你移出后，你发布的 artifact 仍留在 workspace 里。如果你用错了账号，退出后换一个登录。',
+    title: '你已被移出这个工作区，请联系管理员',
+    text: '管理员把你移出后，你发布的 artifact 仍留在工作区里。如果你用错了账号，退出后换一个登录。',
   },
   inviteUnusable: {
     pageTitle: '邀请已失效 · Open Artifact',

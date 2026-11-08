@@ -150,12 +150,40 @@ function wireSignOut() {
   }
 }
 
-function wireWorkspaceSwitcher() {
-  const switcher = document.querySelector('[data-switch-workspace]')
-  switcher?.addEventListener('change', async () => {
-    await api('/api/me/workspace', { method: 'POST', body: { workspaceId: switcher.value } })
-    location.href = '/'
+// The workspace menu (PageShell.workspaceSwitcher): switch, create, and restore a deleted workspace.
+function wireWorkspaceMenu() {
+  for (const workspaceItem of document.querySelectorAll('[data-switch-workspace]')) {
+    workspaceItem.addEventListener('click', async () => {
+      if (workspaceItem.getAttribute('aria-checked') === 'true') return
+      await api('/api/me/workspace', { method: 'POST', body: { workspaceId: workspaceItem.dataset.switchWorkspace } })
+      location.href = '/'
+    })
+  }
+  const newWorkspaceForm = document.getElementById('new-workspace-form')
+  // A new workspace starts with inviting people, so its members page opens next.
+  newWorkspaceForm?.addEventListener('submit', async event => {
+    event.preventDefault()
+    const nameInput = newWorkspaceForm.elements.namedItem('name')
+    const name = nameInput.value.trim()
+    if (name === '') return Xxd.setFieldError(nameInput, nameInput.dataset.errorRequired)
+    Xxd.setFieldError(nameInput, '')
+    try {
+      await Xxd.runBusy(event.submitter, () => api('/api/workspaces', { method: 'POST', body: { name } }))
+      location.href = '/settings/members'
+    } catch (error) {
+      Xxd.setFieldError(nameInput, error instanceof ApiError && error.field === 'name' ? userMessageOf(error) : m.client.workspaces.createFailed(userMessageOf(error)))
+    }
   })
+  for (const restoreButton of document.querySelectorAll('[data-restore-workspace]')) {
+    restoreButton.addEventListener('click', async () => {
+      try {
+        await Xxd.runBusy(restoreButton, () => api(`/api/workspaces/${encodeURIComponent(restoreButton.dataset.restoreWorkspace)}/restore`, { method: 'POST' }))
+        location.href = '/'
+      } catch (error) {
+        Xxd.toast(m.client.workspaces.restoreFailed(userMessageOf(error)), { tone: 'danger', within: restoreButton.closest('dialog') })
+      }
+    })
+  }
 }
 
 /** The bell in the top bar: the unread count, and the person's notifications as sentences, newest first. */
@@ -236,5 +264,5 @@ function wireNotificationBell() {
 
 renderServerTimes()
 wireSignOut()
-wireWorkspaceSwitcher()
+wireWorkspaceMenu()
 wireNotificationBell()

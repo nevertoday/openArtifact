@@ -77,7 +77,7 @@ describe('settings for an admin', () => {
     expect(adminMembers).toContain('data-member-role')
     expect(adminMembers).toContain('data-remove-member')
     expect(adminMembers).toContain('不能移除自己')
-    expect(adminMembers).toContain('workspace 至少要有一位管理员')
+    expect(adminMembers).toContain('工作区至少要有一位管理员')
     expect(memberMembers).not.toContain('data-member-role')
     expect(memberMembers).not.toContain('data-remove-member')
   })

@@ -410,7 +410,7 @@ class PendingInvites {
 
   #item(invite) {
     const subject = invite.email ?? m.client.settings.invites.anyoneLink
-    const expiry = dateText(invite.expiresAt)
+    const expiry = invite.expiresAt === null ? null : dateText(invite.expiresAt)
     return element('li', { className: 'xxd-list__item' },
       element('span', { className: 'xxd-list__main' },
         element('span', { className: 'xxd-list__title' }, subject),
@@ -448,7 +448,9 @@ function wireInvites() {
   linkButton.addEventListener('click', async () => {
     linkButton.disabled = true
     try {
-      await Xxd.runBusy(linkButton, () => api('/api/workspace/invites/link', { method: 'POST' }))
+      const chosenExpiry = document.getElementById('invite-link-expiry').value
+      const expiresInDays = chosenExpiry === 'never' ? null : Number(chosenExpiry)
+      await Xxd.runBusy(linkButton, () => api('/api/workspace/invites/link', { method: 'POST', body: { expiresInDays } }))
       Xxd.toast(m.client.settings.invites.linkCreated, { tone: 'success' })
       await pendingInvites.refresh()
     } catch (error) {
@@ -509,6 +511,27 @@ function wireContentAdministration() {
   }
 }
 
+// Leaving and deleting both end in the personal workspace, which the answer has already switched to.
+function wireWorkspaceLifecycle() {
+  const { lifecycle } = m.client.settings
+  const actions = [
+    { button: document.querySelector('[data-leave-workspace]'), title: lifecycle.leaveTitle, message: lifecycle.leaveMessage, label: m.settings.workspace.lifecycle.leave, request: { path: '/api/workspace/leave', method: 'POST' } },
+    { button: document.querySelector('[data-delete-workspace]'), title: lifecycle.deleteTitle, message: lifecycle.deleteMessage, label: m.settings.workspace.lifecycle.delete, request: { path: '/api/workspace', method: 'DELETE' } },
+  ]
+  for (const { button, title, message, label, request } of actions) {
+    button?.addEventListener('click', async () => {
+      const confirmed = await Xxd.confirmDialog({ title: title(button.dataset.name), message, confirmLabel: label, cancelLabel: m.client.dialog.cancel, closeLabel: m.client.dialog.close, tone: 'danger' })
+      if (!confirmed) return
+      try {
+        await Xxd.runBusy(button, () => api(request.path, { method: request.method }))
+        location.href = '/'
+      } catch (error) {
+        Xxd.toast(lifecycle.failed(userMessageOf(error)), { tone: 'danger' })
+      }
+    })
+  }
+}
+
 wireAgentConnection()
 wireProfileForm()
 wireThemeChoice()
@@ -517,3 +540,4 @@ wirePublicLinksSwitch()
 wireMemberAdministration()
 wireInvites()
 wireContentAdministration()
+wireWorkspaceLifecycle()

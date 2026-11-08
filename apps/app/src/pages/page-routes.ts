@@ -1,4 +1,4 @@
-import { ArtifactPath, CommentThread, parseLocale, PublicLinkPassword, type ArtifactPage, type Invite } from '@open-artifact/core'
+import { ArtifactPath, CommentThread, parseLocale, PublicLinkPassword, WorkspaceDeletion, type ArtifactPage, type Invite } from '@open-artifact/core'
 import { ArtifactGate, type OpenedArtifact } from '../access/artifact-gate.ts'
 import type { ApiContext } from '../api/api-context.ts'
 import { INVITE_COOKIE } from '../auth/admission.ts'
@@ -106,12 +106,16 @@ export class PageRoutes {
     const identity = await this.#context.identity()
     if (!identity) return this.#redirectToLogin(request)
     const searchParams = new URL(request.url).searchParams
-    const [workspaceArtifacts, openThreadComments, grantsOfUser] = await Promise.all([
+    const [workspaceArtifacts, openThreadComments, sharedArtifacts] = await Promise.all([
       this.#context.gate.listWorkspace(identity),
       this.#context.repositories.comments.listInOpenThreads(identity.membership.workspace.workspaceId),
-      this.#context.repositories.artifactAccess.listGrantsOfUser(identity.userId),
+      this.#context.gate.listSharedWith(identity),
     ])
-    const listing = new HomeListing(workspaceArtifacts, identity, CommentThread.allOf(openThreadComments), new Set(grantsOfUser.map(grant => grant.artifactId)))
+    const listing = new HomeListing(workspaceArtifacts, identity, CommentThread.allOf(openThreadComments), sharedArtifacts)
+    const [workspaceNames, deletedWorkspaces] = await Promise.all([
+      this.#workspaceNames(listing.otherWorkspaceIds()),
+      this.#context.repositories.workspaces.listRestorable(identity.userId, WorkspaceDeletion.purgeCutoff(Date.now())),
+    ])
     const requestedFilter = searchParams.get('filter')
     const query = {
       filter: HOME_FILTERS.find(filter => filter === requestedFilter) ?? ('all' as HomeFilter),
@@ -121,7 +125,12 @@ export class PageRoutes {
     const [authorNames, m] = await Promise.all([this.#context.people.namesOf(listing.peopleIds()), this.#context.messages()])
     const previewUrls = await this.#previewUrls(listing.matching(m, query, authorNames))
     const justRemoved = listing.restorable(searchParams.get('removed'))
-    return HomePage.render({ m, identity, listing, query, authorNames, previewUrls, justRemoved, usercontentOrigin: this.#settings.usercontentOrigin, now: Date.now() })
+    return HomePage.render({ m, identity, listing, query, authorNames, workspaceNames, deletedWorkspaces, previewUrls, justRemoved, usercontentOrigin: this.#settings.usercontentOrigin, now: Date.now() })
+  }
+
+  async #workspaceNames(workspaceIds: string[]): Promise<Map<string, string>> {
+    const workspaces = await Promise.all(workspaceIds.map(workspaceId => this.#context.repositories.workspaces.findWorkspace(workspaceId)))
+    return new Map(workspaces.flatMap(workspace => (workspace === null ? [] : [[workspace.workspaceId, workspace.name] as const])))
   }
 
   /** Anyone may read a personal page; `/@me` takes a signed-in person to their own, making it the first time. */

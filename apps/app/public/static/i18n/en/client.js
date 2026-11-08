@@ -4,6 +4,10 @@ const plural = (/** @type {number} */ count, /** @type {string} */ one, /** @typ
 
 export default /** @satisfies {import('../messages').Messages['client']} */ ({
   dialog: { cancel: 'Cancel', close: 'Close' },
+  workspaces: {
+    createFailed: message => `Couldn't create it: ${message}`,
+    restoreFailed: message => `Couldn't restore it: ${message}`,
+  },
   errorFallback: "That didn't work. Please try again.",
   errors: {
     network: "Can't reach Open Artifact. Check your connection and try again.",
@@ -120,6 +124,13 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
       open: 'Open',
     },
     profile: { saved: 'Saved' },
+    lifecycle: {
+      leaveTitle: name => `Leave “${name}”?`,
+      leaveMessage: "You lose access to its artifacts at once, and your tokens here stop working. Anyone's invite brings you back.",
+      deleteTitle: name => `Delete “${name}”?`,
+      deleteMessage: 'Every member loses access at once, and its artifacts, public links and tokens stop working. You can restore it from “Recently deleted” in the workspace menu for 30 days.',
+      failed: message => `That didn't work: ${message}`,
+    },
     publicLinks: {
       offTitle: 'Turn off public links?',
       offMessage: count => `${count === 1 ? 'The public link stops' : `All ${count} public links stop`} working right away.`,
@@ -140,7 +151,7 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
       none: 'No pending invites.',
       heading: count => `Pending invites (${count})`,
       anyoneLink: 'Invite link · anyone can use it',
-      meta: ({ inviter, expiry }) => `Invited by ${inviter} · expires ${expiry}`,
+      meta: ({ inviter, expiry }) => `Invited by ${inviter} · ${expiry === null ? 'never expires' : `expires ${expiry}`}`,
       copy: 'Copy link',
       copyDone: 'Copied the invite link',
       revoke: 'Revoke',

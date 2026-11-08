@@ -13,7 +13,7 @@ export default /** @satisfies {import('../messages').Messages['home']} */ ({
   filterDescriptions: {
     all: 'Artifacts published by your teammates and their agents. The whole workspace can see them by default.',
     mine: 'What you published, and what your agents published for you.',
-    shared: 'Artifacts whose authors added you to the share list.',
+    shared: 'Artifacts whose authors added you to the share list, whichever workspace they are in.',
     removed: 'Deleted artifacts are hidden from everyone. You can restore them for 30 days, then they\'re deleted for good.',
     waiting_for_me: 'Comments are waiting for your reply.',
     waiting_for_my_agent: 'Comments for an agent are still open, waiting for your agent.',
@@ -46,6 +46,7 @@ export default /** @satisfies {import('../messages').Messages['home']} */ ({
     sourceOption: ({ agent, count }) => `${agent} (${count})`,
     countTitle: artifacts,
   },
+  fromWorkspace: workspace => `From the workspace “${workspace}”`,
   unresolvedComments: ({ count, forAgent }) => `${count} unresolved ${count === 1 ? 'comment' : 'comments'}${forAgent > 0 ? ` · ${forAgent} for an agent` : ''}`,
   empty: {
     searchTitle: search => `Nothing found for “${search}”`,
@@ -54,6 +55,7 @@ export default /** @satisfies {import('../messages').Messages['home']} */ ({
     agentTitle: agent => `No artifacts from ${agent}`,
     viewAll: 'View all',
     connectAgent: 'Connect an agent',
+    inviteMembers: 'Invite members',
     filters: {
       all: { title: 'No artifacts yet', text: 'Connect your agent under “Connect agents”, then have it publish design docs, reports or dashboards here.' },
       mine: { title: 'You haven\'t published an artifact yet', text: 'Connect your agent and have it publish pages here.' },

@@ -213,7 +213,7 @@ describe('home page', () => {
     const newcomerHome = await pageText('/', newcomerCookie)
     const cardOf = (title: string) => authorHome.slice(authorHome.indexOf(`title="${title}"`), authorHome.indexOf('</a>', authorHome.indexOf(`title="${title}"`)))
 
-    expect(cardOf('Team roadmap')).not.toContain('workspace 内可见')
+    expect(cardOf('Team roadmap')).not.toContain('工作区内可见')
     expect(cardOf('Private notes')).toContain('<span class="xxd-badge">私有</span>')
     expect(cardOf('Team roadmap')).not.toContain('>v1</span>')
     expect(cardOf('Revised brief')).toContain('<span class="xxd-mono">v2</span>')

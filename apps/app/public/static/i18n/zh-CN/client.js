@@ -3,6 +3,12 @@ const NEW_TOKEN_HINT = '请在「Agent 接入」里新建一个。'
 
 export default {
   dialog: { cancel: '取消', close: '关闭' },
+  workspaces: {
+    /** @param {string} message */
+    createFailed: message => `没有建好：${message}`,
+    /** @param {string} message */
+    restoreFailed: message => `恢复失败：${message}`,
+  },
   errorFallback: '操作没有成功，请重试。',
   /** Keyed by ErrorCode in src/http-error.ts; `network` is the browser's own. */
   errors: /** @satisfies {Partial<Record<import('../../../../src/http-error.ts').ErrorCode | 'network', unknown>>} */ ({
@@ -12,7 +18,7 @@ export default {
     token_revoked: `这个 token 已撤销，${NEW_TOKEN_HINT}`,
     token_expired: `这个 token 已过期，${NEW_TOKEN_HINT}`,
     forbidden: '你没有权限做这件事。',
-    admin_required: '只有 workspace 管理员可以做这件事。',
+    admin_required: '只有工作区管理员可以做这件事。',
     browser_session_required: '这件事要在网页上登录后做。',
     outside_token_scope: '这个 token 只能发布。要做这件事，请新建一个完全权限的 token，或者在网页上操作。',
     cross_site_request: '请在 Open Artifact 的页面上操作。',
@@ -21,14 +27,14 @@ export default {
     /** @param {{ maxLength: number }} error */
     field_too_long: ({ maxLength }) => `最多 ${maxLength} 个字。`,
     too_large: '内容太大，请减小后再试。',
-    last_admin: 'workspace 至少要有一位管理员。先把别人设为管理员。',
+    last_admin: '工作区至少要有一位管理员。先把别人设为管理员。',
     cannot_remove_self: '不能移除自己，请另一位管理员操作。',
     author_always_sees: '作者自己一直能看到，不用添加。',
     public_links_off: '管理员已关闭公开链接。',
     version_conflict: '刚有人发布了新版本。刷新页面后再试。',
     not_listable: '只有不设密码的公开链接才能列在主页上。',
     share_text_too_long: '这段文案加上链接超过了 X 的 280 字限制，请删短一些。',
-    workspace_changed: '你在另一个标签页切换了 workspace。请刷新页面后再操作。',
+    workspace_changed: '你在另一个标签页切换了工作区。请刷新页面后再操作。',
     mail_limit_reached: '今天发出的邀请或分享邮件已经到上限，这次没有发出，也没有保存。请明天再试。',
     workspace_deleted: '这个工作区已被删除。',
     personal_workspace: '个人工作区不能离开或删除，你也一直是它的管理员。',
@@ -145,6 +151,16 @@ export default {
       open: '打开',
     },
     profile: { saved: '已保存' },
+    lifecycle: {
+      /** @param {string} name */
+      leaveTitle: name => `离开「${name}」？`,
+      leaveMessage: '你会立即看不到这里的 artifact，你在这里的 token 也会失效。之后有人邀请你，你还能回来。',
+      /** @param {string} name */
+      deleteTitle: name => `删除「${name}」？`,
+      deleteMessage: '所有成员会立即失去访问，artifact、公开链接和 token 都停止工作。30 天内你可以在工作区菜单的「最近删除」里恢复。',
+      /** @param {string} message */
+      failed: message => `没有完成：${message}`,
+    },
     publicLinks: {
       offTitle: '关闭公开链接？',
       /** @param {number} count */
@@ -160,7 +176,7 @@ export default {
       roleChangeFailed: message => `修改角色失败：${message}`,
       /** @param {string} name */
       removeTitle: name => `移除 ${name}？`,
-      removeMessage: 'TA 会立即失去访问权限，个人 API token 也会被撤销，再次登录也不会自动加入，除非你用邮箱重新邀请 TA。TA 发布的 artifact 会留在 workspace 里。',
+      removeMessage: 'TA 会立即失去访问权限，个人 API token 也会被撤销，再次登录也不会自动加入，除非你用邮箱重新邀请 TA。TA 发布的 artifact 会留在工作区里。',
       remove: '移除',
       /** @param {string} name */
       removed: name => `已移除 ${name}`,
@@ -172,8 +188,8 @@ export default {
       /** @param {number} count */
       heading: count => `待接受的邀请（${count}）`,
       anyoneLink: '邀请链接 · 任何人可用',
-      /** @param {{ inviter: string, expiry: string }} p */
-      meta: ({ inviter, expiry }) => `${inviter} 邀请 · ${expiry} 到期`,
+      /** @param {{ inviter: string, expiry: string | null }} p */
+      meta: ({ inviter, expiry }) => `${inviter} 邀请 · ${expiry === null ? '永不过期' : `${expiry} 到期`}`,
       copy: '复制链接',
       copyDone: '已复制邀请链接',
       revoke: '撤销',

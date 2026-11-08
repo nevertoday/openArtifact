@@ -205,6 +205,17 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     return summaryRows.map(summaryRow => CloudflareArtifactRepository.#summaryOf(summaryRow))
   }
 
+  async listGrantedTo(userId: string): Promise<ArtifactSummary[]> {
+    const { results: summaryRows } = await this.#db
+      .prepare(
+        `${SUMMARY_SELECT} JOIN artifact_grants ON artifact_grants.artifact_id = artifacts.id
+         WHERE artifact_grants.user_id = ? AND artifacts.removed_at IS NULL ORDER BY artifacts.updated_at DESC, artifacts.rowid DESC`,
+      )
+      .bind(userId)
+      .all<SummaryRow>()
+    return summaryRows.map(CloudflareArtifactRepository.#summaryOf)
+  }
+
   async listListedBy(authorId: string): Promise<ArtifactSummary[]> {
     const { results: summaryRows } = await this.#db
       .prepare(`${SUMMARY_SELECT} WHERE artifacts.author_id = ? AND artifacts.listed = 1 AND artifacts.removed_at IS NULL ORDER BY artifacts.updated_at DESC, artifacts.rowid DESC`)

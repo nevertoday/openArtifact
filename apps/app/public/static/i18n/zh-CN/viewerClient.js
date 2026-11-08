@@ -241,7 +241,7 @@ export default {
     discardMessage: '分享设置有修改还没有保存。关闭后，这些修改不会生效。',
     discardConfirm: '放弃修改',
     whoCanSee: '谁能看到',
-    publicLinksOff: 'workspace 管理员已关闭公开链接',
+    publicLinksOff: '工作区管理员已关闭公开链接',
     visibilityDescriptions: {
       private: '只有你自己',
       specified: '只有你在下面添加的人',

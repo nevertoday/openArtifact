@@ -125,6 +125,8 @@ export interface ArtifactRepository extends ArtifactFileSource {
   findSummaryByShortId(shortId: string): Promise<ArtifactSummary | null>
   /** Every artifact of the workspace, removed ones included, most recently updated first. */
   listRecentlyUpdated(workspaceId: string): Promise<ArtifactSummary[]>
+  /** The active artifacts granted to the user one by one, in every workspace, most recently updated first. */
+  listGrantedTo(userId: string): Promise<ArtifactSummary[]>
   /** The author's active artifacts they put on their personal page, in every workspace, most recently updated first. */
   listListedBy(authorId: string): Promise<ArtifactSummary[]>
   /** null goes back to the page's opening words. */

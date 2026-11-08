@@ -253,3 +253,75 @@ describe('an invite link', () => {
     expect(await app.repositories.invites.findPendingByCode(new URL(lasting.invite.url).pathname.split('/').pop() ?? '', Date.now() + 3650 * DAY)).not.toBeNull()
   })
 })
+
+describe('the pages', () => {
+  it('show every workspace in the top bar menu, the current one checked and the personal one marked, with a way to create one', async () => {
+    const cookie = await app.signIn('menu@example.com')
+
+    const home = await (await app.request('/', { cookie })).text()
+    const items = [...home.matchAll(/role="menuitemradio" aria-checked="(true|false)" data-switch-workspace="([^"]+)"[^>]*>.*?<span class="app-workspace-menu__name">([^<]+)<\/span>(<span class="xxd-badge"[^>]*>个人<\/span>)?/g)]
+
+    expect(items.map(([, checked, , name, personalBadge]) => [name, checked, personalBadge !== undefined])).toEqual([
+      ['menu的工作区', 'false', true],
+      ['我的团队', 'true', false],
+    ])
+    expect(home).toContain('data-xxd-dialog-open="new-workspace-dialog">')
+    expect(home).toContain('新建工作区')
+    expect(home).not.toContain('deleted-workspaces-dialog')
+  })
+
+  it('offers an admin the workspaces they deleted, with the days left to restore them', async () => {
+    const created = await createWorkspace(await app.signInAlone('restorer@example.com'), 'Archive me')
+    await app.request('/api/workspace', { method: 'DELETE', cookie: created.cookie })
+
+    const home = await (await app.request('/', { cookie: created.cookie })).text()
+
+    expect(home).toContain('data-xxd-dialog-open="deleted-workspaces-dialog"')
+    expect(home).toMatch(/Archive me<\/span><span class="xxd-list__meta">30 天后彻底删除<\/span>/)
+    expect(home).toContain(`data-restore-workspace="${created.workspace.workspaceId}"`)
+  })
+
+  it('list under 分享给我的 what was shared with the person in any workspace, naming the workspace it comes from', async () => {
+    const authorCookie = (await createWorkspace(await app.signInAlone('far-author@example.com'), 'Far team')).cookie
+    const readerCookie = await app.signIn('near-reader@example.com')
+    const farPage = await app.publish({ cookie: authorCookie }, 'Far away plan', '<h1>far</h1>', 'specified')
+    await app.grant(authorCookie, farPage.artifactId, 'near-reader@example.com', 'viewer')
+    const nearPage = await app.publish({ cookie: adminCookie }, 'Close by plan', '<h1>near</h1>', 'specified')
+    await app.grant(adminCookie, nearPage.artifactId, 'near-reader@example.com', 'viewer')
+
+    const shared = await (await app.request('/?filter=shared', { cookie: readerCookie })).text()
+    const all = await (await app.request('/', { cookie: readerCookie })).text()
+
+    expect(shared).toContain('Far away plan')
+    expect(shared).toContain('Close by plan')
+    expect(shared).toMatch(/title="来自工作区「Far team」">.*Far team<\/span>/)
+    expect(shared).not.toMatch(/title="来自工作区「我的团队」"/)
+    expect(all).not.toContain('Far away plan')
+  })
+
+  it('give an admin of an empty workspace a way to invite members beside connecting an agent', async () => {
+    const created = await createWorkspace(await app.signInAlone('empty-admin@example.com'), 'Empty room')
+
+    const home = await (await app.request('/', { cookie: created.cookie })).text()
+
+    expect(home).toMatch(/<div class="xxd-empty__actions xxd-cluster"><a class="xxd-btn" data-variant="primary" href="\/settings\/agents">连接 agent<\/a><a class="xxd-btn"  href="\/settings\/members">邀请成员<\/a><\/div>/)
+  })
+
+  it('end the workspace settings with leave and delete, and say why a personal workspace has neither', async () => {
+    const memberCookie = await app.signIn('settings-member@example.com')
+    const personalCookie = await app.signInAlone('settings-personal@example.com')
+
+    const asAdmin = await (await app.request('/settings/workspace', { cookie: adminCookie })).text()
+    const asMember = await (await app.request('/settings/workspace', { cookie: memberCookie })).text()
+    const asOwner = await (await app.request('/settings/workspace', { cookie: personalCookie })).text()
+    const members = await (await app.request('/settings/members', { cookie: adminCookie })).text()
+
+    expect(asAdmin).toContain('data-leave-workspace')
+    expect(asAdmin).toContain('data-delete-workspace')
+    expect(asMember).toContain('data-leave-workspace')
+    expect(asMember).not.toContain('data-delete-workspace')
+    expect(asOwner).toContain('这是你的个人工作区，不能离开或删除')
+    expect(asOwner).not.toContain('data-leave-workspace')
+    expect(members).toMatch(/<select id="invite-link-expiry">\s*<option value="7">7 天<\/option><option value="30">30 天<\/option><option value="never">永不过期<\/option>/)
+  })
+})

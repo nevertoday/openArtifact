@@ -112,7 +112,7 @@ describe('an invite link', () => {
 
     expect(me.body.workspaces.map(workspace => workspace.workspaceId)).not.toContain(app.teamWorkspaceId)
     expect(invitePage.status).toBe(403)
-    expect(await invitePage.text()).toContain('你已被移出这个 workspace')
+    expect(await invitePage.text()).toContain('你已被移出这个工作区')
   })
 })
 

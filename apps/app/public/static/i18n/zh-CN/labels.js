@@ -3,7 +3,7 @@ export default {
   visibility: {
     private: '私有',
     specified: '指定的人',
-    workspace: 'workspace 内可见',
+    workspace: '工作区内可见',
     public_link: '公开链接',
   },
   roles: { admin: '管理员', member: '成员' },
