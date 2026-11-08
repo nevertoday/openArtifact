@@ -24,6 +24,8 @@
   ],
   // Cloudflare Email Service, used when MAILER=cloudflare; MAIL_FROM must be on a domain verified there.
   "send_email": [{ "name": "EMAIL" }],
+  // Workers AI translates titles such as Chinese ones into the words of their links. scripts/production-config.mjs
+  // binds it as "AI" in production only: bound here, local development would call Cloudflare for every publish.
   // Secrets (BETTER_AUTH_SECRET, USERCONTENT_SIGNING_KEY, optional OAuth client ids) live in .dev.vars locally
   // and in `wrangler secret put` when deployed.
   "vars": { "USERCONTENT_ORIGIN": "http://localhost:8789", "MCP_ORIGIN": "http://localhost:8788" }

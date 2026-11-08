@@ -58,20 +58,39 @@ export class ArtifactSlug {
     return slug
   }
 
-  /** The words the publisher chose, or else the ASCII words of the title. */
-  static forNewArtifact(requested: string | null, title: string): string {
-    return ArtifactSlug.#requested(requested) ?? ArtifactSlug.normalize(title)
+  /**
+   * The words the publisher chose, or else those of the title. `englishTitle` is the title translated, for a title
+   * whose own words would be lost to the address; see titleToTranslate.
+   */
+  static forNewArtifact(requested: string | null, title: string, englishTitle: string | null = null): string {
+    return ArtifactSlug.afterChange('', requested, title, englishTitle)
   }
 
   /**
    * Links already sent keep their words when only the title changes. An artifact that has no words yet takes
    * them from its new title.
    */
-  static afterChange(current: string, requested: string | null, changedTitle: string | null): string {
+  static afterChange(current: string, requested: string | null, changedTitle: string | null, englishTitle: string | null = null): string {
     const chosen = ArtifactSlug.#requested(requested)
     if (chosen !== null) return chosen
-    if (current === '' && changedTitle !== null) return ArtifactSlug.normalize(changedTitle)
+    if (current === '' && changedTitle !== null) return ArtifactSlug.#titleWords(changedTitle, englishTitle)
     return current
+  }
+
+  /**
+   * The title worth translating before afterChange: one that gives the address its words but has letters, such as
+   * Chinese ones, that the address cannot keep. A new artifact is a change from no words, `current` ''.
+   */
+  static titleToTranslate(current: string, requested: string | null, changedTitle: string | null): string | null {
+    if (ArtifactSlug.#requested(requested) !== null || current !== '' || changedTitle === null) return null
+    const lettersLost = changedTitle.normalize('NFKD').replace(/\p{M}/gu, '').replace(/[a-z]/gi, '')
+    return /\p{L}/u.test(lettersLost) ? changedTitle : null
+  }
+
+  // A translation that keeps no ASCII words is no better than the title's own.
+  static #titleWords(title: string, englishTitle: string | null): string {
+    const translated = englishTitle === null ? '' : ArtifactSlug.normalize(englishTitle)
+    return translated === '' ? ArtifactSlug.normalize(title) : translated
   }
 
   // Words that normalize to nothing, such as a slug written only in Chinese, count as not given.

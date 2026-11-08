@@ -1,6 +1,6 @@
 import { ArtifactPath } from '@open-artifact/core'
 import { env } from 'cloudflare:workers'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { APP_ORIGIN, TestApp } from './test-app.ts'
 
 const app = new TestApp()
@@ -219,5 +219,43 @@ describe('changing the words of an address', () => {
     const renamed = await app.json<{ slug: string }>(`/api/artifacts/${published.artifactId}`, { method: 'PATCH', cookie: authorCookie, body: { slug: '预算' } })
 
     expect(renamed.body.slug).toBe('budget')
+  })
+})
+
+describe('the address of an artifact with a Chinese title', () => {
+  beforeEach(() => {
+    app.translator.english = null
+    app.translator.asked.length = 0
+  })
+
+  it('reads like the title translated into English when the agent chose no words', async () => {
+    app.translator.english = 'Quarterly sales review'
+    const published = await publish({ title: '季度销售复盘' })
+
+    expect(app.translator.asked).toEqual(['季度销售复盘'])
+    expect(published.url).toBe(`${APP_ORIGIN}/a/quarterly-sales-review-${published.shortId}`)
+  })
+
+  it('keeps the words the agent chose without translating the title', async () => {
+    app.translator.english = 'Quarterly sales review'
+    const published = await publish({ title: '季度销售复盘', slug: 'q3-review' })
+
+    expect(published.slug).toBe('q3-review')
+    expect(app.translator.asked).toEqual([])
+  })
+
+  it('keeps the title\'s own English words when there is no translation', async () => {
+    const published = await publish({ title: 'pstack 使用指南' })
+
+    expect(published.url).toBe(`${APP_ORIGIN}/a/pstack-${published.shortId}`)
+  })
+
+  it('gives a wordless address the translated words of its new title', async () => {
+    const wordless = await publish({ title: '季度销售复盘' })
+    app.translator.english = 'Annual plan'
+
+    const { body: renamed } = await app.json<Published>(`/api/artifacts/${wordless.artifactId}`, { method: 'PATCH', token: authorToken, body: { title: '年度计划' } })
+
+    expect(new URL(renamed.url).pathname).toBe(`/a/annual-plan-${wordless.shortId}`)
   })
 })

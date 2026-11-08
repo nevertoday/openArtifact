@@ -42,6 +42,24 @@ describe('ArtifactSlug', () => {
     expect(ArtifactSlug.forNewArtifact(null, '季度销售复盘')).toBe('')
   })
 
+  it('takes the words of a translated title over the title\'s own, unless the translation keeps none', () => {
+    expect(ArtifactSlug.forNewArtifact(null, 'pstack 使用指南', 'pstack User Guide')).toBe('pstack-user-guide')
+    expect(ArtifactSlug.forNewArtifact('guide', 'pstack 使用指南', 'pstack User Guide')).toBe('guide')
+    expect(ArtifactSlug.forNewArtifact(null, 'pstack 使用指南', '使用指南')).toBe('pstack')
+    expect(ArtifactSlug.afterChange('', null, '季度销售复盘', 'Quarterly sales review')).toBe('quarterly-sales-review')
+    expect(ArtifactSlug.afterChange('roadmap', null, '季度销售复盘', 'Quarterly sales review')).toBe('roadmap')
+  })
+
+  it('asks for a translation only of a title that gives the address its words and has letters it cannot keep', () => {
+    expect(ArtifactSlug.titleToTranslate('', null, '季度销售复盘')).toBe('季度销售复盘')
+    expect(ArtifactSlug.titleToTranslate('', null, 'pstack 使用指南')).toBe('pstack 使用指南')
+    expect(ArtifactSlug.titleToTranslate('', '季度', '季度销售复盘')).toBe('季度销售复盘')
+    expect(ArtifactSlug.titleToTranslate('', null, 'Café roadmap 2027')).toBeNull()
+    expect(ArtifactSlug.titleToTranslate('', 'quarterly-review', '季度销售复盘')).toBeNull()
+    expect(ArtifactSlug.titleToTranslate('roadmap', null, '季度销售复盘')).toBeNull()
+    expect(ArtifactSlug.titleToTranslate('', null, null)).toBeNull()
+  })
+
   it('keeps the words of links already sent when only the title changes', () => {
     expect(ArtifactSlug.afterChange('roadmap', null, 'Launch plan')).toBe('roadmap')
     expect(ArtifactSlug.afterChange('roadmap', 'launch-plan', null)).toBe('launch-plan')

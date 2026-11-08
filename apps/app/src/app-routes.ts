@@ -3,6 +3,7 @@ import { ArtifactGate } from './access/artifact-gate.ts'
 import { ArtifactPageAddress } from './access/artifact-page-address.ts'
 import { ApiContext } from './api/api-context.ts'
 import { ApiRoutes } from './api/api-routes.ts'
+import type { TitleTranslator } from './api/title-translator.ts'
 import { Admission } from './auth/admission.ts'
 import { SignInLimits } from './auth/sign-in-limits.ts'
 import type { Mailer } from './auth/mailer.ts'
@@ -27,6 +28,7 @@ export interface AppDependencies {
   env: AppEnv
   repositories: Repositories
   mailer: Mailer
+  titleTranslator: TitleTranslator
   mcpUrl: string
 }
 
@@ -88,7 +90,7 @@ export class AppRoutes {
   }
 
   #contextFor(request: Request, appOrigin: string): ApiContext {
-    const { env, repositories, mailer } = this.#dependencies
+    const { env, repositories, mailer, titleTranslator } = this.#dependencies
     const admission = new Admission(env.ALLOWED_EMAIL_DOMAINS, repositories)
     const auth = new OpenArtifactAuth(env, appOrigin, mailer, repositories, admission)
     return new ApiContext({
@@ -100,6 +102,7 @@ export class AppRoutes {
       admission,
       appOrigin,
       artifactPages: this.#artifactPages,
+      titleTranslator,
       localeSignals: { ...requestLocaleSignals(request.headers), fallback: fallbackLocaleOf(env) },
     })
   }
