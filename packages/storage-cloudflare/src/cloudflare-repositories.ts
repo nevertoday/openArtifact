@@ -8,6 +8,7 @@ import { CloudflareNotificationRepository } from './cloudflare-notification-repo
 import { CloudflareInviteRepository } from './cloudflare-invite-repository.ts'
 import { CloudflareProfileRepository } from './cloudflare-profile-repository.ts'
 import { CloudflareSharedDataRepository } from './cloudflare-shared-data-repository.ts'
+import { CloudflareSignInCodeFailures } from './cloudflare-sign-in-code-failures.ts'
 import { CloudflareUserDirectory, CloudflareWorkspaceRepository } from './cloudflare-workspace-repository.ts'
 
 export function cloudflareRepositories(db: D1Database, files: R2Bucket): Repositories {
@@ -23,5 +24,6 @@ export function cloudflareRepositories(db: D1Database, files: R2Bucket): Reposit
     sharedData: new CloudflareSharedDataRepository(db),
     profiles: new CloudflareProfileRepository(db),
     auditLog: new CloudflareAuditLog(db),
+    signInCodeFailures: new CloudflareSignInCodeFailures(db),
   }
 }

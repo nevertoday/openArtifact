@@ -122,9 +122,10 @@ details.faq p { margin: 8px 0 2px; font-size: 14.5px; }
     <section id="login">
       <h2><span class="num">02</span>登录</h2>
       <ol>
-        <li>打开 Open Artifact 的地址，输入邮箱，点「发送登录链接」。</li>
-        <li>打开邮件里的链接，就登录了。链接 5 分钟内有效，只能用一次。</li>
-        <li>没收到邮件，等 60 秒后点「再发一次」。按钮上会倒数剩下的秒数。改了邮箱，按钮马上变回「发送登录链接」。</li>
+        <li>打开 Open Artifact 的地址，输入邮箱，点「发送验证码」。</li>
+        <li>邮件标题里就是 6 位验证码。把它填进登录页，填满 6 位自动登录。验证码 10 分钟内有效，只能用一次。</li>
+        <li>没收到邮件，等 60 秒后点「再发一次」。按钮上会倒数剩下的秒数。新验证码发出后，旧的就不能用了。</li>
+        <li>验证码输错 3 次后作废，点「再发一次」拿新的。填错了邮箱，点「换个邮箱」。</li>
       </ol>
       <ul>
         <li>能登录的邮箱：部署时允许的邮箱域名，和管理员邀请的人。其他邮箱会在输入框下面看到「这个邮箱不能登录 Open Artifact。请用公司邮箱，或请管理员邀请你。」</li>
@@ -133,7 +134,7 @@ details.faq p { margin: 8px 0 2px; font-size: 14.5px; }
         <li>如果团队配置了公司 SSO、GitHub 或 Google，登录页会多出对应的按钮。</li>
         <li>从别人发来的链接被带到登录页时，登录页写着「登录后会打开你刚才的页面。」</li>
       </ul>
-      <p class="note">本地试用时没有邮件服务，登录链接打印在运行 <code>pnpm dev</code> 的终端里，搜索 <code>[mail]</code>。</p>
+      <p class="note">本地试用时没有邮件服务，验证码打印在运行 <code>pnpm dev</code> 的终端里，搜索 <code>[mail]</code>。</p>
     </section>
 
     <section id="home">

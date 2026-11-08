@@ -23,7 +23,7 @@ pnpm dev:setup   # writes .dev.vars with local secrets, applies the D1 migration
 pnpm dev         # usercontent :8789, app :8787, MCP :8788
 ```
 
-Open http://localhost:8787 and sign in with an `@example.com` address (local setup allows that domain; change `ALLOWED_EMAIL_DOMAINS` in `apps/app/.dev.vars`). Locally the sign-in link is printed in the terminal running `pnpm dev` (look for `[mail]`). The first person to sign in becomes the admin of the workspace; everyone after joins it as a member.
+Open http://localhost:8787 and sign in with an `@example.com` address (local setup allows that domain; change `ALLOWED_EMAIL_DOMAINS` in `apps/app/.dev.vars`). Locally the sign-in code is printed in the terminal running `pnpm dev` (look for `[mail]`). The first person to sign in becomes the admin of the workspace; everyone after joins it as a member.
 
 Stop the servers with Ctrl-C. If a port is still taken afterwards, `pkill -f workerd`.
 
@@ -60,16 +60,27 @@ pnpm run check   # storage boundary, type checks, all tests (Workers runtime, lo
 |---|---|---|
 | `BETTER_AUTH_SECRET` | app | Session signing |
 | `ALLOWED_EMAIL_DOMAINS` | app | Comma-separated domains whose people may create an account, or `*` to let any address sign up and join the workspace. Unset: only the first person (the founder) can sign up |
-| `MAILER` | app | `console` prints mail to the log for local development. `cloudflare` sends through Cloudflare Email Service with the `EMAIL` binding. Unset: sign-in mail fails loudly instead of leaking links into logs. Any other value, or `cloudflare` without `EMAIL` or `MAIL_FROM`, fails every request with a configuration error |
+| `MAILER` | app | `console` prints mail to the log for local development. `cloudflare` sends through Cloudflare Email Service with the `EMAIL` binding. Unset: sign-in mail fails loudly instead of leaking codes into logs. Any other value, or `cloudflare` without `EMAIL` or `MAIL_FROM`, fails every request with a configuration error |
 | `MAIL_FROM` | app | Sender for `MAILER=cloudflare`, such as `Open Artifact <noreply@example.com>` or `noreply@example.com`. Its domain must be onboarded and verified in Cloudflare Email Service. Sending to any recipient needs the Workers Paid plan, and the service is in public beta |
 | `USERCONTENT_SIGNING_KEY` | app, usercontent | Must be the same in both; signs artifact file URLs |
 | `USERCONTENT_ORIGIN`, `MCP_ORIGIN` | app | Public addresses of the other two Workers |
 | `APP_ORIGIN` | usercontent, mcp | Public address of the app |
-| `GITHUB_CLIENT_ID` / `_SECRET`, `GOOGLE_CLIENT_ID` / `_SECRET` | app | Optional sign-in providers |
+| `GITHUB_CLIENT_ID` / `_SECRET`, `GOOGLE_CLIENT_ID` / `_SECRET` | app | Optional sign-in providers; each button appears once both of its values are set. See [Sign in with GitHub or Google](#sign-in-with-github-or-google) |
 | `OIDC_DISCOVERY_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_DISPLAY_NAME` | app | Optional company SSO |
 | `DEFAULT_LOCALE` | app | Interface language when neither the person nor their browser picks one: `zh-CN` (default) or `en` |
 
-Bindings besides variables: the app needs `DB` (D1), `FILES` (R2) and `UNLOCK_RATE_LIMITER` (rate limit for public-link passwords), `SIGN_IN_EMAIL_RATE_LIMITER` and `SIGN_IN_ADDRESS_RATE_LIMITER` (sign-in links per address and per sender), plus the `EMAIL` `send_email` binding (Cloudflare Email Service) when `MAILER=cloudflare`; usercontent needs the `ARTIFACT_FILES` service binding to the app; MCP needs the `APP` service binding.
+Bindings besides variables: the app needs `DB` (D1), `FILES` (R2) and `UNLOCK_RATE_LIMITER` (rate limit for public-link passwords), `SIGN_IN_EMAIL_RATE_LIMITER` and `SIGN_IN_ADDRESS_RATE_LIMITER` (sign-in codes per address and per sender), plus the `EMAIL` `send_email` binding (Cloudflare Email Service) when `MAILER=cloudflare`; usercontent needs the `ARTIFACT_FILES` service binding to the app; MCP needs the `APP` service binding.
+
+### Sign in with GitHub or Google
+
+Create one OAuth app per provider, with the callback URL on the app's own address:
+
+| Provider | Where | Callback URL |
+|---|---|---|
+| GitHub | Settings › Developer settings › OAuth Apps › New OAuth App | `https://<app>/api/auth/callback/github` |
+| Google | Google Cloud Console › APIs & Services › Credentials › Create OAuth client ID (Web application) | `https://<app>/api/auth/callback/google` |
+
+Then set the secrets from `apps/app` with `wrangler secret put GITHUB_CLIENT_ID` and likewise `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. No deploy is needed. For local development, make a second app with `http://localhost:8787/api/auth/callback/<provider>` and put its values in `apps/app/.dev.vars`. A Google app in Testing status admits only its test users until you publish it on the OAuth consent screen. Someone who first signed in with a code and later uses GitHub or Google with the same verified email lands in the same account.
 
 The usercontent Worker must run on a different site from the app (another domain, not only another port in production), so artifact pages can never read the app's cookies.
 

@@ -8,10 +8,13 @@ export default {
     storage: '页面和数据都存在团队自己的 Cloudflare 账号里。',
   },
   heading: '登录',
-  intro: '输入邮箱，我们发一个登录链接，不用密码。',
+  intro: '输入邮箱，我们发一个 6 位验证码，不用密码。',
   returnsToPage: '登录后会打开你刚才的页面。',
   /** @template T @param {T} address @returns {(string | T)[]} */
-  linkSent: address => ['登录链接已发送到 ', address, '，5 分钟内有效。没收到的话，检查垃圾邮件，或者再发一次。'],
+  codeSentTo: address => ['6 位验证码已发送到 ', address],
+  changeEmail: '换个邮箱',
+  codeLabel: '6 位验证码',
+  noMail: '没收到？看看垃圾邮件。',
   /** @param {string} provider */
   signInWith: provider => `用 ${provider} 登录`,
   companySso: '公司 SSO',
@@ -20,7 +23,7 @@ export default {
   errorRequired: '输入邮箱',
   errorInvalid: '请输入有效的邮箱，比如 name@example.com',
   errorNotAdmitted: '这个邮箱不能登录 Open Artifact。请用公司邮箱，或请管理员邀请你。',
-  sendLink: '发送登录链接',
+  sendCode: '发送验证码',
   invitation: {
     /** @param {{ inviter: string, workspace: string }} p */
     title: ({ inviter, workspace }) => `${inviter} 邀请你加入 ${workspace}`,

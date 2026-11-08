@@ -30,6 +30,7 @@ export type { Invite, InviteRepository, NewInvite } from './invite-repository.ts
 export { AccessTokenSecret, InviteCode, PublicLinkPassword, SigningKey, UsercontentSignature } from './secrets.ts'
 export type { UsercontentRequest } from './secrets.ts'
 export type { SharedCollection, SharedDataRepository, SharedDocument } from './shared-data-repository.ts'
+export type { SignInCodeFailures } from './sign-in-code-failures.ts'
 export { WORKSPACE_ROLES } from './workspace-repository.ts'
 export type { JoinResult, Membership, MembershipChange, UserDirectory, UserProfile, Workspace, WorkspaceMember, WorkspaceRepository, WorkspaceRole } from './workspace-repository.ts'
 export type { Repositories } from './repositories.ts'

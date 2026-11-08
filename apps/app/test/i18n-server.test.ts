@@ -7,16 +7,8 @@ const CHINESE_TEXT = /[一-鿿]/
 let linCookie = ''
 let zhouCookie = ''
 
-async function signInWithHeaders(email: string, headers: Record<string, string>): Promise<string> {
-  const sent = await app.request('/api/auth/sign-in/magic-link', { method: 'POST', body: { email, callbackURL: '/' }, headers })
-  expect(sent.ok).toBe(true)
-  const signInLink = app.mailer.lastTo(email)?.text.match(/https?:\/\/\S+/)?.[0] ?? ''
-  const verified = await app.routes.respond(new Request(signInLink, { redirect: 'manual', headers }))
-  return verified.headers.getSetCookie().map(setCookie => setCookie.split(';')[0]).join('; ')
-}
-
 beforeAll(async () => {
-  linCookie = await signInWithHeaders('lin@example.com', ENGLISH)
+  linCookie = await app.signIn('lin@example.com', undefined, ENGLISH)
   await app.request('/locale', { method: 'POST', form: { locale: 'en' }, cookie: linCookie })
   zhouCookie = await app.signIn('zhou@example.com')
 })
@@ -59,15 +51,15 @@ describe('server text in the reader’s language', () => {
   })
 
   it('sends the sign-in mail in the language the browser asks for', async () => {
-    await app.request('/api/auth/sign-in/magic-link', { method: 'POST', body: { email: 'wang@example.com', callbackURL: '/' }, headers: ENGLISH })
+    await app.sendCode('wang@example.com', { headers: ENGLISH })
     const english = app.mailer.lastTo('wang@example.com')
-    await app.request('/api/auth/sign-in/magic-link', { method: 'POST', body: { email: 'wang@example.com', callbackURL: '/' } })
+    await app.sendCode('wang@example.com')
     const chinese = app.mailer.lastTo('wang@example.com')
 
-    expect(english?.subject).toBe('Sign in to Open Artifact')
-    expect(english?.text).toContain('It works for 5 minutes')
+    expect(english?.subject).toMatch(/^\d{6} is your Open Artifact code$/)
+    expect(english?.text).toContain('It works for 10 minutes')
     expect(`${english?.subject}${english?.text}`).not.toMatch(CHINESE_TEXT)
-    expect(chinese?.subject).toBe('登录 Open Artifact')
+    expect(chinese?.subject).toMatch(/^\d{6} 是你的 Open Artifact 验证码$/)
   })
 
   it('invites in both languages, the inviter’s first', async () => {
