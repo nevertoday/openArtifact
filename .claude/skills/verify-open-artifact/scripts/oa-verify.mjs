@@ -291,6 +291,19 @@ async function createToken(run, scope, name) {
 }
 
 // ---------- api / publish / mcp ----------
+// The session follows cookies the app sets, as a browser does: creating or switching a workspace sets oa_workspace.
+function keepCookies(run, response) {
+  const jar = new Map(run.cookie.split('; ').map(pair => [pair.split('=')[0], pair]))
+  for (const setCookie of response.headers.getSetCookie()) {
+    const pair = setCookie.split(';')[0]
+    const name = pair.split('=')[0]
+    if (pair.endsWith('=')) jar.delete(name)
+    else jar.set(name, pair)
+  }
+  run.cookie = [...jar.values()].join('; ')
+  saveRun(run)
+}
+
 async function api(run, method, path, flags) {
   const as = flags.as ?? (run.token ? 'token' : 'session')
   const headers = { Origin: run.origins.app }
@@ -306,6 +319,7 @@ async function api(run, method, path, flags) {
     headers['Content-Type'] = 'application/json'
   }
   const response = await fetch(new URL(path, run.origins.app), { method: method.toUpperCase(), headers, body })
+  if (as === 'session') keepCookies(run, response)
   const text = await response.text()
   let parsed = text
   try { parsed = JSON.parse(text) } catch {}

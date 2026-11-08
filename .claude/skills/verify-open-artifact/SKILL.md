@@ -33,7 +33,7 @@ Secrets (`BETTER_AUTH_SECRET`, `USERCONTENT_SIGNING_KEY`) come from the existing
 node $V launch            # about 6 s
 ```
 
-It applies the D1 migrations to a fresh state dir, starts app, then usercontent, then mcp, and waits until each answers `/health`. Then it signs in `founder@example.com` through the real sign-in code flow, which makes that address the workspace admin, and creates a full-scope API token. **Ready** means the output has `"ready": true` with a `tokenPrefix`: the app is usable as a signed-in user and as an agent, not just answering health.
+It applies the D1 migrations to a fresh state dir, starts app, then usercontent, then mcp, and waits until each answers `/health`. Then it signs in `founder@example.com` through the real sign-in code flow, which gives that address its personal workspace as admin, and creates a full-scope API token. **Ready** means the output has `"ready": true` with a `tokenPrefix`: the app is usable as a signed-in user and as an agent, not just answering health.
 
 - `--no-seed` skips sign-in and the token, for testing the first-sign-in path yourself.
 - If `.dev.vars` is missing, launch says so. Run `pnpm dev:setup` once. It keeps existing secrets, but it also migrates the developer's `.wrangler/state`, which is harmless.
@@ -102,7 +102,7 @@ It kills only the process groups this run spawned (pnpm, wrangler, workerd) and 
 
 - A sign-in code works once and lives 10 minutes. `sign-in` requests a fresh code, reads it from the app log and enters it, so run it again rather than reusing an old code.
 - Every page has a language switch, `form[action="/locale"]`, whose buttons are `type=submit`. A bare `form [type=submit]` clicks a language button. Scope submit selectors to their form.
-- Only `@example.com` addresses are admitted in a run. The first address ever to sign in becomes admin.
+- Only `@example.com` addresses are admitted in a run. Every address gets its own personal workspace; two people share one only after an invite.
 - Session writes without a matching `Origin` header answer 403 `cross_site_request`. `api --as session` adds the header. A hand-rolled curl must add it too.
 - Token scopes: `publish` cannot change sharing (403 "this token may only publish"). The seeded token is `full`, so to test the refusal, create one with `node $V token --scope publish`. That replaces the run's token.
 - Sign-in has rate limits: 3 code requests per address per minute, 20 per sender per minute. UI sends count too. Looping `sign-in` hits them.

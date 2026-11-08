@@ -1,12 +1,12 @@
 # Sign in
 
-A person enters an email on the login page and gets a six-digit code by mail (printed to the app log locally). The form changes to a code step, and typing the sixth digit signs them in. The first person to sign in becomes the workspace admin. Others join as members if their domain is admitted.
+A person enters an email on the login page and gets a six-digit code by mail (printed to the app log locally). The form changes to a code step, and typing the sixth digit signs them in. Everyone who signs in gets a personal workspace and is its admin; a person who came through an invite link also joins that workspace. Who may sign up at all follows `ALLOWED_EMAIL_DOMAINS` (`example.com` in a run).
 
 ## Sub-features
 
 - `signin-code-send` sends a code to an admitted address and shows the code step.
 - `signin-code-enter` enters the code and gets a session.
-- `signin-founder` makes the first account the admin.
+- `signin-personal` gives every new account its own personal workspace, as admin.
 - `signin-refuse` refuses an address outside `ALLOWED_EMAIL_DOMAINS` with an error under the email field.
 
 ## How to get to it (user POV)
@@ -22,7 +22,7 @@ Preconditions:
 
 - **Send code (UI).** Run `node $V browse /login --as anon --fill '#login-email::member@example.com' --click '#email-step [type=submit]' --sleep 1200 --eval 'JSON.stringify({code:!document.getElementById("code-step").hidden,sent:document.querySelector("[data-sent-to]").textContent})' --shot signin-code-step`. The eval is `{"code":true,"sent":"member@example.com"}`. `node $V log app --tail 20` shows `[mail] To: member@example.com` and a subject that starts with the six-digit code.
 - **Enter code.** Run `node $V sign-in --email member@example.com`. It posts a fresh code to `/api/auth/sign-in/email-otp`, the same endpoint the page uses. `node $V api GET /api/me --as session` answers 200 with that email.
-- **Founder role.** After the first sign-in on a `--no-seed` run, `node $V api GET /api/workspace/members --as session` lists that person with the admin role.
+- **Personal workspace.** After a sign-in, `node $V api GET /api/me --as session` names the current workspace, and `node $V api GET /api/workspace/members --as session` lists that person alone with the admin role. A second address signed in with `sign-in --email` gets a workspace of its own, not the founder's; to put two people in one workspace, create an invite link as the first (`node $V api POST /api/workspace/invites/link --as session`), then sign the second in and open the link's `url` path as them (`node $V browse <path> --as session`).
 - **Refusal (UI).** Run `node $V browse /login --as anon --fill '#login-email::someone@other.test' --click '#email-step [type=submit]' --sleep 1500 --eval 'JSON.stringify({codeHidden:document.getElementById("code-step").hidden,invalid:document.getElementById("login-email").getAttribute("aria-invalid"),error:document.querySelector("#email-step .xxd-error")?.textContent})' --shot signin-refused`. The code step stays hidden, `invalid` is `"true"`, and `error` says the address may not sign in.
 - **Refusal (helper).** `node $V sign-in --email someone@other.test` fails with `sign-in code request answered 403` and `EMAIL_NOT_ADMITTED`. No `[mail] To: someone@other.test` line appears in the log.
 - **Proof.** `signin-code-step.png`, `signin-refused.png`, the quoted `[mail]` log lines, and the `/api/me` JSON.
