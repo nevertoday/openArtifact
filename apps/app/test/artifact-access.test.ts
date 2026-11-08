@@ -471,7 +471,7 @@ describe('what a visitor of a public link sees', () => {
 
   it('treats a signed-in person from another workspace like any visitor of the link', async () => {
     await env.DB.prepare("INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES ('workspace-partner', 'Partner team', ?)").bind(Date.now()).run()
-    const partnerPage = await app.repositories.artifacts.create({ workspaceId: 'workspace-partner', authorId: 'user-partner', title: 'Partner brief', slug: 'partner-brief', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: null, listed: false, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+    const partnerPage = await app.repositories.artifacts.create({ workspaceId: 'workspace-partner', authorId: 'user-partner', title: 'Partner brief', slug: 'partner-brief', visibility: 'public_link', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: null, listed: false, summary: null, shareText: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
 
     const versions = await app.request(`/api/artifacts/${partnerPage.artifactId}/versions`, { cookie: memberCookie })
     const pageMarkup = await (await app.request(ArtifactPath.of({ slug: 'partner-brief', shortId: partnerPage.shortId }), { cookie: memberCookie })).text()

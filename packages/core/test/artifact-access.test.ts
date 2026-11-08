@@ -24,6 +24,7 @@ function artifactWith(sharing: Partial<ArtifactSharing>, removal: ArtifactRemova
     summary: null,
     currentVersionNote: null,
     currentVersionAt: now,
+    shareText: null,
   }
 }
 

@@ -116,7 +116,7 @@ describe('links that are not the canonical address', () => {
   it('answers a member without access, or someone outside the workspace, without redirecting or naming the artifact', async () => {
     const privatePage = await publish({ title: 'Reorg draft', slug: 'reorg-draft', visibility: 'private' })
     await env.DB.prepare("INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES ('workspace-addresses-elsewhere', 'Elsewhere', ?)").bind(Date.now()).run()
-    const elsewhere = await app.repositories.artifacts.create({ workspaceId: 'workspace-addresses-elsewhere', authorId: 'user-elsewhere', title: 'Acquisition target', slug: 'acquisition-target', visibility: 'workspace', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: null, listed: false, summary: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
+    const elsewhere = await app.repositories.artifacts.create({ workspaceId: 'workspace-addresses-elsewhere', authorId: 'user-elsewhere', title: 'Acquisition target', slug: 'acquisition-target', visibility: 'workspace', publicLinkExpiresAt: null, publishedVia: null, note: null, excerpt: null, listed: false, summary: null, shareText: null, files: [{ path: 'index.html', contentType: 'text/html', body: new TextEncoder().encode('x') }] })
 
     const memberWithoutAccess = await app.request(`/a/${privatePage.artifactId}`, { cookie: memberCookie })
     const outsider = await app.request(`/a/${elsewhere.artifactId}`, { cookie: memberCookie })

@@ -13,11 +13,12 @@ import {
   type PublishResult,
   type VersionOrigin,
 } from '@open-artifact/core'
+import { CloudflareShareCardImages } from './cloudflare-share-card-images.ts'
 
 const SUMMARY_SELECT = `
   SELECT artifacts.id, artifacts.short_id, artifacts.slug, artifacts.workspace_id, artifacts.title, artifacts.author_id, artifacts.visibility,
          artifacts.public_link_expires_at, artifacts.public_link_password_hash, artifacts.anonymous_write_enabled, artifacts.public_link_shows_comments,
-         artifacts.listed, COALESCE(artifacts.summary, artifact_versions.excerpt) AS summary,
+         artifacts.listed, COALESCE(artifacts.summary, artifact_versions.excerpt) AS summary, artifacts.share_text,
          artifacts.current_version, artifacts.updated_at, artifact_versions.published_via,
          artifact_versions.note AS current_version_note, artifact_versions.created_at AS current_version_at,
          artifacts.removed_at, artifacts.removed_by, artifacts.removed_as_admin
@@ -38,6 +39,7 @@ interface SummaryRow {
   public_link_shows_comments: number
   listed: number
   summary: string | null
+  share_text: string | null
   current_version_note: string | null
   current_version_at: number
   current_version: number
@@ -102,8 +104,8 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     await this.#writeVersion(artifactId, newArtifact.files, uploadId => [
       this.#db
         .prepare(
-          `INSERT INTO artifacts (id, short_id, slug, workspace_id, author_id, title, visibility, public_link_expires_at, listed, summary, current_version, current_upload_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO artifacts (id, short_id, slug, workspace_id, author_id, title, visibility, public_link_expires_at, listed, summary, share_text, current_version, current_upload_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           artifactId,
@@ -116,6 +118,7 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
           newArtifact.publicLinkExpiresAt,
           newArtifact.listed ? 1 : 0,
           newArtifact.summary,
+          newArtifact.shareText,
           firstVersion,
           uploadId,
           createdAt,
@@ -209,6 +212,10 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     await this.#db.prepare('UPDATE artifacts SET summary = ? WHERE id = ?').bind(summary, artifactId).run()
   }
 
+  async setShareText(artifactId: string, shareText: string | null): Promise<void> {
+    await this.#db.prepare('UPDATE artifacts SET share_text = ? WHERE id = ?').bind(shareText, artifactId).run()
+  }
+
   async listVersions(artifactId: string): Promise<ArtifactVersionRecord[]> {
     const { results: versionRows } = await this.#db
       .prepare(`${VERSION_SELECT} WHERE artifact_id = ? ORDER BY version DESC`)
@@ -244,20 +251,21 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     return restoreUpdate.meta.changes === 1
   }
 
-  // Files go first and the row last, so a crash leaves the artifact listed for the next run. Deleting the row
-  // cascades to its versions, file rows, comments, grants and shared data.
+  // Files and share cards go first and the row last, so a crash leaves the artifact listed for the next run.
+  // Deleting the row cascades to its versions, file rows, comments, grants and shared data.
   async purgeRemovedBefore(cutoff: number): Promise<void> {
     const { results: purgedRows } = await this.#db.prepare('SELECT id FROM artifacts WHERE removed_at <= ?').bind(cutoff).all<{ id: string }>()
     for (const { id: artifactId } of purgedRows) {
-      await this.#deleteStoredFiles(artifactId)
+      await this.#deleteObjectsUnder(CloudflareArtifactRepository.#artifactPrefix(artifactId))
+      await this.#deleteObjectsUnder(CloudflareShareCardImages.prefixOf(artifactId))
       await this.#db.prepare('DELETE FROM artifacts WHERE id = ? AND removed_at <= ?').bind(artifactId, cutoff).run()
     }
   }
 
-  async #deleteStoredFiles(artifactId: string): Promise<void> {
+  async #deleteObjectsUnder(prefix: string): Promise<void> {
     let listing: R2Objects | null = null
     do {
-      listing = await this.#files.list({ prefix: CloudflareArtifactRepository.#artifactPrefix(artifactId), ...(listing?.truncated ? { cursor: listing.cursor } : {}) })
+      listing = await this.#files.list({ prefix, ...(listing?.truncated ? { cursor: listing.cursor } : {}) })
       const objectKeys = listing.objects.map(storedObject => storedObject.key)
       if (objectKeys.length > 0) await this.#files.delete(objectKeys)
     } while (listing.truncated)
@@ -362,6 +370,7 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
         listed: summaryRow.listed === 1,
       },
       summary: summaryRow.summary,
+      shareText: summaryRow.share_text,
       currentVersionNote: summaryRow.current_version_note,
       currentVersionAt: summaryRow.current_version_at,
       version: summaryRow.current_version,

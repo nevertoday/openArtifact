@@ -32,6 +32,7 @@ describe('UsercontentFiles', () => {
       excerpt: null,
       listed: false,
       summary: null,
+      shareText: null,
       files: [
         { path: 'index.html', contentType: html, body: encoded('<html><head><title>v1</title></head><body><h1>v1</h1></body></html>') },
         { path: 'assets/app.css', contentType: 'text/css; charset=utf-8', body: encoded('h1{}') },

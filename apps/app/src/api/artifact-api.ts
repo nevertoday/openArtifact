@@ -48,6 +48,7 @@ export class ArtifactApi {
       publicLinkExpiresAt: publicLinkExpiry.expiresAt,
       listed,
       summary: requestBody.optionalText('summary', MAX_SUMMARY_LENGTH),
+      shareText: null,
       files,
     })
     const createdSummary = { artifactId: createdArtifact.artifactId, shortId: createdArtifact.shortId, slug, title, authorId: identity.userId }
