@@ -9,7 +9,7 @@ import { cloudflareRepositories } from '@open-artifact/storage-cloudflare'
 export const APP_ORIGIN = 'http://app.test'
 export const USERCONTENT_ORIGIN = 'http://usercontent.test'
 export const SIGNING_KEY = 'test-signing-key-that-is-long-enough'
-const WORKSPACE_WRITE = /^\/api\/(workspace|tokens)(\/|$)/
+const WORKSPACE_WRITE = /^\/api\/((workspace|tokens)(\/|$)|artifacts$)/
 
 /** Keeps sent mail in memory, so tests can read the sign-in code. */
 export class RecordingMailer implements Mailer {

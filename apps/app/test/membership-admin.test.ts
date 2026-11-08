@@ -256,6 +256,22 @@ describe('writes that name their workspace', () => {
     expect(named.status).toBe(200)
   })
 
+  it('refuses a browser publish into a workspace the page did not name, and lets a token publish without one', async () => {
+    const adminToken = await app.createToken(adminCookie, 'publish')
+    const publishBody = { title: 'Stale tab page', files: [{ path: 'index.html', content: '<h1>stale</h1>' }] }
+    const listBefore = await app.json<{ artifacts: unknown[] }>('/api/artifacts', { cookie: adminCookie })
+
+    const stale = await app.json<{ code: string }>('/api/artifacts', { method: 'POST', cookie: adminCookie, body: publishBody, workspaceId: 'workspace-switched-away' })
+    const unnamed = await app.request('/api/artifacts', { method: 'POST', cookie: adminCookie, body: publishBody, workspaceId: null })
+    const listAfter = await app.json<{ artifacts: unknown[] }>('/api/artifacts', { cookie: adminCookie })
+    const byToken = await app.request('/api/artifacts', { method: 'POST', token: adminToken, body: publishBody })
+
+    expect([stale.status, unnamed.status]).toEqual([409, 409])
+    expect(stale.body.code).toBe('workspace_changed')
+    expect(listAfter.body.artifacts.length).toBe(listBefore.body.artifacts.length)
+    expect(byToken.status).toBe(201)
+  })
+
   it('does not ask a token, a workspace switch or a write to an artifact to name one', async () => {
     const adminToken = await app.createToken(adminCookie, 'full')
     const workspaceId = (await app.json<{ workspace: { workspaceId: string } }>('/api/me', { cookie: adminCookie })).body.workspace.workspaceId
