@@ -4,7 +4,7 @@ import { COMMENT_FILTERS } from './comment-threads.js'
 
 const COPIED_LABEL_MS = 2000
 const COMMENT_LINK_PREFIX = '#comment-'
-const THREAD_CONTROLS = ['.comment-pin', '.comment-thread__resolve', '.comment-thread__reply-toggle', '.comment-thread__delete']
+const THREAD_CONTROLS = ['.comment-pin', '.comment-thread__resolve', '.comment-thread__reply-toggle', '.comment-thread__more']
 const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)')
 
 /**
@@ -155,9 +155,10 @@ export class CommentList extends EventTarget {
     this.#element.querySelector('[data-comment-status]').textContent = text
   }
 
+  // A refresh would replace the reply being typed or the menu being read, so it waits until the person is done.
   #isTyping() {
     const focused = document.activeElement
-    return this.#element.contains(focused) && focused.matches('textarea')
+    return (this.#element.contains(focused) && focused.matches('textarea')) || this.#element.querySelector('.xxd-menu:popover-open') !== null
   }
 
   #renderIfWaiting() {
@@ -228,22 +229,26 @@ export class CommentList extends EventTarget {
 
   #threadElement(thread) {
     const isResolved = !thread.isOpen
+    const isActive = thread.id === this.#activeId
+    // A resolved thread folds to one line until it is selected again: what is still open stays easy to scan.
+    const folded = isResolved && !isActive && this.#replyingTo !== thread.id
     const threadElement = element('article', {
       className: 'comment-thread',
       'data-thread-id': thread.id,
       'data-state': thread.pinState,
-      'data-active': thread.id === this.#activeId,
+      'data-active': isActive,
+      'data-folded': folded,
       'data-arrived': this.#arrivedIds.has(thread.id) || thread.id === this.#freshId,
       tabindex: '-1',
       'aria-label': m.viewerClient.comments.threadLabel({ number: thread.number, author: CommentList.#authorOf(thread.root), resolved: isResolved }),
-    },
+    }, folded ? this.#foldedLineOf(thread) : [
       this.#metaOf(thread),
       this.#excerptOf(thread),
       element('p', { className: 'comment-thread__body' }, thread.root.body),
       thread.replies.length > 0 ? element('ol', { className: 'comment-replies' }, thread.replies.map(reply => this.#replyElement(thread, reply))) : null,
       isResolved ? CommentList.#resolutionOf(thread.root) : null,
-      this.#canComment ? this.#actionsOrReplyForm(thread) : null,
-    )
+      this.#canComment ? this.#replyFormOrPrompt(thread, isActive) : null,
+    ])
     threadElement.addEventListener('click', event => {
       if (event.target.closest('button, a, form')) return
       this.select(thread.id)
@@ -251,15 +256,56 @@ export class CommentList extends EventTarget {
     return threadElement
   }
 
+  #pinOf(thread) {
+    const pinContent = thread.pinState === 'resolved' ? icon('Check', 12) : String(thread.number)
+    return element('button', { type: 'button', className: 'comment-pin', 'data-state': thread.pinState, 'aria-label': m.viewerClient.comments.showPin(thread.number), onClick: () => this.select(thread.id) }, pinContent)
+  }
+
+  // The pin alone marks the thread, in the shape it has on the page; a second square for the author read as another number.
   #metaOf(thread) {
-    const pinContent = thread.pinState === 'resolved' ? icon('Check', 14) : String(thread.number)
     return element('div', { className: 'comment-thread__meta' },
-      element('button', { type: 'button', className: 'comment-pin', 'data-state': thread.pinState, 'aria-label': m.viewerClient.comments.showPin(thread.number), onClick: () => this.select(thread.id) }, pinContent),
-      element('span', { className: 'xxd-avatar', 'data-size': 'sm', 'aria-hidden': 'true' }, initialOf(thread.root.author.name)),
+      this.#pinOf(thread),
       element('b', { className: 'comment-thread__author' }, CommentList.#authorOf(thread.root)),
       timeElement(thread.root.createdAt),
       thread.forAgent ? element('span', { className: 'xxd-badge', 'data-tone': 'warning' }, m.viewerClient.comments.forAgent) : null,
+      this.#canComment ? this.#toolsOf(thread) : null,
     )
+  }
+
+  #foldedLineOf(thread) {
+    return element('div', { className: 'comment-thread__folded' },
+      this.#pinOf(thread),
+      element('b', { className: 'comment-thread__author' }, CommentList.#authorOf(thread.root)),
+      element('span', { className: 'comment-thread__folded-body' }, thread.root.body))
+  }
+
+  // Resolving sits outside the menu, one press away; the rest are named in words inside it.
+  #toolsOf(thread) {
+    const isResolved = !thread.isOpen
+    const tool = (iconName, label, onClick, className) => element('button', { type: 'button', className: `xxd-btn ${className}`, 'data-variant': 'ghost', 'data-size': 'xs', 'data-icon-only': '', 'aria-label': label, 'data-tooltip': label, onClick }, icon(iconName, 16))
+    const resolveTool = isResolved
+      ? tool('RotateCcw', m.viewerClient.comments.reopenLabel(thread.number), () => this.#reopen(thread), 'comment-thread__resolve')
+      : tool('CircleCheck', m.viewerClient.comments.resolveLabel(thread.number), () => this.#resolve(thread), 'comment-thread__resolve')
+    const replyTool = thread.id === this.#activeId ? null : tool('Reply', m.viewerClient.comments.replyTo(thread.number), () => this.#openReply(thread.id), 'comment-thread__reply-toggle')
+    const menuId = `comment-menu-${thread.id}`
+    const menuItem = (iconName, label, onClick, extra = {}) => element('button', { type: 'button', className: 'xxd-menu__item', role: 'menuitem', onClick, ...extra }, icon(iconName, 14), label)
+    const items = [
+      this.#handoff && !isResolved ? menuItem('Bot', m.viewerClient.handoff.copyOne, () => this.#copyToAgent(null, [thread], m.viewerClient.handoff.copiedOne(thread.number))) : null,
+      menuItem('Link', m.viewerClient.comments.copyLink, () => this.#copyLink(thread)),
+      ...(thread.root.canDelete ? [element('div', { className: 'xxd-menu__sep', role: 'separator' }), menuItem('Trash2', m.viewerClient.comments.delete, () => this.#deleteThread(thread), { 'data-tone': 'danger', 'aria-label': m.viewerClient.comments.deleteLabel(thread.number) })] : []),
+    ]
+    return element('div', { className: 'comment-thread__tools' },
+      resolveTool,
+      replyTool,
+      element('button', { type: 'button', className: 'xxd-btn comment-thread__more', 'data-variant': 'ghost', 'data-size': 'xs', 'data-icon-only': '', 'data-xxd-menu': menuId, 'aria-label': m.viewerClient.comments.more(thread.number) }, icon('Ellipsis', 16)),
+      element('div', { className: 'xxd-menu comment-thread__menu', id: menuId, role: 'menu', popover: '' }, items))
+  }
+
+  async #copyLink(thread) {
+    const link = new URL(location.href)
+    link.hash = `${COMMENT_LINK_PREFIX.slice(1)}${thread.root.commentId}`
+    const copied = await Xxd.copyText(link.href)
+    Xxd.toast(copied ? m.viewerClient.comments.linkCopied : m.viewerClient.handoff.copyFailed, { tone: copied ? 'success' : 'danger', within: this.#toastRegion })
   }
 
   // Every comment still open under the filter, ready to paste in one go: what an agent should work through next.
@@ -270,14 +316,17 @@ export class CommentList extends EventTarget {
     const copyAll = element('button', {
       type: 'button',
       className: 'xxd-btn agent-handoff__copy',
-      'data-variant': 'primary',
-      'data-size': 'sm',
+      'data-variant': 'ghost',
+      'data-size': 'xs',
       onClick: event => this.#copyToAgent(event.currentTarget, waiting, m.viewerClient.handoff.copiedAll(waiting.length)),
     }, icon('Copy', 14), element('span', { 'data-copy-label': '' }, m.viewerClient.handoff.copyAll))
+    // The how-to stays one hover away on the link that leads to it, so the line reads as a count and an action.
+    const setUp = element('a', { className: 'xxd-btn', 'data-variant': 'ghost', 'data-size': 'xs', 'data-icon-only': '', href: '/settings/agents', 'aria-label': m.viewerClient.handoff.setUp, 'data-tooltip': m.viewerClient.handoff.hint }, icon('ArrowUpRight', 16))
     return element('section', { className: 'agent-handoff', 'aria-label': m.viewerClient.handoff.region },
+      icon('Bot', 16),
       element('p', { className: 'agent-handoff__title' }, this.#filter === 'agent' ? m.viewerClient.handoff.waitingAgent(waiting.length) : m.viewerClient.handoff.waitingOpen(waiting.length)),
       copyAll,
-      element('p', { className: 'agent-handoff__hint' }, m.viewerClient.handoff.hint, element('a', { className: 'xxd-link', href: '/settings/agents' }, m.viewerClient.handoff.setUp)))
+      setUp)
   }
 
   #excerptOf(thread) {
@@ -286,24 +335,17 @@ export class CommentList extends EventTarget {
     return element('p', { className: 'comment-thread__quote' }, lostSpot, thread.excerpt)
   }
 
-  // One quiet row of words under each thread, so no two actions share a look and none is a bare symbol.
-  #actionsOrReplyForm(thread) {
+  // The selected thread offers a reply in the shape of a box, so where the reply goes is plain before pressing.
+  #replyFormOrPrompt(thread, isActive) {
     if (this.#replyingTo === thread.id) return this.#replyForm(thread)
-    const isResolved = !thread.isOpen
-    const action = (label, onClick, extra = {}) => element('button', { type: 'button', className: 'xxd-btn comment-action', 'data-variant': 'ghost', 'data-size': 'xs', onClick, ...extra }, label)
-    return element('div', { className: 'comment-thread__actions' },
-      action(m.viewerClient.comments.reply, () => this.#openReply(thread.id), { className: 'xxd-btn comment-action comment-thread__reply-toggle', 'aria-label': m.viewerClient.comments.replyTo(thread.number) }),
-      this.#handoff && !isResolved ? action(m.viewerClient.handoff.copyOne, event => this.#copyToAgent(event.currentTarget, [thread], m.viewerClient.handoff.copiedOne(thread.number)), { 'aria-label': m.viewerClient.handoff.copyOneLabel(thread.number) }) : null,
-      isResolved
-        ? action(m.viewerClient.comments.reopen, () => this.#reopen(thread), { className: 'xxd-btn comment-action comment-thread__resolve', 'aria-label': m.viewerClient.comments.reopenLabel(thread.number) })
-        : action(m.viewerClient.comments.resolve, () => this.#resolve(thread), { className: 'xxd-btn comment-action comment-thread__resolve', 'aria-label': m.viewerClient.comments.resolveLabel(thread.number) }),
-      thread.root.canDelete ? CommentList.#deleteButton(() => this.#deleteThread(thread), m.viewerClient.comments.deleteLabel(thread.number)) : null,
-    )
+    if (!isActive) return null
+    return element('button', { type: 'button', className: 'comment-thread__reply-toggle comment-reply-prompt', 'aria-label': m.viewerClient.comments.replyTo(thread.number), onClick: () => this.#openReply(thread.id) },
+      icon('Reply', 14), element('span', {}, m.viewerClient.comments.replyPlaceholder))
   }
 
-  // Set apart at the row's end and quiet until pointed at, so it is never pressed on the way to resolving.
+  // Quiet until its reply is pointed at, at the end of the reply's own line.
   static #deleteButton(onClick, label) {
-    return element('button', { type: 'button', className: 'xxd-btn comment-action comment-thread__delete', 'data-variant': 'ghost', 'data-size': 'xs', 'aria-label': label, onClick }, m.viewerClient.comments.delete)
+    return element('button', { type: 'button', className: 'xxd-btn comment-thread__delete', 'data-variant': 'ghost', 'data-size': 'xs', 'data-icon-only': '', 'aria-label': label, 'data-tooltip': label, onClick }, icon('Trash2', 14))
   }
 
   // Deleting cannot be undone, so it always asks; the kit puts cancel first and the danger action last.
@@ -340,11 +382,16 @@ export class CommentList extends EventTarget {
   }
 
   // The control itself says it copied for a moment, in words, so it never reads as another control's symbol.
+  // `control` is null for a menu item, which closes as it is pressed: the toast alone says it copied.
   async #copyToAgent(control, threads, doneMessage) {
     // The kit falls back to a hidden selection when the clipboard API is refused; it answers false only when both fail.
     const copied = await Xxd.copyText(this.#handoff.promptFor(threads))
     if (!copied) {
       Xxd.toast(m.viewerClient.handoff.copyFailed, { tone: 'danger', within: this.#toastRegion })
+      return
+    }
+    if (!control) {
+      Xxd.toast(doneMessage, { tone: 'success', within: this.#toastRegion })
       return
     }
     const label = control.querySelector('[data-copy-label]') ?? control

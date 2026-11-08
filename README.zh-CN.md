@@ -5,11 +5,11 @@
 任何 AI agent 都能把 HTML 页面（artifact）发布上来，整个团队打开、评论、使用，不需要 Claude 账户。所有服务都跑在你自己的 Cloudflare 账户里。
 
 - **任何 agent 都能发布。** Claude Code、Codex、Cursor 或其他 agent，通过 MCP 或普通的 HTTP API。
-- **直接在页面上评论。** 评论可以钉在页面的某个位置或选中的一段文字上，未处理的评论一键复制给 agent。
+- **直接在页面上评论。** 评论可以钉在页面的某个位置或选中的一段文字上，未处理的评论一键复制给 agent；每条评论都能复制链接，打开就定位到那一条。
 - **版本、分享和公开链接。** 私有、指定的人、整个 workspace，或者带有效期和可选密码的公开链接。
 - **个人主页。** 作者可以把公开的 artifact 列在 `/@名字` 上；只有这些页面带分享卡片、允许搜索引擎收录。
 
-界面目前只有中文。
+界面支持中文和英文，见下面的[语言](#语言)。
 
 > **许可证。** Open Artifact 以 [PolyForm Noncommercial License 1.0.0](LICENSE) 公开源码，非商业用途免费。商业用途需要另外取得授权，包括公司部署给自己的员工使用：https://ui.xiaoxiaodong.ai/license
 

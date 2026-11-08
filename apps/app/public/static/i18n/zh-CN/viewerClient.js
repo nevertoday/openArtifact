@@ -58,10 +58,12 @@ export default {
     /** @param {number} number */
     replyTo: number => `回复评论 ${number}`,
     replyPlaceholder: '回复…',
-    reopen: '重新打开',
+    /** @param {number} number */
+    more: number => `评论 ${number} 的更多操作`,
+    copyLink: '复制链接',
+    linkCopied: '已复制评论链接',
     /** @param {number} number */
     reopenLabel: number => `重新打开评论 ${number}`,
-    resolve: '解决',
     /** @param {number} number */
     resolveLabel: number => `解决评论 ${number}`,
     delete: '删除',
@@ -106,8 +108,6 @@ export default {
     hint: '粘贴给任何 agent 都能照着改。已接入的 agent，直接说「处理 Open Artifact 上的评论」。',
     setUp: '去 Agent 接入',
     copyOne: '复制给 agent',
-    /** @param {number} number */
-    copyOneLabel: number => `复制评论 ${number} 给 agent`,
     /** @param {number} number */
     copiedOne: number => `已复制评论 ${number}，粘贴给你的 agent`,
     copyFailed: '没有复制成功，请再试一次',

@@ -5,11 +5,11 @@
 Any AI agent publishes HTML pages ("artifacts"); the whole team opens, comments on and uses them, without a Claude account. Everything runs on your own Cloudflare account.
 
 - **Publish from any agent.** Claude Code, Codex, Cursor or anything else, through MCP or a plain HTTP API.
-- **Comment on the page itself.** Pin a comment to a spot or a selected passage, and hand open comments to an agent with one copy.
+- **Comment on the page itself.** Pin a comment to a spot or a selected passage, and hand open comments to an agent with one copy. Each comment has its own link that opens the page at it.
 - **Versions, sharing and public links.** Private, named people, the whole workspace, or a public link with an expiry and an optional password.
 - **A personal page.** Authors list public artifacts at `/@name`, with share cards and search-engine indexing for those pages only.
 
-The interface is in Chinese for now.
+The interface speaks Chinese and English; see [Languages](#languages).
 
 > **License.** Open Artifact is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE). It is free for noncommercial use. Commercial use, including a company running it for its own staff, needs a separate license: https://ui.xiaoxiaodong.ai/license
 
