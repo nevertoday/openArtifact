@@ -95,8 +95,8 @@ ${AgentConnectSection.render(model)}`
   <div class="xxd-field">
     <label class="xxd-label" for="profile-name">${profile.nameLabel}</label>
     <div class="profile-form__row">
-      <input class="xxd-input" id="profile-name" name="name" required maxlength="60" value="${identity.name}" data-name-chosen="${String(identity.hasChosenName)}" autocomplete="name" aria-describedby="profile-name-help" data-error-required="${profile.nameRequired}">
-      <button type="submit" class="xxd-btn" data-variant="primary" ${identity.hasChosenName ? new SafeHtml('disabled') : ''}>${m.settings.save}</button>
+      <input class="xxd-input" id="profile-name" name="name" required maxlength="60" value="${identity.name}" autocomplete="name" aria-describedby="profile-name-help" data-error-required="${profile.nameRequired}">
+      <button type="submit" class="xxd-btn" data-variant="primary" disabled>${m.settings.save}</button>
     </div>
     <p class="xxd-help" id="profile-name-help">${profile.nameHelp}</p>
   </div>
@@ -163,10 +163,10 @@ ${isAdmin ? SettingsPage.#inviteSection(m) : ''}
     <div class="xxd-cluster invite-form__actions">
       <button type="submit" class="xxd-btn" data-variant="primary">${invite.send}</button>
       <span class="xxd-cluster invite-form__link">
-        <button type="button" class="xxd-btn" id="create-invite-link">${PageShell.icon('Link', 14)}${invite.createLink}</button>
         <label class="xxd-select" data-size="sm"><span class="xxd-sr-only">${invite.linkExpiry}</span><select id="invite-link-expiry">
           <option value="7">${invite.linkExpiries[7]}</option><option value="30">${invite.linkExpiries[30]}</option><option value="never">${invite.linkExpiries.never}</option>
         </select></label>
+        <button type="button" class="xxd-btn" id="create-invite-link">${PageShell.icon('Link', 14)}${invite.createLink}</button>
       </span>
     </div>
   </form>

@@ -82,6 +82,8 @@
 .artifact-cover__blocks span { background: var(--wash-strong); }
 /* Rendered at three times the card's width (about 770px) and scaled down: wide enough for a page's desktop layout,
    narrow enough that its content fills the cover instead of floating small in the middle of it. */
+/* On a phone a card is narrow, so its page renders at twice the width instead of three times and fills the cover. */
+@media (max-width: 640px) { .artifact-cover__preview { width: 200%; height: calc(200% + 12px); transform: scale(.5); } }
 /* An artifact page without its own background is written for white paper, whatever theme the app is in. */
 .artifact-cover__preview { color-scheme: light; background: #fff; }
 /* 12px taller than the cover, so lifting it 4px on hover never shows the cover's ground beneath it. */
@@ -224,7 +226,7 @@
 .login-panel__locale { position: absolute; inset-block-start: var(--space-4); inset-inline-end: var(--space-4); }
 .login-card { max-width: 400px; padding-block: 0; }
 .login-card .xxd-auth__name { font-size: var(--text-xl, 22px); }
-.login-gate { justify-self: stretch; text-align: start; }
+.login-gate { justify-self: stretch; text-align: start; word-break: keep-all; }
 .login-card .xxd-banner { justify-self: stretch; text-align: left; }
 .login-card__address { white-space: nowrap; }
 .login-card form[hidden] { display: none; }

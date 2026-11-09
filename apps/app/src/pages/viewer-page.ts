@@ -262,7 +262,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   }
 
   static #commentModeButton(model: ViewerModel): SafeHtml {
-    return html`<button type="button" class="xxd-btn viewer-comment-mode" data-variant="ghost" data-size="sm" data-icon-only aria-pressed="false" aria-keyshortcuts="C" aria-label="${model.m.viewer.bar.comment}" data-tooltip="${model.m.viewer.bar.commentModeTooltip}" data-comment-mode>${PageShell.icon('Plus')}</button>`
+    return html`<button type="button" class="xxd-btn viewer-comment-mode" data-variant="ghost" data-size="sm" aria-pressed="false" aria-keyshortcuts="C" data-tooltip="${model.m.viewer.bar.commentModeTooltip}" data-comment-mode>${PageShell.icon('Plus')}<span class="viewer-bar__label">${model.m.viewer.bar.comment}</span></button>`
   }
 
   static #commentCountButton(m: Messages): SafeHtml {

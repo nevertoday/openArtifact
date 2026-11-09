@@ -112,12 +112,10 @@ button.viewer-visibility { cursor: pointer; }
 .viewer-shortcut { display: inline-flex; gap: 2px; color: var(--muted); }
 @media (pointer: coarse) { .viewer-shortcut { display: none; } }
 
-/* A one-time hint hanging under the comment-mode button. */
+/* A one-time hint resting at the bottom of the page. */
 .viewer-coach { position: absolute; z-index: 8; display: flex; align-items: center; gap: var(--space-3); padding: 10px var(--space-2) 10px 14px; background: var(--ink); color: var(--paper); font-size: var(--text-sm); line-height: 20px; white-space: nowrap; box-shadow: var(--shadow-popover); animation: viewer-rise-in var(--motion-medium) var(--ease-out-expo); }
 .viewer-coach[hidden] { display: none; }
-.viewer-coach[data-centred] { max-width: calc(100% - 24px); white-space: normal; }
-.viewer-coach[data-centred]::before { display: none; }
-.viewer-coach::before { content: ""; position: absolute; top: -6px; right: var(--arrow-right, 24px); width: 12px; height: 12px; background: var(--ink); transform: rotate(45deg); }
+.viewer-coach { max-width: calc(100% - 24px); border-radius: 999px; }
 
 /* Drawer: beside the page on a wide screen, over it on a tablet, a sheet from the bottom on a phone. */
 .viewer-drawer { position: relative; flex: none; display: flex; flex-direction: column; width: 380px; min-height: 0; border-inline-start: 1px solid var(--line); background: var(--paper); }

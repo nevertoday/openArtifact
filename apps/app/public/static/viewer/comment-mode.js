@@ -169,15 +169,13 @@ export class Composer extends EventTarget {
   }
 }
 
-/** A one-time hint under the comment-mode button. Remembered in the browser; once a session when storage is blocked. */
+/** A one-time hint at the bottom of the page. Remembered in the browser; once a session when storage is blocked. */
 export class CoachMark {
   #element
-  #button
   #seenThisSession = false
 
-  constructor(coach, button) {
+  constructor(coach) {
     this.#element = coach
-    this.#button = button
     coach.querySelector('[data-dismiss-coach]').addEventListener('click', () => this.dismiss())
     window.addEventListener('resize', () => this.#place())
     // Doing anything else with the page, by pointer or by keyboard, is as good as dismissing it.
@@ -222,20 +220,9 @@ export class CoachMark {
   // Hangs under the comment-mode button, its arrow pointing at the button, inside the window.
   #place() {
     if (!this.isOpen) return
+    // Rests at the bottom centre, clear of the page's title and its pins, where a thumb or a glance finds it.
     const area = this.#element.offsetParent.getBoundingClientRect()
-    const width = this.#element.offsetWidth
-    // A phone's bar has no comment-mode button (a long press writes instead), so the hint rests at the bottom, under the thumb and clear of the title.
-    if (this.#button.offsetParent === null) {
-      this.#element.style.left = `${Math.max(COMPOSER_EDGE, (area.width - width) / 2)}px`
-      this.#element.style.top = `${area.height - this.#element.offsetHeight - COMPOSER_GAP * 3}px`
-      this.#element.dataset.centred = ''
-      return
-    }
-    delete this.#element.dataset.centred
-    const button = this.#button.getBoundingClientRect()
-    const left = Math.max(COMPOSER_EDGE, Math.min(button.right - area.left - width + COMPOSER_EDGE, area.width - width - COMPOSER_EDGE))
-    this.#element.style.left = `${left}px`
-    this.#element.style.top = `${button.bottom - area.top + COMPOSER_GAP}px`
-    this.#element.style.setProperty('--arrow-right', `${Math.max(12, area.left + left + width - (button.left + button.width / 2) - 6)}px`)
+    this.#element.style.left = `${Math.max(COMPOSER_EDGE, (area.width - this.#element.offsetWidth) / 2)}px`
+    this.#element.style.top = `${area.height - this.#element.offsetHeight - COMPOSER_GAP * 3}px`
   }
 }

@@ -75,7 +75,7 @@ if (threads) {
 
 const commentMode = permissions.canComment ? new CommentMode({ button: viewer.querySelector('[data-comment-mode]'), hint: stage.querySelector('[data-mode-hint]'), frame }) : null
 const composer = permissions.canComment ? new Composer({ form: stage.querySelector('[data-composer]'), stage, frame, threads, shownVersion: () => frame.version }) : null
-const coach = permissions.canComment ? new CoachMark(viewer.querySelector('[data-coach]'), viewer.querySelector('[data-comment-mode]')) : null
+const coach = permissions.canComment ? new CoachMark(viewer.querySelector('[data-coach]')) : null
 
 if (commentMode) {
   composer.addEventListener('open', () => {
