@@ -63,6 +63,7 @@ Stable handles in this UI are ids and `data-*` attributes. Use them, not text or
 
 - viewer: `[data-open-report]` and `#report-dialog` (a public link's visitor only; reasons are `#report-reason-<reason>`, fields `#report-details`, `#report-contact`), `#artifact-frame`, `[data-artifact-title]`, `[data-version-label]`, `[data-comment-mode]`, `button.xxd-btn[data-open-share]` (the bare attribute also matches the visibility badge), `[data-comment-count-button]`, `[data-comment-count]`, `[data-version-button]`, `[data-composer]`
 - comment drawer: `[data-comment-filters] [data-value=all]`, `.comment-thread__resolve`, `.comment-thread__more`, `.comment-pin[data-state]`
+- share dialog: `.share-reach` tiles hold the `#visibility-<visibility>` radios; under 工作区内可见 with nobody added, the add-person form (`#grant-email`) is behind `.share-people-reveal`
 - share to X: `[data-share-to-x]` (share dialog footer), `[data-open-share-x]` (author's byline), `.viewer-byline__share` (visitor's byline), `#share-x-dialog`, `[data-share-x-readiness]`, `[data-share-x-count]`, `[data-share-x-open]`
 - home: `a.artifact-card[href$="-<shortId>"]`, `#artifact-search`; in 最近删除 (`/?filter=removed`) `[data-restore-artifact=<id>]` and `[data-purge-artifact=<id>]` (永久删除, behind the kit's confirm dialog)
 - workspace menu: `[data-xxd-menu=workspace-menu]`, `[data-xxd-dialog-open=new-workspace-dialog]`, `#new-workspace-name`, `#new-workspace-form [type=submit]` (its error shows under the name)
