@@ -97,9 +97,21 @@ export interface ArtifactVersionContent {
   files: ArtifactFile[]
 }
 
+/** What a workspace holds, for the limits on what it may store. */
+export interface WorkspaceUsage {
+  /** Artifacts not removed. */
+  activeArtifacts: number
+  /** Every stored version's files, removed artifacts included until they are purged. */
+  fileBytes: number
+}
+
 export type PublishResult =
   | { status: 'published'; version: number }
-  | { status: 'conflict'; currentVersion: number }
+  /**
+   * The artifact is no longer at the base version. `uploaded` says the publish stored its files before finding out,
+   * as when another publish won a race; a publish on a stale version finds out before it stores anything.
+   */
+  | { status: 'conflict'; currentVersion: number; uploaded: boolean }
   | { status: 'not_found' }
 
 /**
@@ -112,7 +124,10 @@ export interface ArtifactFileSource {
 
 export interface ArtifactRepository extends ArtifactFileSource {
   create(newArtifact: NewArtifact): Promise<CreatedArtifact>
-  /** Publishes only while the artifact is still at `baseVersion`; a concurrent publish turns this into a conflict. */
+  /**
+   * Publishes only while the artifact is still at `baseVersion`. A stale base version is refused before any file is
+   * stored; a concurrent publish that wins in the meantime turns this into a conflict after the upload.
+   */
   publishOnTopOf(artifactId: string, baseVersion: number, publication: Publication): Promise<PublishResult>
   readCurrentVersion(artifactId: string): Promise<ArtifactVersionContent | null>
   readVersion(artifactId: string, version: number): Promise<ArtifactVersionContent | null>
@@ -146,4 +161,11 @@ export interface ArtifactRepository extends ArtifactFileSource {
    * Purges at most `limit` artifacts; the next call takes the rest.
    */
   purgeRemovedBefore(cutoff: number, limit: number): Promise<void>
+  /**
+   * Purges one removed artifact now, as purgeRemovedBefore does once it is past restoring. It is made past restoring
+   * as of `cutoff` first, so nobody can restore it meanwhile and a crash part way leaves it to the daily purge.
+   * Returns false, and changes nothing, when the artifact is missing or not removed.
+   */
+  purgeRemovedNow(artifactId: string, cutoff: number): Promise<boolean>
+  usageOf(workspaceId: string): Promise<WorkspaceUsage>
 }

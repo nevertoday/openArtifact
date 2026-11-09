@@ -12,7 +12,7 @@ export default {
     all: '团队成员和他们的 agent 发布的 artifact，默认工作区内可见。',
     mine: '你发布的，和你的 agent 代你发布的。',
     shared: '作者把你加进分享名单的 artifact，不论它在哪个工作区。',
-    removed: '删除后所有人都看不到。30 天内可以恢复，之后彻底删除。',
+    removed: '删除后所有人都看不到。30 天内可以恢复，之后彻底删除；也可以现在就永久删除，立即释放存储空间。',
     waiting_for_me: '有评论在等你回复。',
     waiting_for_my_agent: '有给 agent 的评论还没解决，等你的 agent 处理。',
   },
@@ -39,6 +39,7 @@ export default {
     kept: '保留',
     actions: '操作',
     restore: '恢复',
+    purge: '永久删除',
   },
   searchPlaceholder: '搜索标题、作者或 agent',
   sidebar: {

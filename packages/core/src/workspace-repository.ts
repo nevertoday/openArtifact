@@ -68,8 +68,12 @@ export interface WorkspaceRepository {
   findWorkspace(workspaceId: string): Promise<Workspace | null>
   /** The workspaces the user belongs to now, their personal workspace first, then in the order they joined. */
   membershipsOf(userId: string): Promise<Membership[]>
-  /** A new workspace with its creator as admin. */
-  create(name: string, creatorId: string, createdAt: number): Promise<Membership>
+  /**
+   * A new workspace with its creator as admin, when the creator has created fewer than `cap.max` workspaces that are
+   * not yet purged, deleted ones included; null, and nothing created, when they have. Concurrent calls cannot both
+   * take the last place.
+   */
+  create(name: string, creatorId: string, createdAt: number, cap: { max: number }): Promise<Membership | null>
   /**
    * The user's personal workspace, created with them as admin when they have none. Safe to call from any number of
    * requests at once: they all end with the same single workspace.

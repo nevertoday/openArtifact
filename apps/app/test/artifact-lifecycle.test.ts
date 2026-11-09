@@ -252,6 +252,60 @@ describe('purging removed artifacts', () => {
     expect(restorableTitles).not.toContain('Expired page')
   })
 
+  it('deletes a removed artifact forever at its author\'s word, freeing its space at once and logging it', async () => {
+    const workspaceId = (await app.json<{ workspace: { workspaceId: string } }>('/api/me', { cookie: authorCookie })).body.workspace.workspaceId
+    const bulky = await app.publish({ token: authorToken }, 'Bulky page', 'x'.repeat(50_000))
+    await app.request(`/api/artifacts/${bulky.artifactId}/data/votes/author`, { method: 'PUT', cookie: authorCookie, body: { data: { choice: 'a' } } })
+    await app.request(`/api/artifacts/${bulky.artifactId}`, { method: 'DELETE', cookie: authorCookie })
+    const usageWhileRemoved = await app.repositories.artifacts.usageOf(workspaceId)
+    const sharedDataWhileRemoved = await app.repositories.sharedData.workspaceBytes(workspaceId)
+
+    const byToken = await app.request(`/api/artifacts/${bulky.artifactId}/purge`, { method: 'POST', token: authorToken })
+    const byMember = await app.request(`/api/artifacts/${bulky.artifactId}/purge`, { method: 'POST', cookie: memberCookie })
+    const purged = await app.json<{ title: string }>(`/api/artifacts/${bulky.artifactId}/purge`, { method: 'POST', cookie: authorCookie })
+    const usageAfter = await app.repositories.artifacts.usageOf(workspaceId)
+    const sharedDataAfter = await app.repositories.sharedData.workspaceBytes(workspaceId)
+    const again = await app.request(`/api/artifacts/${bulky.artifactId}/purge`, { method: 'POST', cookie: authorCookie })
+
+    expect([byToken.status, byMember.status]).toEqual([403, 404])
+    expect(purged.status).toBe(200)
+    expect(usageWhileRemoved.fileBytes - usageAfter.fileBytes).toBeGreaterThanOrEqual(50_000)
+    expect(sharedDataWhileRemoved - sharedDataAfter).toBe(JSON.stringify({ choice: 'a' }).length)
+    expect(await storedRows(bulky.artifactId)).toEqual([0, 0, 0, 0, 0, 0])
+    expect(await storedObjectCount(bulky.artifactId)).toBe(0)
+    expect(again.status).toBe(404)
+    expect((await auditEvents()).filter(event => event.targetId === bulky.artifactId).map(event => event.action)).toEqual(['artifact.purged', 'artifact.removed'])
+  })
+
+  it('deletes forever only what its person may restore: not an active artifact, nor an admin\'s takedown by its author, nor the operator\'s', async () => {
+    const active = await app.publish({ token: authorToken }, 'Still live')
+    const takenDown = await app.publish({ token: authorToken }, 'Taken down by admin')
+    await app.request(`/api/artifacts/${takenDown.artifactId}`, { method: 'DELETE', cookie: adminCookie })
+    const byOperator = await app.publish({ token: authorToken }, 'Taken down by operator')
+    await env.DB.prepare(`UPDATE artifacts SET removed_at = ?, removed_by = 'operator', removed_as_admin = 1 WHERE id = ?`).bind(Date.now(), byOperator.artifactId).run()
+
+    const activePurge = await app.request(`/api/artifacts/${active.artifactId}/purge`, { method: 'POST', cookie: authorCookie })
+    const authorPurgesTakedown = await app.request(`/api/artifacts/${takenDown.artifactId}/purge`, { method: 'POST', cookie: authorCookie })
+    const adminPurgesOperatorTakedown = await app.request(`/api/artifacts/${byOperator.artifactId}/purge`, { method: 'POST', cookie: adminCookie })
+    const adminPurgesTakedown = await app.request(`/api/artifacts/${takenDown.artifactId}/purge`, { method: 'POST', cookie: adminCookie })
+
+    expect([activePurge.status, authorPurgesTakedown.status, adminPurgesOperatorTakedown.status]).toEqual([403, 404, 404])
+    expect(adminPurgesTakedown.status).toBe(200)
+    expect((await storedRows(active.artifactId))[0]).toBe(1)
+    expect((await storedRows(byOperator.artifactId))[0]).toBe(1)
+    expect(await storedObjectCount(byOperator.artifactId)).toBe(1)
+  })
+
+  it('offers 永久删除 next to 恢复 in 最近删除', async () => {
+    const removed = await app.publish({ token: authorToken }, 'Offered for purge')
+    await app.request(`/api/artifacts/${removed.artifactId}`, { method: 'DELETE', cookie: authorCookie })
+
+    const page = await (await app.request('/?filter=removed', { cookie: authorCookie })).text()
+
+    expect(page).toContain(`data-purge-artifact="${removed.artifactId}"`)
+    expect(page).toContain('永久删除')
+  })
+
   it('refuses to restore an artifact whose 30 days are over, even before the purge ran', async () => {
     const lapsed = await app.publish({ token: authorToken }, 'Lapsed page')
     await removeDaysAgo(lapsed.artifactId, 30)

@@ -8,7 +8,10 @@ import { HttpError } from '../http-error.ts'
 import { Notifier } from '../notifications/notifier.ts'
 import { People } from '../people.ts'
 import { PersonalPages } from '../personal-pages.ts'
+import type { AbuseReporting } from './abuse-report-api.ts'
 import { MailLimits } from './mail-limits.ts'
+import { PublishLimits } from './publish-limits.ts'
+import type { SharedDataWriteLimiters } from './shared-data-api.ts'
 import type { TitleTranslator } from './title-translator.ts'
 import { ArtifactPath, type AddressedArtifact, type Locale, type Repositories } from '@open-artifact/core'
 import { messagesFor, type Messages } from '../i18n/messages.ts'
@@ -24,6 +27,8 @@ export interface ApiContextFields {
   appOrigin: string
   artifactPages: ArtifactPageAddress
   titleTranslator: TitleTranslator
+  abuseReporting: AbuseReporting
+  sharedDataWriteLimiters: SharedDataWriteLimiters
   /** What the request says about language before anyone is identified; the account's choice is added later. */
   localeSignals: Omit<LocaleSignals, 'account'>
 }
@@ -44,6 +49,9 @@ export class ApiContext {
   readonly personalPages: PersonalPages
   readonly titleTranslator: TitleTranslator
   readonly mailLimits: MailLimits
+  readonly publishLimits: PublishLimits
+  readonly abuseReporting: AbuseReporting
+  readonly sharedDataWriteLimiters: SharedDataWriteLimiters
   readonly #localeSignals: Omit<LocaleSignals, 'account'>
   #locale: Promise<Locale> | null = null
 
@@ -51,7 +59,7 @@ export class ApiContext {
     this.repositories = fields.repositories
     this.gate = fields.gate
     this.requestIdentity = fields.requestIdentity
-    this.people = new People(fields.repositories.users, async () => (await this.messages()).server.deletedPerson)
+    this.people = new People(fields.repositories.users, async () => (await this.messages()).server)
     this.mailer = fields.mailer
     this.notifier = new Notifier(fields.repositories, fields.mailer, artifact => this.artifactUrl(artifact), fields.localeSignals.fallback)
     this.auth = fields.auth
@@ -61,6 +69,9 @@ export class ApiContext {
     this.personalPages = new PersonalPages(fields.repositories, fields.appOrigin)
     this.titleTranslator = fields.titleTranslator
     this.mailLimits = new MailLimits(fields.repositories.outboundMail)
+    this.publishLimits = new PublishLimits(fields.repositories)
+    this.abuseReporting = fields.abuseReporting
+    this.sharedDataWriteLimiters = fields.sharedDataWriteLimiters
     this.#localeSignals = fields.localeSignals
   }
 

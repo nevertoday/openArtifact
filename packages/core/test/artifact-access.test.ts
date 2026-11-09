@@ -133,6 +133,14 @@ describe('ArtifactAccess', () => {
     expect(takenDown.permissionsFor(anonymous).canView).toBe(false)
   })
 
+  it('lets nobody restore what the operator took down, not even an author who is the admin of their personal workspace', () => {
+    const takenDownByOperator = new ArtifactAccess(artifactWith({ visibility: 'public_link' }, new ArtifactRemoval(now, ArtifactRemoval.OPERATOR, true)), true, now)
+    const authorAsAdmin: ArtifactViewer = { ...author, workspaceRole: 'admin' }
+
+    expect(takenDownByOperator.permissionsFor(authorAsAdmin)).toMatchObject({ canView: false, canRestore: false })
+    expect(takenDownByOperator.permissionsFor(admin).canRestore).toBe(false)
+  })
+
   it('stops restoring once the 30 days are over', () => {
     const removedAt = now - 30 * DAY
     const expired = new ArtifactAccess(artifactWith({}, new ArtifactRemoval(removedAt, authorId, false)), true, now)

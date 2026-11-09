@@ -31,6 +31,7 @@ jobs:
           USERCONTENT_HOST: ${{ vars.USERCONTENT_HOST }}
           MAIL_FROM: ${{ vars.MAIL_FROM }}
           ALLOWED_EMAIL_DOMAINS: ${{ vars.ALLOWED_EMAIL_DOMAINS }}
+          ABUSE_REPORT_EMAIL: ${{ vars.ABUSE_REPORT_EMAIL }}
       - run: pnpm deploy:production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

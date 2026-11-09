@@ -6,6 +6,11 @@ export interface AppEnv {
   SIGN_IN_EMAIL_RATE_LIMITER: RateLimit
   /** Sign-in codes asked for from one network address. */
   SIGN_IN_ADDRESS_RATE_LIMITER: RateLimit
+  /** Abuse reports sent from one network address. */
+  REPORT_RATE_LIMITER: RateLimit
+  /** Shared-data writes by visitors who are not signed in, from one network address. */
+  SHARED_DATA_WRITE_RATE_LIMITER: RateLimit
+  SHARED_DATA_PERSON_RATE_LIMITER: RateLimit
   USERCONTENT_ORIGIN: string
   /** Where the MCP Worker runs; the settings page shows agents this address. */
   MCP_ORIGIN: string
@@ -18,6 +23,8 @@ export interface AppEnv {
   MAILER?: string
   /** Cloudflare Email Service binding, used when MAILER is "cloudflare". */
   EMAIL?: SendEmail
+  /** Where abuse reports on public pages are mailed, for the operator; unset stores them without mailing anyone. */
+  ABUSE_REPORT_EMAIL?: string
   /** Sender for MAILER=cloudflare, on a domain verified in Cloudflare Email Service. */
   MAIL_FROM?: string
   GITHUB_CLIENT_ID?: string

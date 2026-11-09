@@ -112,6 +112,20 @@ export default {
       /** @param {boolean} enabled */
       state: enabled => `${enabled ? '已允许' : '已关闭'} · 只有管理员可以修改`,
     },
+    usage: {
+      title: '用量',
+      artifacts: 'Artifact',
+      files: '文件',
+      sharedData: '共享数据',
+      /** @param {{ used: number, max: number }} count */
+      artifactCount: ({ used, max }) => `${used.toLocaleString('zh-CN')} / ${max.toLocaleString('zh-CN')} 个`,
+      /** @param {{ usedMb: number, maxGb: number }} size */
+      filesSize: ({ usedMb, maxGb }) => `${usedMb.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} MB / ${maxGb} GB`,
+      /** @param {{ usedMb: number, maxMb: number }} size */
+      sharedDataSize: ({ usedMb, maxMb }) => `${usedMb.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} MB / ${maxMb} MB`,
+      /** @param {{ maxArtifacts: number, maxGb: number, maxSharedDataMb: number }} limits */
+      help: ({ maxArtifacts, maxGb, maxSharedDataMb }) => `每个工作区最多 ${maxArtifacts.toLocaleString('zh-CN')} 个 artifact、${maxGb} GB 文件（每个版本的文件都算）和 ${maxSharedDataMb} MB 共享数据（页面为访客保存的数据）。删除的 artifact 立即不占数量，但它的文件和数据要到 30 天后彻底清除，或在「最近删除」里永久删除后，才释放空间。`,
+    },
     lifecycle: {
       title: '离开或删除',
       personalNote: '这是你的个人工作区，不能离开或删除，你一直是它的管理员。可以改名，也可以邀请别人进来一起用。',
@@ -142,6 +156,8 @@ export default {
         'artifact.removed': ({ actor, takenDown, title }) => `${actor} ${takenDown ? '下架' : '删除'}了「${title}」`,
         /** @param {{ actor: string, title: string }} p */
         'artifact.restored': ({ actor, title }) => `${actor} 恢复了「${title}」`,
+        /** @param {{ actor: string, title: string }} p */
+        'artifact.purged': ({ actor, title }) => `${actor} 永久删除了「${title}」`,
         /** @param {{ actor: string, from: string, to: string }} p */
         'artifact.renamed': ({ actor, from, to }) => `${actor} 把「${from}」重命名为「${to}」`,
         /** @param {{ actor: string, target: string }} p */

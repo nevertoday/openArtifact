@@ -94,13 +94,19 @@ export class TestApp {
    * Tests sign the same people in many times a minute, so sign-in codes are limited loosely unless
    * `productionSignInLimits` asks for the limits the app is deployed with.
    */
-  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean } = { allowedEmailDomains: 'example.com' }) {
+  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean; abuseReportEmail?: string; noMailService?: boolean } = { allowedEmailDomains: 'example.com' }) {
     const appEnv: AppEnv = {
       DB: env.DB,
       FILES: env.FILES,
       UNLOCK_RATE_LIMITER: env.UNLOCK_RATE_LIMITER,
       SIGN_IN_EMAIL_RATE_LIMITER: options.productionSignInLimits ? env.SIGN_IN_EMAIL_RATE_LIMITER : env.LOOSE_SIGN_IN_RATE_LIMITER,
       SIGN_IN_ADDRESS_RATE_LIMITER: options.productionSignInLimits ? env.SIGN_IN_ADDRESS_RATE_LIMITER : env.LOOSE_SIGN_IN_RATE_LIMITER,
+      REPORT_RATE_LIMITER: env.REPORT_RATE_LIMITER,
+      SHARED_DATA_WRITE_RATE_LIMITER: env.SHARED_DATA_WRITE_RATE_LIMITER,
+      SHARED_DATA_PERSON_RATE_LIMITER: env.SHARED_DATA_PERSON_RATE_LIMITER,
+      ...(options.abuseReportEmail === undefined ? {} : { ABUSE_REPORT_EMAIL: options.abuseReportEmail }),
+      // The routes are given the recording mailer; MAILER only says a mail service is set up, as the deployment's would.
+      ...(options.noMailService ? {} : { MAILER: 'console' }),
       ...(options.allowedEmailDomains === undefined ? {} : { ALLOWED_EMAIL_DOMAINS: options.allowedEmailDomains }),
       USERCONTENT_ORIGIN,
       MCP_ORIGIN: 'http://mcp.test',
@@ -169,7 +175,9 @@ export class TestApp {
     const userId = me.body.user.userId
     if (this.#teamWorkspaceId === null) {
       const teamName = headers?.['Accept-Language']?.startsWith('en') ? 'My team' : '我的团队'
-      this.#teamWorkspaceId = (await this.repositories.workspaces.create(teamName, userId, Date.now())).workspace.workspaceId
+      const team = await this.repositories.workspaces.create(teamName, userId, Date.now(), { max: Number.MAX_SAFE_INTEGER })
+      if (team === null) throw new Error(`the team workspace for ${email} was not created`)
+      this.#teamWorkspaceId = team.workspace.workspaceId
     } else {
       const joinResult = await this.repositories.workspaces.join(this.#teamWorkspaceId, userId, Date.now(), { readmitsRemoved: false })
       if (joinResult.status === 'removed') return sessionCookie

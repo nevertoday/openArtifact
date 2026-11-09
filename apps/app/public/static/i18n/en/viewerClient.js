@@ -261,4 +261,8 @@ export default /** @satisfies {import('../messages').Messages['viewerClient']} *
     previewLabel: 'Card preview',
     previewMissing: 'The picture card is made once the document is on your page.',
   },
+  report: {
+    sent: 'Report sent. Thank you.',
+    failed: message => `Couldn't send the report: ${message}`,
+  },
 })

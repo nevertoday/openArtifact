@@ -5,6 +5,7 @@ import { INVITE_COOKIE } from '../auth/admission.ts'
 import { WORKSPACE_COOKIE, type Identity } from '../auth/request-identity.ts'
 import { AgentGuide } from '../guide/agent-guide.ts'
 import { PersonalPages } from '../personal-pages.ts'
+import { SenderNetwork } from '../sender-network.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { HttpError } from '../http-error.ts'
 import { LOCALE_COOKIE } from '../i18n/resolve-locale.ts'
@@ -13,7 +14,7 @@ import { LoginPage } from './login-page.ts'
 import { MessagePages, type PasswordPrompt } from './message-pages.ts'
 import { PersonalPage } from './personal-page.ts'
 import { ProfileShareCard, ShareCard } from '../share/share-card.ts'
-import { SettingsPage, type WorkspaceAdministration } from './settings-page.ts'
+import { SettingsPage, type SettingsUsage, type WorkspaceAdministration } from './settings-page.ts'
 import { SETTINGS_SECTIONS, type SettingsSection } from './settings-sections.ts'
 import { ViewerPage, type Byline, type OlderVersion, type ViewerModel } from './viewer-page.ts'
 
@@ -244,8 +245,8 @@ export class PageRoutes {
     const passwordHash = summary?.sharing.publicLinkPasswordHash ?? null
     if (!summary || passwordHash === null) return MessagePages.notFound(await this.#context.messages(), requestedPath)
     // Each guess costs a PBKDF2 run, so guessing is limited per visitor and artifact.
-    const visitorAddress = request.headers.get('CF-Connecting-IP') ?? 'unknown'
-    const { success: withinAttemptLimit } = await this.#settings.unlockRateLimiter.limit({ key: `${summary.artifactId}:${visitorAddress}` })
+    const visitorNetwork = SenderNetwork.of(request) ?? 'unknown'
+    const { success: withinAttemptLimit } = await this.#settings.unlockRateLimiter.limit({ key: `${summary.artifactId}:${visitorNetwork}` })
     if (!withinAttemptLimit) return PageRoutes.#backToPasswordPrompt(requestedPath, 'wait')
     const formData = await request.formData()
     const password = String(formData.get('password') ?? '')
@@ -296,13 +297,19 @@ export class PageRoutes {
   }
 
   async #settingsPage(identity: Identity, section: SettingsSection): Promise<Response> {
-    const [accessTokens, members, administration] = await Promise.all([
+    const [accessTokens, members, administration, usage] = await Promise.all([
       this.#context.repositories.accessTokens.listForUser(identity.userId),
       this.#context.repositories.workspaces.listMembers(identity.membership.workspace.workspaceId),
       section === 'workspace' ? this.#workspaceAdministration(identity) : null,
+      section === 'workspace' ? this.#workspaceUsage(identity.membership.workspace.workspaceId) : null,
     ])
     const guideFiles = new AgentGuide(this.#context.appOrigin, this.#settings.mcpUrl).files()
-    return SettingsPage.render({ m: await this.#context.messages(), identity, section, mcpUrl: this.#settings.mcpUrl, appOrigin: this.#context.appOrigin, accessTokens, guideFiles, members, administration, now: Date.now() })
+    return SettingsPage.render({ m: await this.#context.messages(), identity, section, mcpUrl: this.#settings.mcpUrl, appOrigin: this.#context.appOrigin, accessTokens, guideFiles, members, administration, usage, now: Date.now() })
+  }
+
+  async #workspaceUsage(workspaceId: string): Promise<SettingsUsage> {
+    const [usage, sharedDataBytes] = await Promise.all([this.#context.repositories.artifacts.usageOf(workspaceId), this.#context.repositories.sharedData.workspaceBytes(workspaceId)])
+    return { ...usage, sharedDataBytes }
   }
 
   // Only an admin sees every artifact's metadata and the audit log; a member gets null.

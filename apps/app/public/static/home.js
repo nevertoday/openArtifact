@@ -1,4 +1,4 @@
-import { m, readJsonData, removalText, renderServerTimes, restoreArtifact, userMessageOf } from './common.js'
+import { api, m, readJsonData, removalText, renderServerTimes, restoreArtifact, userMessageOf } from './common.js'
 
 const homeConfig = readJsonData('home-config')
 const SEARCH_DELAY_MS = 250
@@ -34,6 +34,30 @@ async function restoreFromList(restoreButton) {
     Xxd.toast(m.client.restore.failed(userMessageOf(error)), { tone: 'danger' })
   } finally {
     restoreButton.removeAttribute('aria-busy')
+  }
+}
+
+async function purgeFromList(purgeButton) {
+  const { title } = purgeButton.dataset
+  const confirmed = await Xxd.confirmDialog({
+    title: m.client.purge.confirmTitle(title),
+    message: m.client.purge.confirmMessage,
+    confirmLabel: m.client.purge.confirm,
+    cancelLabel: m.client.dialog.cancel,
+    closeLabel: m.client.dialog.close,
+    tone: 'danger',
+  })
+  if (!confirmed) return
+  purgeButton.setAttribute('aria-busy', 'true')
+  try {
+    await api(`/api/artifacts/${encodeURIComponent(purgeButton.dataset.purgeArtifact)}/purge`, { method: 'POST' })
+    purgeButton.closest('tr')?.remove()
+    showOneFewerRemoved()
+    Xxd.toast(m.client.purge.done(title), { tone: 'success' })
+  } catch (error) {
+    Xxd.toast(m.client.purge.failed(userMessageOf(error)), { tone: 'danger' })
+  } finally {
+    purgeButton.removeAttribute('aria-busy')
   }
 }
 
@@ -96,6 +120,8 @@ if (homeConfig?.justRemoved) offerUndo(homeConfig.justRemoved)
 document.addEventListener('click', event => {
   const restoreButton = event.target.closest('[data-restore-artifact]')
   if (restoreButton) restoreFromList(restoreButton)
+  const purgeButton = event.target.closest('[data-purge-artifact]')
+  if (purgeButton) purgeFromList(purgeButton)
 })
 document.addEventListener('change', event => {
   const sourcePicker = event.target.closest('[data-source-picker]')

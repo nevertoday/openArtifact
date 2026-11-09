@@ -1,5 +1,6 @@
 import { ArtifactPath } from '@open-artifact/core'
 import { HttpError } from '../http-error.ts'
+import { AbuseReportApi } from './abuse-report-api.ts'
 import type { ApiContext } from './api-context.ts'
 import { ArtifactApi } from './artifact-api.ts'
 import { CommentApi } from './comment-api.ts'
@@ -31,6 +32,7 @@ class Apis {
   readonly sharedData: SharedDataApi
   readonly workspace: WorkspaceApi
   readonly profile: ProfileApi
+  readonly abuseReports: AbuseReportApi
 
   constructor(context: ApiContext) {
     this.artifacts = new ArtifactApi(context)
@@ -42,6 +44,7 @@ class Apis {
     this.sharedData = new SharedDataApi(context)
     this.workspace = new WorkspaceApi(context)
     this.profile = new ProfileApi(context)
+    this.abuseReports = new AbuseReportApi(context)
   }
 }
 
@@ -90,6 +93,7 @@ const API_ROUTES: ApiRoute[] = [
   route('PATCH', '/api/artifacts/:artifactId', (apis, request, params) => apis.artifacts.rename(request, param(params, 'artifactId'))),
   route('DELETE', '/api/artifacts/:artifactId', (apis, request, params) => apis.artifacts.remove(request, param(params, 'artifactId'))),
   route('POST', '/api/artifacts/:artifactId/restore', (apis, request, params) => apis.artifacts.restoreRemoved(request, param(params, 'artifactId'))),
+  route('POST', '/api/artifacts/:artifactId/purge', (apis, request, params) => apis.artifacts.purgeRemoved(request, param(params, 'artifactId'))),
   route('GET', '/api/artifacts/:artifactId/versions', (apis, request, params) => apis.artifacts.listVersions(request, param(params, 'artifactId'))),
   route('GET', '/api/artifacts/:artifactId/versions/:version(\\d+)/page', (apis, request, params) =>
     apis.artifacts.versionPage(request, param(params, 'artifactId'), Number(param(params, 'version'))),
@@ -105,6 +109,7 @@ const API_ROUTES: ApiRoute[] = [
   route('GET', '/api/comments', (apis, request) => apis.comments.listWaitingForMyAgent(request)),
   route('PATCH', '/api/comments/:commentId', (apis, request, params) => apis.comments.setResolved(request, param(params, 'commentId'))),
   route('DELETE', '/api/comments/:commentId', (apis, request, params) => apis.comments.remove(request, param(params, 'commentId'))),
+  route('POST', '/api/artifacts/:artifactId/reports', (apis, request, params) => apis.abuseReports.report(request, param(params, 'artifactId'))),
   route('GET', '/api/artifacts/:artifactId/sharing', (apis, request, params) => apis.sharing.read(request, param(params, 'artifactId'))),
   route('PUT', '/api/artifacts/:artifactId/sharing', (apis, request, params) => apis.sharing.update(request, param(params, 'artifactId'))),
   route('POST', '/api/artifacts/:artifactId/access-requests', (apis, request, params) => apis.sharing.requestAccess(request, param(params, 'artifactId'))),

@@ -104,6 +104,16 @@ export default /** @satisfies {import('../messages').Messages['settings']} */ ({
       help: 'Turning this off ends every existing public link at once. Members can still view artifacts inside the workspace.',
       state: enabled => `${enabled ? 'Allowed' : 'Off'} · Only admins can change this`,
     },
+    usage: {
+      title: 'Usage',
+      artifacts: 'Artifacts',
+      files: 'Files',
+      sharedData: 'Shared data',
+      artifactCount: ({ used, max }) => `${used.toLocaleString('en')} of ${max.toLocaleString('en')}`,
+      filesSize: ({ usedMb, maxGb }) => `${usedMb.toLocaleString('en', { maximumFractionDigits: 1 })} MB of ${maxGb} GB`,
+      sharedDataSize: ({ usedMb, maxMb }) => `${usedMb.toLocaleString('en', { maximumFractionDigits: 1 })} MB of ${maxMb} MB`,
+      help: ({ maxArtifacts, maxGb, maxSharedDataMb }) => `A workspace holds up to ${maxArtifacts.toLocaleString('en')} artifacts, ${maxGb} GB of files, every version's files included, and ${maxSharedDataMb} MB of shared data, the data pages keep for their visitors. A removed artifact stops counting toward the number at once, but its files and data keep their space until it's purged 30 days later, or until you delete it forever under Recently deleted.`,
+    },
     lifecycle: {
       title: 'Leave or delete',
       personalNote: "This is your personal workspace. It can't be left or deleted, and you always stay its admin. You can rename it and invite others into it.",
@@ -129,6 +139,7 @@ export default /** @satisfies {import('../messages').Messages['settings']} */ ({
       events: {
         'artifact.removed': ({ actor, takenDown, title }) => `${actor} ${takenDown ? 'took down' : 'deleted'} “${title}”`,
         'artifact.restored': ({ actor, title }) => `${actor} restored “${title}”`,
+        'artifact.purged': ({ actor, title }) => `${actor} deleted “${title}” forever`,
         'artifact.renamed': ({ actor, from, to }) => `${actor} renamed “${from}” to “${to}”`,
         'member.removed': ({ actor, target }) => `${actor} removed ${target} from the workspace`,
         'member.role_changed': ({ actor, target, role }) => `${actor} changed ${target}'s role to ${role}`,

@@ -281,3 +281,5 @@ button.viewer-visibility { cursor: pointer; }
   .xxd-dialog.share-x { width: 100%; max-width: 100%; max-height: 92dvh; margin: auto 0 0; padding-bottom: max(var(--space-4), env(safe-area-inset-bottom, 0px)); border-bottom-left-radius: 0; border-bottom-right-radius: 0; animation: viewer-sheet-in var(--motion-sheet) var(--ease-out-expo); }
   .share-x__hint { display: none; }
 }
+
+.viewer-report { white-space: nowrap; }

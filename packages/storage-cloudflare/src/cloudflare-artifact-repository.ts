@@ -12,6 +12,7 @@ import {
   type Publication,
   type PublishResult,
   type VersionOrigin,
+  type WorkspaceUsage,
 } from '@open-artifact/core'
 import { CloudflareShareCardImages } from './cloudflare-share-card-images.ts'
 
@@ -139,6 +140,8 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
   }
 
   async publishOnTopOf(artifactId: string, baseVersion: number, publication: Publication): Promise<PublishResult> {
+    const stale = await this.#rejectionFor(artifactId, baseVersion, false)
+    if (stale) return stale
     const nextVersion = baseVersion + 1
     const publishedAt = Date.now()
     const { batchResults, uploadId } = await this.#writeVersion(artifactId, publication.files, uploadId => [
@@ -151,7 +154,7 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     const claimedNextVersion = versionAdvance?.meta.changes === 1
     if (claimedNextVersion) return { status: 'published', version: nextVersion }
     await this.#discardUpload(artifactId, uploadId, publication.files)
-    return this.#rejectionFor(artifactId)
+    return (await this.#rejectionFor(artifactId, baseVersion, true)) ?? { status: 'conflict', currentVersion: baseVersion, uploaded: true }
   }
 
   async readCurrentVersion(artifactId: string): Promise<ArtifactVersionContent | null> {
@@ -271,11 +274,32 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
   // Deleting the row cascades to its versions, file rows, comments, grants and shared data.
   async purgeRemovedBefore(cutoff: number, limit: number): Promise<void> {
     const { results: purgedRows } = await this.#db.prepare(`SELECT id FROM artifacts WHERE ${PAST_RESTORING} LIMIT ?`).bind(cutoff, cutoff, limit).all<{ id: string }>()
-    for (const { id: artifactId } of purgedRows) {
-      await this.#deleteObjectsUnder(CloudflareArtifactRepository.#artifactPrefix(artifactId))
-      await this.#deleteObjectsUnder(CloudflareShareCardImages.prefixOf(artifactId))
-      await this.#db.prepare(`DELETE FROM artifacts WHERE id = ? AND (${PAST_RESTORING})`).bind(artifactId, cutoff, cutoff).run()
-    }
+    for (const { id: artifactId } of purgedRows) await this.#purge(artifactId, cutoff)
+  }
+
+  async purgeRemovedNow(artifactId: string, cutoff: number): Promise<boolean> {
+    const madePastRestoring = await this.#db.prepare('UPDATE artifacts SET removed_at = MIN(removed_at, ?) WHERE id = ? AND removed_at IS NOT NULL').bind(cutoff, artifactId).run()
+    if (madePastRestoring.meta.changes !== 1) return false
+    await this.#purge(artifactId, cutoff)
+    return true
+  }
+
+  async #purge(artifactId: string, cutoff: number): Promise<void> {
+    await this.#deleteObjectsUnder(CloudflareArtifactRepository.#artifactPrefix(artifactId))
+    await this.#deleteObjectsUnder(CloudflareShareCardImages.prefixOf(artifactId))
+    await this.#db.prepare(`DELETE FROM artifacts WHERE id = ? AND (${PAST_RESTORING})`).bind(artifactId, cutoff, cutoff).run()
+  }
+
+  async usageOf(workspaceId: string): Promise<WorkspaceUsage> {
+    const usageRow = await this.#db
+      .prepare(
+        `SELECT (SELECT COUNT(*) FROM artifacts WHERE workspace_id = ?1 AND removed_at IS NULL) AS active_artifacts,
+                (SELECT COALESCE(SUM(artifact_files.size_bytes), 0) FROM artifacts JOIN artifact_files ON artifact_files.artifact_id = artifacts.id
+                 WHERE artifacts.workspace_id = ?1) AS file_bytes`,
+      )
+      .bind(workspaceId)
+      .first<{ active_artifacts: number; file_bytes: number }>()
+    return { activeArtifacts: usageRow?.active_artifacts ?? 0, fileBytes: usageRow?.file_bytes ?? 0 }
   }
 
   async #deleteObjectsUnder(prefix: string): Promise<void> {
@@ -343,10 +367,11 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     return [versionRow, ...fileRows]
   }
 
-  async #rejectionFor(artifactId: string): Promise<PublishResult> {
+  /** Why a publish on `baseVersion` cannot land now, or null while the artifact is still at it. */
+  async #rejectionFor(artifactId: string, baseVersion: number, uploaded: boolean): Promise<PublishResult | null> {
     const currentVersion = await this.#db.prepare('SELECT current_version FROM artifacts WHERE id = ?').bind(artifactId).first<number>('current_version')
     if (currentVersion === null) return { status: 'not_found' }
-    return { status: 'conflict', currentVersion }
+    return currentVersion === baseVersion ? null : { status: 'conflict', currentVersion, uploaded }
   }
 
   async #uploadFiles(artifactId: string, uploadId: string, files: ArtifactFile[]): Promise<void> {

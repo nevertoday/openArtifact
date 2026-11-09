@@ -20,6 +20,22 @@ async function storedObjectCount(artifactId: string): Promise<number> {
   return listing.objects.length
 }
 
+/** The bucket, counting the files stored in it. */
+function countingUploads(): { bucket: R2Bucket; uploads: () => number } {
+  let uploads = 0
+  const bucket = new Proxy(env.FILES, {
+    get(target, property) {
+      const value = Reflect.get(target, property)
+      if (property !== 'put') return typeof value === 'function' ? value.bind(target) : value
+      return (...args: Parameters<R2Bucket['put']>) => {
+        uploads++
+        return target.put(...args)
+      }
+    },
+  })
+  return { bucket, uploads: () => uploads }
+}
+
 async function versionCount(artifactId: string): Promise<number | null> {
   return env.DB.prepare('SELECT COUNT(*) AS versions FROM artifact_versions WHERE artifact_id = ?').bind(artifactId).first<number>('versions')
 }
@@ -74,14 +90,16 @@ describe('CloudflareArtifactRepository', () => {
     expect(currentVersion?.files.map(pageText)).toEqual(['<h1>revised</h1>'])
   })
 
-  it('rejects a publish based on a stale version and leaves no trace of it', async () => {
+  it('rejects a publish based on a stale version before storing any of its files', async () => {
     const designDoc = await createDesignDoc()
     await artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId: reviewerId, publishedVia: null, origin: { kind: 'published' }, note: null, excerpt: null, files: [htmlPage('revised')] })
     const objectsBeforeStalePublish = await storedObjectCount(designDoc.artifactId)
+    const { bucket, uploads } = countingUploads()
 
-    const publishResult = await artifactRepository.publishOnTopOf(designDoc.artifactId, 1, { authorId, publishedVia: null, origin: { kind: 'published' }, note: null, excerpt: null, files: [htmlPage('stale edit')] })
+    const publishResult = await new CloudflareArtifactRepository(env.DB, bucket).publishOnTopOf(designDoc.artifactId, 1, { authorId, publishedVia: null, origin: { kind: 'published' }, note: null, excerpt: null, files: [htmlPage('stale edit')] })
 
-    expect(publishResult).toEqual({ status: 'conflict', currentVersion: 2 })
+    expect(publishResult).toEqual({ status: 'conflict', currentVersion: 2, uploaded: false })
+    expect(uploads()).toBe(0)
     expect(await versionCount(designDoc.artifactId)).toBe(2)
     expect(await storedObjectCount(designDoc.artifactId)).toBe(objectsBeforeStalePublish)
     const currentVersion = await artifactRepository.readCurrentVersion(designDoc.artifactId)
@@ -93,7 +111,7 @@ describe('CloudflareArtifactRepository', () => {
 
     const publishResult = await artifactRepository.publishOnTopOf(designDoc.artifactId, 5, { authorId, publishedVia: null, origin: { kind: 'published' }, note: null, excerpt: null, files: [htmlPage('from the future')] })
 
-    expect(publishResult).toEqual({ status: 'conflict', currentVersion: 1 })
+    expect(publishResult).toEqual({ status: 'conflict', currentVersion: 1, uploaded: false })
     expect(await versionCount(designDoc.artifactId)).toBe(1)
   })
 
@@ -107,6 +125,7 @@ describe('CloudflareArtifactRepository', () => {
 
     const statuses = publishResults.map(publishResult => publishResult.status).sort()
     expect(statuses).toEqual(['conflict', 'published'])
+    expect(publishResults.find(publishResult => publishResult.status === 'conflict')).toEqual({ status: 'conflict', currentVersion: 2, uploaded: true })
     expect(await versionCount(designDoc.artifactId)).toBe(2)
   })
 

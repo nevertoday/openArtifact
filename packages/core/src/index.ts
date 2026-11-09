@@ -1,3 +1,5 @@
+export { ABUSE_REASONS } from './abuse-reports.ts'
+export type { AbuseReason, AbuseReports, NewAbuseReport } from './abuse-reports.ts'
 export { ACCESS_TOKEN_SCOPES } from './access-token-repository.ts'
 export type { AccessToken, AccessTokenRepository, AccessTokenScope, NewAccessToken, TokenUse } from './access-token-repository.ts'
 export type { ArtifactAccessRepository, ArtifactGrant, GrantRole, PendingGrant, PersonGrant } from './artifact-access-repository.ts'
@@ -19,6 +21,7 @@ export type {
   Publication,
   PublishResult,
   VersionOrigin,
+  WorkspaceUsage,
 } from './artifact-repository.ts'
 export { ArtifactRemoval, RESTORE_WINDOW } from './artifact-removal.ts'
 export type { AuditAction, AuditChange, AuditEvent, AuditLog, NewAuditEvent } from './audit-log.ts'
@@ -30,8 +33,9 @@ export type { Invite, InviteRepository, NewInvite } from './invite-repository.ts
 export { AccessTokenSecret, InviteCode, PublicLinkPassword, SigningKey, UsercontentSignature } from './secrets.ts'
 export type { UsercontentRequest } from './secrets.ts'
 export type { ShareCardImages } from './share-card-images.ts'
-export type { SharedCollection, SharedDataRepository, SharedDocument } from './shared-data-repository.ts'
+export type { SharedCollection, SharedDataBudget, SharedDataBudgets, SharedDataRepository, SharedDocument, SharedDocumentWrite } from './shared-data-repository.ts'
 export type { SignInCodeFailures } from './sign-in-code-failures.ts'
+export type { PublishLog } from './publish-log.ts'
 export type { MailQuota, MailQuotaScope, OutboundMailing, OutboundMailKind, OutboundMailLog } from './outbound-mail-log.ts'
 export { WORKSPACE_ROLES, WorkspaceDeletion } from './workspace-repository.ts'
 export type { DeletedWorkspace, JoinResult, Membership, MembershipChange, UserDirectory, UserProfile, Workspace, WorkspaceMember, WorkspaceRepository, WorkspaceRole } from './workspace-repository.ts'

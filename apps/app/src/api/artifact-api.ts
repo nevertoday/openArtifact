@@ -38,22 +38,29 @@ export class ArtifactApi {
     const listed = ArtifactApi.#listedOnCreate(requestBody, identity, visibility)
     const publicLinkExpiry = PublicLinkExpiry.of(requestBody, identity, { visibilityBefore: null, visibilityAfter: visibility, savedExpiresAt: null, listedAfter: listed }, Date.now())
     const files = ArtifactFileJson.filesFrom(requestBody.raw('files'))
-    const [englishTitle, excerpt] = await Promise.all([this.#englishTitle('', requestedSlug, title), PageExcerpt.of(files)])
-    const slug = ArtifactSlug.forNewArtifact(requestedSlug, title, englishTitle)
-    const createdArtifact = await this.#context.repositories.artifacts.create({
-      workspaceId: identity.membership.workspace.workspaceId,
-      authorId: identity.userId,
-      publishedVia: identity.agentClient,
-      note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
-      excerpt,
-      title,
-      slug,
-      visibility,
-      publicLinkExpiresAt: publicLinkExpiry.expiresAt,
-      listed,
-      summary: requestBody.optionalText('summary', MAX_SUMMARY_LENGTH),
-      shareText: ArtifactApi.#shareTextFrom(requestBody),
-      files,
+    const workspaceId = identity.membership.workspace.workspaceId
+    const note = requestBody.optionalText('note', MAX_NOTE_LENGTH)
+    const summary = requestBody.optionalText('summary', MAX_SUMMARY_LENGTH)
+    const shareText = ArtifactApi.#shareTextFrom(requestBody)
+    const { slug, createdArtifact } = await this.#context.publishLimits.publishWithin({ publisherId: identity.userId, workspaceId, files, newArtifact: true }, async () => {
+      const [englishTitle, excerpt] = await Promise.all([this.#englishTitle('', requestedSlug, title), PageExcerpt.of(files)])
+      const slug = ArtifactSlug.forNewArtifact(requestedSlug, title, englishTitle)
+      const createdArtifact = await this.#context.repositories.artifacts.create({
+        workspaceId,
+        authorId: identity.userId,
+        publishedVia: identity.agentClient,
+        note,
+        excerpt,
+        title,
+        slug,
+        visibility,
+        publicLinkExpiresAt: publicLinkExpiry.expiresAt,
+        listed,
+        summary,
+        shareText,
+        files,
+      })
+      return { slug, createdArtifact }
     })
     const createdSummary = { artifactId: createdArtifact.artifactId, shortId: createdArtifact.shortId, slug, title, authorId: identity.userId }
     if (listed) await this.#context.personalPages.claim(identity.userId)
@@ -110,14 +117,20 @@ export class ArtifactApi {
     const newSummary = requestBody.optionalText('summary', MAX_SUMMARY_LENGTH)
     const newShareText = requestBody.has('shareText') ? { shareText: ArtifactApi.#shareTextFrom(requestBody) } : null
     const baseVersion = requestBody.boolean('force', false) ? openedArtifact.summary.version : requestBody.positiveInteger('baseVersion', BASE_VERSION_HINT)
-    const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
-      authorId: identity.userId,
-      publishedVia: identity.agentClient,
-      origin: { kind: 'published' },
-      note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
-      excerpt: await PageExcerpt.of(files),
-      files,
-    })
+    const note = requestBody.optionalText('note', MAX_NOTE_LENGTH)
+    const publishResult = await this.#context.publishLimits.publishWithin(
+      { publisherId: identity.userId, workspaceId: openedArtifact.summary.workspaceId, files, newArtifact: false },
+      async () =>
+        this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
+          authorId: identity.userId,
+          publishedVia: identity.agentClient,
+          origin: { kind: 'published' },
+          note,
+          excerpt: await PageExcerpt.of(files),
+          files,
+        }),
+      ArtifactApi.#counts,
+    )
     if (publishResult.status !== 'published') return this.#publishResponse(request, identity, openedArtifact.summary, publishResult)
     const renamedSummary = await this.#rename(identity, openedArtifact.summary, newName)
     if (newSummary !== null) await this.#context.repositories.artifacts.setSummary(artifactId, newSummary)
@@ -170,6 +183,7 @@ export class ArtifactApi {
   async restoreRemoved(request: Request, artifactId: string): Promise<Response> {
     const identity = await this.#context.requireIdentity()
     const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canRestore', 'restore this artifact')
+    await this.#context.publishLimits.ensureRoomToRestore(summary.workspaceId)
     const restoredNow = await this.#context.repositories.artifacts.restore(artifactId)
     if (!restoredNow) throw HttpError.notFound(`removed artifact ${artifactId}`)
     await this.#context.repositories.auditLog.record({
@@ -181,6 +195,26 @@ export class ArtifactApi {
       detail: { title: summary.title },
     })
     return Response.json({ artifactId, title: summary.title, url: this.#context.artifactUrl(summary) })
+  }
+
+  /**
+   * Deletes a removed artifact for good now instead of in 30 days, so its files stop counting at once. Whoever may
+   * restore it may do this; nobody may for a page the operator took down, which the operator keeps until the purge.
+   */
+  async purgeRemoved(request: Request, artifactId: string): Promise<Response> {
+    const identity = await this.#context.requireIdentity()
+    const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canRestore', 'delete this artifact forever')
+    const purgedNow = await this.#context.repositories.artifacts.purgeRemovedNow(artifactId, ArtifactRemoval.purgeCutoff(Date.now()))
+    if (!purgedNow) throw HttpError.notFound(`removed artifact ${artifactId}`)
+    await this.#context.repositories.auditLog.record({
+      workspaceId: summary.workspaceId,
+      actorId: identity.userId,
+      action: 'artifact.purged',
+      targetType: 'artifact',
+      targetId: artifactId,
+      detail: { title: summary.title },
+    })
+    return Response.json({ artifactId, title: summary.title })
   }
 
   async listVersions(request: Request, artifactId: string): Promise<Response> {
@@ -220,16 +254,28 @@ export class ArtifactApi {
     const [olderVersion, versionHistory] = await Promise.all([this.#context.repositories.artifacts.readVersion(artifactId, version), this.#context.repositories.artifacts.listVersions(artifactId)])
     const olderVersionRecord = versionHistory.find(versionRecord => versionRecord.version === version)
     if (!olderVersion || !olderVersionRecord) throw HttpError.notFound(`version ${version} of artifact ${artifactId}`)
-    const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
-      authorId: identity.userId,
-      // The files are the older version's, so the source people see stays the one that made them.
-      publishedVia: olderVersionRecord.publishedVia,
-      origin: { kind: 'restored', restoredFrom: version },
-      note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
-      excerpt: await PageExcerpt.of(olderVersion.files),
-      files: olderVersion.files,
-    })
+    const note = requestBody.optionalText('note', MAX_NOTE_LENGTH)
+    const publishResult = await this.#context.publishLimits.publishWithin(
+      { publisherId: identity.userId, workspaceId: openedArtifact.summary.workspaceId, files: olderVersion.files, newArtifact: false },
+      async () =>
+        this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
+          authorId: identity.userId,
+          // The files are the older version's, so the source people see stays the one that made them.
+          publishedVia: olderVersionRecord.publishedVia,
+          origin: { kind: 'restored', restoredFrom: version },
+          note,
+          excerpt: await PageExcerpt.of(olderVersion.files),
+          files: olderVersion.files,
+        }),
+      ArtifactApi.#counts,
+    )
     return this.#publishResponse(request, identity, openedArtifact.summary, publishResult)
+  }
+
+  // A conflict found after the files were stored was a real race and cost what a publish costs; one found before,
+  // on a stale base version, stored nothing, so retrying it to find the current version is free.
+  static #counts(publishResult: PublishResult): boolean {
+    return publishResult.status === 'published' || (publishResult.status === 'conflict' && publishResult.uploaded)
   }
 
   static #originJson(origin: VersionOrigin): { origin: VersionOrigin['kind']; restoredFrom: number | null } {

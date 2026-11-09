@@ -23,7 +23,7 @@ The developer usually has `pnpm dev` running on **8787/8788/8789** with their ow
 - ports **18787 app, 18788 mcp, 18789 usercontent** and inspector ports 18797–18799 (`--base` moves the whole range)
 - its own D1/R2 state in `.verify/runs/<runId>/state`, migrated from empty
 - its own wrangler dev registry (`WRANGLER_REGISTRY_PATH`), so service bindings resolve to this run's Workers and not the developer's
-- `--var` overrides for `USERCONTENT_ORIGIN`, `MCP_ORIGIN`, `APP_ORIGIN`, `MAILER=console`, `ALLOWED_EMAIL_DOMAINS=example.com`
+- `--var` overrides for `USERCONTENT_ORIGIN`, `MCP_ORIGIN`, `APP_ORIGIN`, `MAILER=console`, `ALLOWED_EMAIL_DOMAINS=example.com`, `ABUSE_REPORT_EMAIL=operator@example.com` (so a report from a public link's Report button shows up as mail in `logs/app.log`)
 
 Secrets (`BETTER_AUTH_SECRET`, `USERCONTENT_SIGNING_KEY`) come from the existing `apps/*/.dev.vars`. One active run at a time. `launch` refuses a second one.
 
@@ -61,13 +61,15 @@ This is read-only. For each Worker it checks that the pid is alive, `/health` re
 
 Stable handles in this UI are ids and `data-*` attributes. Use them, not text or position:
 
-- viewer: `#artifact-frame`, `[data-artifact-title]`, `[data-version-label]`, `[data-comment-mode]`, `button.xxd-btn[data-open-share]` (the bare attribute also matches the visibility badge), `[data-comment-count-button]`, `[data-comment-count]`, `[data-version-button]`, `[data-composer]`
+- viewer: `[data-open-report]` and `#report-dialog` (a public link's visitor only; reasons are `#report-reason-<reason>`, fields `#report-details`, `#report-contact`), `#artifact-frame`, `[data-artifact-title]`, `[data-version-label]`, `[data-comment-mode]`, `button.xxd-btn[data-open-share]` (the bare attribute also matches the visibility badge), `[data-comment-count-button]`, `[data-comment-count]`, `[data-version-button]`, `[data-composer]`
 - comment drawer: `[data-comment-filters] [data-value=all]`, `.comment-thread__resolve`, `.comment-thread__more`, `.comment-pin[data-state]`
 - share to X: `[data-share-to-x]` (share dialog footer), `[data-open-share-x]` (author's byline), `.viewer-byline__share` (visitor's byline), `#share-x-dialog`, `[data-share-x-readiness]`, `[data-share-x-count]`, `[data-share-x-open]`
-- home: `a.artifact-card[href$="-<shortId>"]`, `#artifact-search`
+- home: `a.artifact-card[href$="-<shortId>"]`, `#artifact-search`; in 最近删除 (`/?filter=removed`) `[data-restore-artifact=<id>]` and `[data-purge-artifact=<id>]` (永久删除, behind the kit's confirm dialog)
+- workspace menu: `[data-xxd-menu=workspace-menu]`, `[data-xxd-dialog-open=new-workspace-dialog]`, `#new-workspace-name`, `#new-workspace-form [type=submit]` (its error shows under the name)
 - personal page: `[data-entry]`, `.personal-cover`, `.personal-share`, `[data-pin]`, `[data-edit-summary]`, `[data-edit-bio]`
 - login: `#email-step`, `#login-email`, `#code-step`, `#login-code`, `[data-sent-to]`
 - language: `form[action="/locale"] button[value=en]`; the kit's confirm dialog: `dialog[role=alertdialog] button[value=confirm]`
+- settings › workspace (`/settings/workspace`): `[data-usage=artifacts]`, `[data-usage=files]` and `[data-usage=shared-data]` (two meters, each against its own limit)
 - settings › agents (`/settings/agents`): `#create-token-form`, `#token-name`, `#token-scope-publish`, `#token-scope-full`, `#connect-token-value`
 - password gate: `#public-link-password`, `form:has(#public-link-password) [type=submit]`
 

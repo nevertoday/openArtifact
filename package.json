@@ -11,7 +11,8 @@
     "dev:setup": "node scripts/setup-local.mjs",
     "dev": "node scripts/dev.mjs",
     "deploy:config": "node scripts/production-config.mjs",
-    "deploy:production": "node scripts/deploy-production.mjs"
+    "deploy:production": "node scripts/deploy-production.mjs",
+    "takedown": "node scripts/takedown.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261005.1",

@@ -152,7 +152,7 @@ async function launch(flags) {
   }
 
   const varsFor = {
-    app: [`USERCONTENT_ORIGIN:${origins.usercontent}`, `MCP_ORIGIN:${origins.mcp}`, 'MAILER:console', 'ALLOWED_EMAIL_DOMAINS:example.com'],
+    app: [`USERCONTENT_ORIGIN:${origins.usercontent}`, `MCP_ORIGIN:${origins.mcp}`, 'MAILER:console', 'ALLOWED_EMAIL_DOMAINS:example.com', 'ABUSE_REPORT_EMAIL:operator@example.com'],
     usercontent: [`APP_ORIGIN:${origins.app}`],
     mcp: [`APP_ORIGIN:${origins.app}`],
   }

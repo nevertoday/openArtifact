@@ -363,4 +363,13 @@ describe('asking for sign-in codes', () => {
     expect(statuses[20]).toBe(429)
     expect((await askForCode('other-network@example.com', '198.51.100.1')).status).toBe(200)
   })
+
+  it('counts every IPv6 address of one /64 as one sender', async () => {
+    const statuses: number[] = []
+    for (let index = 0; index < 21; index++) statuses.push((await askForCode(`v6-sender-${index}@example.com`, `2001:db8:7:7::${(index + 1).toString(16)}`)).status)
+
+    expect(statuses.slice(0, 20).every(status => status === 200)).toBe(true)
+    expect(statuses[20]).toBe(429)
+    expect((await askForCode('v6-other-network@example.com', '2001:db8:7:8::1')).status).toBe(200)
+  })
 })

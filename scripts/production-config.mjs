@@ -10,6 +10,7 @@
 //   ALLOWED_EMAIL_DOMAINS  optional; who may sign up: "*" for anyone, or domains like "example.com, example.cn".
 //                          Unset leaves the app as it was, including a value kept as a Worker secret, which
 //                          has to be deleted before this is set, since a var and a secret cannot share a name.
+//   ABUSE_REPORT_EMAIL     optional; where reports of abusive public pages are mailed. Unset, they are only stored.
 // The app also gets Workers AI, which local development goes without, to translate Chinese titles for their links.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -40,6 +41,7 @@ const appOrigin = `https://${appHost}`
 const usercontentHost = setting('USERCONTENT_HOST')
 const mailFrom = process.env.MAIL_FROM?.trim()
 const allowedEmailDomains = process.env.ALLOWED_EMAIL_DOMAINS?.trim()
+const abuseReportEmail = process.env.ABUSE_REPORT_EMAIL?.trim()
 
 const app = readBaseConfig('app')
 app.d1_databases[0].database_id = setting('D1_DATABASE_ID')
@@ -55,6 +57,7 @@ writeProductionConfig('app', {
     MCP_ORIGIN: appOrigin,
     ...(mailFrom ? { MAILER: 'cloudflare', MAIL_FROM: mailFrom } : {}),
     ...(allowedEmailDomains ? { ALLOWED_EMAIL_DOMAINS: allowedEmailDomains } : {}),
+    ...(abuseReportEmail ? { ABUSE_REPORT_EMAIL: abuseReportEmail } : {}),
   },
 })
 

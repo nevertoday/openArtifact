@@ -1,10 +1,11 @@
 import type { Messages } from '../i18n/messages.ts'
-import { ArtifactPath, ArtifactRemoval, type AccessToken, type AuditEvent, type WorkspaceMember } from '@open-artifact/core'
+import { ArtifactPath, ArtifactRemoval, type AccessToken, type AuditEvent, type WorkspaceMember, type WorkspaceUsage } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import type { GuideFile, GuidePackFormat } from '../guide/agent-guide.ts'
 import { AgentConnectSection } from './agent-connect-section.ts'
 import { INVITE_LIFETIME_DAYS } from '../api/invite-api.ts'
+import { WORKSPACE_LIMITS } from '../api/publish-limits.ts'
 import { People } from '../people.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
 import { html, SafeHtml } from './html.ts'
@@ -30,9 +31,14 @@ export interface SettingsModel {
   guideFiles: GuideFile<GuidePackFormat>[]
   members: WorkspaceMember[]
   administration: WorkspaceAdministration | null
+  /** Shown on the workspace section only; null elsewhere. */
+  usage: SettingsUsage | null
   now: number
 }
 
+
+/** What the workspace holds, files and shared data apart, since each has its own limit. */
+export type SettingsUsage = WorkspaceUsage & { sharedDataBytes: number }
 
 export class SettingsPage {
   static render(model: SettingsModel): Response {
@@ -196,9 +202,40 @@ ${administration ? SettingsPage.#workspaceNameForm(m, identity) : ''}
     </div>
   </div>
 </section>
+${model.usage ? SettingsPage.#usageSection(m, model.usage) : ''}
 ${administration ? SettingsPage.#contentSection(model.m, administration, identity, model.now) : ''}
 ${administration ? SettingsPage.#auditSection(model.m, administration, model.now) : ''}
 ${SettingsPage.#lifecycleSection(m, identity)}`
+  }
+
+  static #usageSection(m: Messages, usage: SettingsUsage): SafeHtml {
+    const { usage: words } = m.settings.workspace
+    const maxGb = WORKSPACE_LIMITS.fileBytes / 1024 ** 3
+    const maxSharedDataMb = WORKSPACE_LIMITS.sharedDataBytes / 1024 ** 2
+    const meter = (id: string, label: string, value: string, used: number, max: number) => {
+      const share = Math.min(used / max, 1)
+      const tone = share >= 0.9 ? 'danger' : share >= 0.75 ? 'warning' : null
+      return html`<div class="xxd-meter" ${tone ? html`data-tone="${tone}"` : ''} style="--value: ${share.toFixed(4)}" data-usage="${id}">
+        <div class="xxd-meter__head"><span>${label}</span><span>${value}</span></div>
+        <div class="xxd-meter__track" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${used}" aria-valuetext="${value}"><div class="xxd-meter__fill"></div></div>
+      </div>`
+    }
+    return html`<section class="xxd-group" aria-labelledby="usage-title">
+  <h2 class="xxd-group__title" id="usage-title">${words.title}</h2>
+  <div class="xxd-group__body">
+    <div class="xxd-row"><div class="xxd-row__text xxd-stack workspace-usage">
+      ${meter('artifacts', words.artifacts, words.artifactCount({ used: usage.activeArtifacts, max: WORKSPACE_LIMITS.activeArtifacts }), usage.activeArtifacts, WORKSPACE_LIMITS.activeArtifacts)}
+      ${meter('files', words.files, words.filesSize({ usedMb: SettingsPage.#shownMegabytes(usage.fileBytes), maxGb }), usage.fileBytes, WORKSPACE_LIMITS.fileBytes)}
+      ${meter('shared-data', words.sharedData, words.sharedDataSize({ usedMb: SettingsPage.#shownMegabytes(usage.sharedDataBytes), maxMb: maxSharedDataMb }), usage.sharedDataBytes, WORKSPACE_LIMITS.sharedDataBytes)}
+      <span class="xxd-row__desc">${words.help({ maxArtifacts: WORKSPACE_LIMITS.activeArtifacts, maxGb, maxSharedDataMb })}</span>
+    </div></div>
+  </div>
+</section>`
+  }
+
+  // A few pages weigh a few kilobytes, which would round to 0 MB and read as nothing stored.
+  static #shownMegabytes(bytes: number): number {
+    return bytes === 0 ? 0 : Math.max(bytes / 1024 ** 2, 0.1)
   }
 
   // Last on the page, since it ends the person's or everyone's access; a personal workspace only says why it has none.
@@ -313,6 +350,7 @@ ${SettingsPage.#lifecycleSection(m, identity)}`
       case 'artifact.removed':
         return events[auditEvent.action]({ actor, takenDown: auditEvent.detail.removedAsAdmin, title: auditEvent.detail.title })
       case 'artifact.restored':
+      case 'artifact.purged':
         return events[auditEvent.action]({ actor, title: auditEvent.detail.title })
       case 'artifact.renamed':
         return events[auditEvent.action]({ actor, from: auditEvent.detail.from, to: auditEvent.detail.to })
