@@ -247,6 +247,7 @@ button.viewer-visibility { cursor: pointer; }
   .viewer-bar { gap: 0; padding-inline: var(--space-1); }
   .viewer-bar__label, .viewer-bar__end > .viewer-visibility, .viewer-bar__workspace, .viewer-bar__crumb { display: none; }
   .viewer-bar { height: 52px; }
+  .viewer-bar .viewer-share-button, .viewer-comment-group { height: 34px; min-height: 34px; border-radius: 999px; }
   .viewer-comment-mode { padding-inline: var(--space-2); }
   .viewer-more-menu__visibility { display: block; }
   .viewer-bar__end { gap: 0; }

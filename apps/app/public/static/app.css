@@ -68,7 +68,8 @@ html { scrollbar-gutter: stable; }
   /* As a row of chips the selected one is filled; the desktop's edge rule would read as a stray line. */
   .app-sidebar .xxd-sidebar__item[aria-current=page] { box-shadow: none; border-radius: 999px; }
   .home-name-nudge { border-radius: var(--r-md); }
-  .app-main .home-name-nudge span { white-space: normal; }
+  .app-main .home-name-nudge { flex-wrap: wrap; row-gap: 2px; padding: 8px 12px; }
+  .app-main .home-name-nudge span { flex-basis: 100%; order: 3; white-space: normal; }
   .app-main { padding-inline: var(--space-4); }
 }
 
