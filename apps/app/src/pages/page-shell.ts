@@ -35,7 +35,6 @@ export type IconName =
   | 'MailCheck'
   | 'MailX'
   | 'MessageSquare'
-  | 'MessageSquarePlus'
   | 'MessageSquareText'
   | 'Pen'
   | 'Plus'
@@ -281,8 +280,8 @@ ${deletedWorkspaces.length > 0 ? PageShell.#deletedWorkspacesDialog(m, deletedWo
   }
 
   /** A person's initial on their own tint; `accountInitial` marks the one the profile page renames live. */
-  static avatar(name: string, options: { size?: 'sm' | 'lg'; accountInitial?: boolean; content?: SafeHtml } = {}): SafeHtml {
-    return html`<span class="xxd-avatar" data-avatar style="${avatarStyle(name)}" ${options.size ? new SafeHtml(`data-size="${options.size}"`) : ''} ${options.accountInitial ? new SafeHtml('data-account-initial') : ''} aria-hidden="true">${options.content ?? PageShell.initialOf(name)}</span>`
+  static avatar(name: string, options: { size?: 'sm' | 'lg'; accountInitial?: boolean } = {}): SafeHtml {
+    return html`<span class="xxd-avatar" data-avatar style="${avatarStyle(name)}" ${options.size ? new SafeHtml(`data-size="${options.size}"`) : ''} ${options.accountInitial ? new SafeHtml('data-account-initial') : ''} aria-hidden="true">${PageShell.initialOf(name)}</span>`
   }
 
   static initialOf(name: string): string {
@@ -307,7 +306,7 @@ ${deletedWorkspaces.length > 0 ? PageShell.#deletedWorkspacesDialog(m, deletedWo
   static #accountMenu(m: Messages, identity: Identity): SafeHtml {
     const menuLink = (section: (typeof SETTINGS_SECTIONS)[number]) =>
       html`<a class="xxd-menu__item" role="menuitem" href="/settings/${section}">${PageShell.icon(SETTINGS_SECTION_ICONS[section], 14)}${m.settings.sections[section]}</a>`
-    return html`<button type="button" class="xxd-btn app-account-button" data-variant="ghost" data-size="sm" data-icon-only data-xxd-menu="account-menu" aria-label="${m.shell.accountMenu(identity.name)}" data-account-button data-current-workspace="${identity.membership.workspace.workspaceId}">${PageShell.avatar(identity.name, { accountInitial: true, content: identity.hasChosenName ? undefined : PageShell.icon('UserRound', 16) })}</button>
+    return html`<button type="button" class="xxd-btn app-account-button" data-variant="ghost" data-size="sm" data-icon-only data-xxd-menu="account-menu" aria-label="${m.shell.accountMenu(identity.name)}" data-account-button data-current-workspace="${identity.membership.workspace.workspaceId}">${PageShell.avatar(identity.name, { accountInitial: true })}</button>
 <div class="xxd-menu" id="account-menu" role="menu" popover>
   <div class="xxd-menu__label xxd-text-pair app-account-head"><span class="xxd-text" data-account-name>${identity.name}</span><span class="xxd-text" data-variant="caption">${identity.email}</span></div>
   <div class="xxd-menu__sep" role="separator"></div>

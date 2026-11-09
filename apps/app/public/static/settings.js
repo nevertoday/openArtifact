@@ -266,7 +266,8 @@ function wireProfileForm() {
   if (!profileForm) return
   const nameInput = document.getElementById('profile-name')
   const saveButton = profileForm.querySelector('[type="submit"]')
-  let savedName = nameInput.value.trim()
+  // A name made from the email is shown filled in; saving it as it is makes it the chosen one.
+  let savedName = nameInput.dataset.nameChosen === 'true' ? nameInput.value.trim() : null
   nameInput.addEventListener('input', () => { saveButton.disabled = nameInput.value.trim() === savedName })
   profileForm.addEventListener('submit', async event => {
     event.preventDefault()

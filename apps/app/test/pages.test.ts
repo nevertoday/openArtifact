@@ -399,7 +399,7 @@ describe('settings', () => {
     expect(profile).toContain('邮箱用来登录，不能修改。')
   })
 
-  it('shows a person icon on the account button until the person chooses a name, then their initial', async () => {
+  it('shows the initial of the name others see on the account button, and follows a new name', async () => {
     const accountAvatar = (markup: string) => markup.match(/<span class="xxd-avatar"[^>]*data-account-initial[^>]*>(.*?)<\/span>/)?.[1]
     const unnamedCookie = await app.signIn('xavier.unnamed@example.com')
 
@@ -407,8 +407,7 @@ describe('settings', () => {
     await app.request('/api/me', { method: 'PATCH', cookie: unnamedCookie, body: { name: '徐同学' } })
     const after = accountAvatar(await pageText('/', unnamedCookie))
 
-    expect(before).toContain('data-xxd-icon="UserRound"')
-    expect(before).not.toContain('X')
+    expect(before).toBe('X')
     expect(after).toBe('徐')
   })
 

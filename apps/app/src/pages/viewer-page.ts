@@ -191,10 +191,10 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     ${isVisitor && model.authorName ? html`<span class="viewer-bar__author">${model.m.viewer.bar.byAuthor(model.authorName)}</span>` : ''}
   </div>
   <div class="viewer-bar__end">
-    ${isVisitor ? '' : ViewerPage.#visibilityBadge(model)}
-    ${permissions.canReadComments ? ViewerPage.#commentCountButton(model.m) : ''}
-    ${permissions.canComment ? html`<button type="button" class="xxd-btn viewer-comment-mode" data-variant="ghost" data-size="sm" data-icon-only aria-pressed="false" aria-keyshortcuts="C" aria-label="${model.m.viewer.bar.comment}" data-tooltip="${model.m.viewer.bar.commentModeTooltip}" data-comment-mode>${PageShell.icon('MessageSquarePlus')}</button>` : ''}
-    ${permissions.canManageSharing ? html`<button type="button" class="xxd-btn" data-variant="primary" data-size="sm" data-open-share>${model.m.viewer.bar.share}</button>` : ''}
+    ${isVisitor || permissions.canManageSharing ? '' : ViewerPage.#visibilityBadge(model)}
+    ${permissions.canReadComments ? html`<span class="viewer-comment-group">${ViewerPage.#commentCountButton(model.m)}${permissions.canComment ? ViewerPage.#commentModeButton(model) : ''}</span>` : ''}
+    ${permissions.canComment && !permissions.canReadComments ? ViewerPage.#commentModeButton(model) : ''}
+    ${permissions.canManageSharing ? ViewerPage.#shareButton(model) : ''}
     ${ViewerPage.#canReport(model) ? html`<button type="button" class="xxd-btn viewer-report" data-variant="ghost" data-size="sm" data-icon-only aria-haspopup="dialog" aria-label="${model.m.viewer.report.open}" data-tooltip="${model.m.viewer.report.open}" data-open-report>${PageShell.icon('Flag', 14)}</button>` : ''}
     ${isVisitor ? '' : ViewerPage.#moreMenu(model)}
     ${model.identity ? PageShell.accountControls(model.m, model.identity) : ViewerPage.#signInLink(model)}
@@ -252,6 +252,16 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     const content = html`<span class="viewer-visibility__dot" aria-hidden="true"></span><span data-visibility-label>${label}</span>`
     if (permissions.canManageSharing) return html`<button type="button" class="viewer-visibility" data-visibility="${visibility}" data-tooltip="${model.m.viewer.visibility.tooltipManage}" data-open-share>${content}</button>`
     return html`<span class="viewer-visibility" data-visibility="${visibility}" tabindex="0" data-tooltip="${model.m.viewer.visibility.tooltip}">${content}</span>`
+  }
+
+  // How far the page reaches rides on the share button as a dot, with the words on hover and in the ⋯ menu.
+  static #shareButton(model: ViewerModel): SafeHtml {
+    const { visibility } = model.openedArtifact.summary.sharing
+    return html`<button type="button" class="xxd-btn viewer-share-button" data-variant="primary" data-size="sm" data-visibility="${visibility}" data-tooltip="${ArtifactLabels.visibility(model.m, visibility)}" data-open-share><span class="viewer-visibility__dot" aria-hidden="true"></span>${model.m.viewer.bar.share}</button>`
+  }
+
+  static #commentModeButton(model: ViewerModel): SafeHtml {
+    return html`<button type="button" class="xxd-btn viewer-comment-mode" data-variant="ghost" data-size="sm" data-icon-only aria-pressed="false" aria-keyshortcuts="C" aria-label="${model.m.viewer.bar.comment}" data-tooltip="${model.m.viewer.bar.commentModeTooltip}" data-comment-mode>${PageShell.icon('Plus')}</button>`
   }
 
   static #commentCountButton(m: Messages): SafeHtml {

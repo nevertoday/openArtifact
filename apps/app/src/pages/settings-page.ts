@@ -88,15 +88,15 @@ ${AgentConnectSection.render(model)}`
     const { profile } = m.settings
     return html`${SettingsPage.#pageHeader(m.settings.sections.profile)}
 <div class="profile-identity">
-  ${PageShell.avatar(identity.name, { size: 'lg', accountInitial: true, content: identity.hasChosenName ? undefined : PageShell.icon('UserRound', 20) })}
+  ${PageShell.avatar(identity.name, { size: 'lg', accountInitial: true })}
   <div class="xxd-text-pair"><span class="xxd-text profile-identity__name" data-account-name>${identity.name}</span><span class="xxd-text profile-email" data-variant="secondary" aria-label="${profile.emailLabel}">${identity.email} · ${profile.emailHelp}</span></div>
 </div>
 <form class="xxd-stack profile-form" id="profile-form" data-xxd-validate>
   <div class="xxd-field">
     <label class="xxd-label" for="profile-name">${profile.nameLabel}</label>
     <div class="profile-form__row">
-      <input class="xxd-input" id="profile-name" name="name" required maxlength="60" value="${identity.hasChosenName ? identity.name : ''}" placeholder="${identity.name}" autocomplete="name" aria-describedby="profile-name-help" data-error-required="${profile.nameRequired}">
-      <button type="submit" class="xxd-btn" data-variant="primary" disabled>${m.settings.save}</button>
+      <input class="xxd-input" id="profile-name" name="name" required maxlength="60" value="${identity.name}" data-name-chosen="${String(identity.hasChosenName)}" autocomplete="name" aria-describedby="profile-name-help" data-error-required="${profile.nameRequired}">
+      <button type="submit" class="xxd-btn" data-variant="primary" ${identity.hasChosenName ? new SafeHtml('disabled') : ''}>${m.settings.save}</button>
     </div>
     <p class="xxd-help" id="profile-name-help">${profile.nameHelp}</p>
   </div>

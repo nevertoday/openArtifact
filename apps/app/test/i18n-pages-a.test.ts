@@ -121,9 +121,11 @@ describe('the server-rendered pages in English', () => {
 })
 
 describe('the home page’s source filter', () => {
-  it('keeps the same address in every language, the web page included', async () => {
+  it('keeps the same address in every language, the web page included, once there is more than one source', async () => {
     const author = await app.signIn('source-filter@example.com')
     await app.request('/api/artifacts', { method: 'POST', cookie: author, body: { title: 'Made on the web page', files: [{ path: 'index.html', content: '<p>web</p>' }] } })
+    const agentToken = await app.createToken(author)
+    await app.request('/api/artifacts', { method: 'POST', token: agentToken, headers: { 'X-Open-Artifact-Client': 'Codex' }, body: { title: 'Made by an agent', files: [{ path: 'index.html', content: '<p>agent</p>' }] } })
 
     const chinese = await app.request('/', { cookie: author })
     const english = await app.request('/', { cookie: author, headers: { 'Accept-Language': 'en' } })

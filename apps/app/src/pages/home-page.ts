@@ -284,7 +284,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">${m.home.sidebar.filter}</div>${ARTIFACT_FILTERS.map(filterLink)}</div>
     <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">${m.home.sidebar.waiting}</div>${WAITING_FILTERS.map(filterLink)}</div>
   </div>
-  ${agentCounts.length > 0 ? html`<div class="xxd-sidebar__group home-sidebar__sources"><div class="xxd-sidebar__label">${m.home.sidebar.sources}</div>${agentCounts.map(agentLink)}</div>` : ''}
+  ${agentCounts.length > 1 ? html`<div class="xxd-sidebar__group home-sidebar__sources"><div class="xxd-sidebar__label">${m.home.sidebar.sources}</div>${agentCounts.map(agentLink)}</div>` : ''}
   ${agentCounts.length > 1 || model.query.agent !== null ? HomePage.#sourcePicker(model, agentCounts) : ''}
 </div></nav>`
   }

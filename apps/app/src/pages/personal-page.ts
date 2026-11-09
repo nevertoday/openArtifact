@@ -71,9 +71,9 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
     const shareOnX = ShareCard.intentUrl(shareText, model.pageUrl)
     return html`<header class="personal-head">
   <span class="personal-head__avatar" data-avatar style="${avatarStyle(name)}" aria-hidden="true">${PageShell.initialOf(name)}</span>
-  <h1 class="personal-head__name">${name}<small>${m.personal.entryCount(model.entries.length)}</small></h1>
+  <h1 class="personal-head__name">${name}${model.entries.length > 0 ? html`<small>${m.personal.entryCount(model.entries.length)}</small>` : ''}</h1>
   <div class="personal-head__bio" data-bio-slot>${PersonalPage.#bio(m, profile.bio, isOwner)}</div>
-  <a class="xxd-btn personal-head__share" data-size="sm" href="${shareOnX}" target="_blank" rel="noopener noreferrer">${PageShell.icon('Share2', 14)}${m.personal.sharePage}</a>
+  ${model.entries.length > 0 ? html`<a class="xxd-btn personal-head__share" data-size="sm" href="${shareOnX}" target="_blank" rel="noopener noreferrer">${PageShell.icon('Share2', 14)}${m.personal.sharePage}</a>` : ''}
 </header>`
   }
 

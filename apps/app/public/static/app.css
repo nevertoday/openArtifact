@@ -68,7 +68,7 @@ html { scrollbar-gutter: stable; }
   /* As a row of chips the selected one is filled; the desktop's edge rule would read as a stray line. */
   .app-sidebar .xxd-sidebar__item[aria-current=page] { box-shadow: none; border-radius: 999px; }
   .home-name-nudge { border-radius: var(--r-md); }
-  .home-name-nudge span { white-space: normal; }
+  .app-main .home-name-nudge span { white-space: normal; }
   .app-main { padding-inline: var(--space-4); }
 }
 
@@ -260,14 +260,16 @@ html { scrollbar-gutter: stable; }
 .profile-form__row { display: flex; gap: var(--space-2); max-width: 520px; }
 .profile-form__row > .xxd-input { flex: 1; min-width: 0; }
 .profile-form + .theme-tiles { margin-top: var(--space-8); }
-.member-role { color: var(--muted); border-bottom: 1px dotted var(--line-strong); cursor: help; }
+.member-role { color: var(--muted); }
 .settings-back { margin-bottom: var(--space-3); color: var(--muted); }
 /* A row's remove or revoke is quiet red text until the row is pointed at, so a long table is not a wall of red boxes. */
-td .xxd-btn[data-variant="danger-outline"][data-size="xs"]:not(:hover, :focus-visible) { border-color: transparent; background: transparent; }
+td .xxd-btn[data-variant="danger-outline"][data-size="xs"]:not(:hover, :focus-visible) { border-color: transparent; background: transparent; color: var(--muted); }
 
 /* Steps 2 and 3 of Agent access, named but quiet until a token exists, so the way ahead is visible from the start. */
 .connect-upcoming { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .connect-upcoming[hidden] { display: none; }
+.connect-upcoming li::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-inline-end: var(--space-2); vertical-align: -1px; background: currentColor; -webkit-mask: var(--lock-icon) center / contain no-repeat; mask: var(--lock-icon) center / contain no-repeat; }
+.connect-upcoming { --lock-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'%3E%3Crect x='4' y='11' width='16' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E"); }
 .connect-upcoming li { padding: var(--space-3) var(--space-4); border-radius: var(--r-md); background: var(--wash); color: var(--muted); font-weight: var(--weight-medium); }
 
 /* X's mark sits on the text baseline like the kit's icons, in whatever colour the control's text is. */
