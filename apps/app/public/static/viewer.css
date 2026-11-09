@@ -1,6 +1,8 @@
 /* The viewer: the artifact first, a slim bar above it, comments written on the page itself and a drawer beside it.
    Kit tokens only. Motion moves opacity and transform alone, and stops when the reader asks for less motion. */
 
+/* The viewer never scrolls the window, so a dialog must not reserve a scrollbar's width and shift the bar. */
+:root:has(.viewer) { scrollbar-gutter: auto !important; }
 .viewer { position: relative; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; background: var(--paper); }
 
 /* Bar: one line, the title cut with an ellipsis before anything wraps. */
@@ -153,7 +155,8 @@ button.viewer-visibility { cursor: pointer; }
 .comment-pin[data-state="resolved"] { background: var(--success-solid); color: var(--success-on-solid); }
 .comment-pin:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
 .comment-thread__quote { margin: 4px 0 6px; }
-.comment-thread__lost { margin-inline-end: var(--space-1-5); color: var(--warning-text); }
+.comment-thread__lost { display: inline-block; margin-inline-end: var(--space-1-5); padding: 0 7px; border-radius: 999px; background: color-mix(in srgb, var(--warning-text) 12%, transparent); color: var(--warning-text); font-weight: var(--weight-medium); line-height: 18px; }
+.comment-thread__quote:has(> .comment-thread__lost:only-child) { padding-inline-start: 0; border-inline-start: 0; }
 .comment-thread__body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .comment-thread[data-state="resolved"] :is(.comment-thread__body, .comment-thread__quote) { color: var(--muted); }
 .comment-replies { display: grid; gap: 10px; margin: 10px 0 0; padding: 0 0 0 var(--space-3); border-inline-start: 1px solid var(--line); list-style: none; }

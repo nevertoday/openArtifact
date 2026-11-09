@@ -28,7 +28,6 @@ export type IconName =
   | 'House'
   | 'Inbox'
   | 'LayoutGrid'
-  | 'LayoutTemplate'
   | 'Link'
   | 'Lock'
   | 'LockKeyhole'
@@ -181,7 +180,12 @@ ${options.description ? html`<meta name="twitter:description" content="${options
   }
 
   static brandLink(): SafeHtml {
-    return html`<a class="app-brand" href="/">${PageShell.icon('LayoutTemplate', 20)}<span>Open Artifact</span></a>`
+    return html`<a class="app-brand" href="/">${PageShell.brandMark()}<span>Open Artifact</span></a>`
+  }
+
+  /** The product's mark: a page with its corner turned, and the orange dot of a comment waiting on it. */
+  static brandMark(size = 22): SafeHtml {
+    return html`<svg class="app-brand__mark" width="${String(size)}" height="${String(size)}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="1" y="1" width="22" height="22" rx="6.5" fill="currentColor"/><path d="M7.5 6h6l3.5 3.5V18h-9.5z" fill="var(--bg, #fff)"/><path d="M13.5 6v3.5H17" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="18.6" cy="5.4" r="3" fill="#ea580c" stroke="var(--bg, #fff)" stroke-width="1.6"/></svg>`
   }
 
   /** The page's top bar; `middle` sits between the brand and the account menu. */

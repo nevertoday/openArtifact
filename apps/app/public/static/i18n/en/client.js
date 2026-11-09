@@ -110,7 +110,7 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
   settings: {
     tokens: {
       scopes: { publish: 'Publish only', full: 'Full access' },
-      states: { revoked: 'Revoked', expired: 'Expired', active: 'Active' },
+      states: { revoked: 'Revoked', expired: 'Expired', expiringSoon: 'Expires soon', active: 'Active' },
       columns: { name: 'Name', scope: 'Access', lastUsed: 'Last used', expires: 'Expires', state: 'Status' },
       neverUsed: 'Never used',
       neverExpires: 'Never expires',

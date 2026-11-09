@@ -10,10 +10,13 @@ function secondaryText(text) {
 
 const POLL_INTERVAL_MS = 5000
 const JUST_CREATED_HIGHLIGHT_MS = 2500
+// A token that stops within a week is flagged while there is still time to make another.
+const EXPIRING_SOON_MS = 7 * 24 * 60 * 60 * 1000
 
 function tokenStateOf(accessToken) {
   if (accessToken.revokedAt) return { label: tokenText.states.revoked, tone: undefined, isActive: false }
   if (accessToken.expiresAt && accessToken.expiresAt <= Date.now()) return { label: tokenText.states.expired, tone: 'warning', isActive: false }
+  if (accessToken.expiresAt && accessToken.expiresAt - Date.now() <= EXPIRING_SOON_MS) return { label: tokenText.states.expiringSoon, tone: 'warning', isActive: true }
   return { label: tokenText.states.active, tone: 'success', isActive: true }
 }
 

@@ -151,7 +151,9 @@ export class VersionHistory extends EventTarget {
     const hasPrevious = this.previousOf(this.shown) !== null
     const compare = element('button', { type: 'button', className: 'xxd-menu__item', role: 'menuitem', disabled: !hasPrevious, 'data-start-compare': true }, icon('Columns2', 14), m.viewerClient.versions.compare)
     const status = this.#historyStatus()
-    this.#menu.replaceChildren(...[element('div', { role: 'group', 'aria-label': m.viewerClient.versions.menuLabel }, items), status, element('div', { className: 'xxd-menu__sep', role: 'separator' }), compare].filter(Boolean))
+    // A first version has nothing to compare with, so the item waits for v2 instead of sitting there greyed out.
+    const compareItems = this.#latest > 1 ? [element('div', { className: 'xxd-menu__sep', role: 'separator' }), compare] : []
+    this.#menu.replaceChildren(...[element('div', { role: 'group', 'aria-label': m.viewerClient.versions.menuLabel }, items), status, ...compareItems].filter(Boolean))
     if (this.#historyLoaded === 'not yet') this.refresh()
   }
 

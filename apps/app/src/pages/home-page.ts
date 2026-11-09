@@ -184,7 +184,7 @@ ${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(mod
     return html`${model.identity.hasChosenName ? '' : HomePage.#nameNudge(model.m, model.identity)}<header class="xxd-page-header home-header">
   <div class="xxd-page-header__row">
     <h1 class="xxd-page-header__title">${HomePage.#heading(model.m, model.query)}</h1>
-    <div class="xxd-page-header__actions"><a class="xxd-btn" data-variant="primary" href="/settings/agents">${model.m.home.letAgentPublish}</a></div>
+    ${shownArtifacts.length > 0 ? html`<div class="xxd-page-header__actions"><a class="xxd-btn" data-variant="primary" href="/settings/agents">${model.m.home.letAgentPublish}</a></div>` : ''}
   </div>
   <p class="xxd-page-header__desc">${HomePage.#description(model.m, model.query)}</p>
 </header>
@@ -330,7 +330,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
   </div>
   <div class="xxd-card__body">
     <p class="xxd-card__title artifact-card__title" title="${summary.title}">${summary.title}</p>
-    <p class="xxd-card__meta artifact-meta" title="${publishedBy} · ${ArtifactLabels.updatedAgo(model.m, summary.updatedAt, model.now)}${summary.version > 1 ? ` · v${summary.version}` : ''}">${PageShell.avatar(authorName, { size: 'sm' })}<span>${publishedBy}</span>${PageShell.relativeTime(model.m, summary.updatedAt, model.now)}${summary.version > 1 ? html`<span class="xxd-mono">v${summary.version}</span>` : ''}</p>
+    <p class="xxd-card__meta artifact-meta" title="${publishedBy} · ${ArtifactLabels.updatedAgo(model.m, summary.updatedAt, model.now)}${summary.version > 1 ? ` · v${summary.version}` : ''}">${PageShell.avatar(authorName, { size: 'sm' })}<span>${authorName}</span>${summary.publishedVia ? html`<span>${summary.publishedVia}</span>` : ''}${PageShell.relativeTime(model.m, summary.updatedAt, model.now)}${summary.version > 1 ? html`<span class="xxd-mono">v${summary.version}</span>` : ''}</p>
   </div>
 </a>`
   }

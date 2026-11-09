@@ -8,7 +8,7 @@ export default {
     storage: '免费使用。第一次登录就有你自己的工作区，也可以邀请别人一起用。',
   },
   heading: '登录或注册',
-  intro: '输入邮箱，我们发一个 6 位验证码。新邮箱会自动注册，不用密码。',
+  intro: '输入邮箱，我们发一个 6 位验证码。新邮箱会自动注册。',
   returnsToPage: '你要打开的页面需要登录后才能看。登录后会直接打开它。',
   /** @template T @param {T} address @returns {(string | T)[]} */
   codeSentTo: address => ['6 位验证码已发送到 ', address],

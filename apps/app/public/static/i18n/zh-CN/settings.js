@@ -81,7 +81,7 @@ export default {
   },
   members: {
     /** @param {{ count: number, isAdmin: boolean }} p */
-    summary: ({ count, isAdmin }) => `${count} 人。${isAdmin ? '' : '要请同事加入，请管理员邀请。'}`,
+    summary: ({ count, isAdmin }) => (isAdmin ? `${count} 位成员` : `${count} 位成员。要请同事加入，请管理员邀请。`),
     you: '（你）',
     allMembers: '全部成员',
     columns: { name: '名字', email: '邮箱', role: '角色' },

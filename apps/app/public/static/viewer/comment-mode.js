@@ -224,11 +224,10 @@ export class CoachMark {
     if (!this.isOpen) return
     const area = this.#element.offsetParent.getBoundingClientRect()
     const width = this.#element.offsetWidth
-    // A phone's bar has no comment-mode button (a long press writes instead), so the hint hangs centred under the bar.
+    // A phone's bar has no comment-mode button (a long press writes instead), so the hint rests at the bottom, under the thumb and clear of the title.
     if (this.#button.offsetParent === null) {
-      const bar = this.#button.closest('header').getBoundingClientRect()
       this.#element.style.left = `${Math.max(COMPOSER_EDGE, (area.width - width) / 2)}px`
-      this.#element.style.top = `${bar.bottom - area.top + COMPOSER_GAP}px`
+      this.#element.style.top = `${area.height - this.#element.offsetHeight - COMPOSER_GAP * 3}px`
       this.#element.dataset.centred = ''
       return
     }

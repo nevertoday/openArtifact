@@ -51,7 +51,7 @@ describe('login page', () => {
 
     expect(fromSharedLink).toContain('你要打开的页面需要登录后才能看。登录后会直接打开它。')
     expect(plain).not.toContain('你要打开的页面需要登录后才能看。登录后会直接打开它。')
-    expect(plain).toContain('输入邮箱，我们发一个 6 位验证码。新邮箱会自动注册，不用密码。')
+    expect(plain).toContain('输入邮箱，我们发一个 6 位验证码。新邮箱会自动注册。')
   })
 
   it.each(['//evil.example/steal', '/\t/evil.example', '/\\evil.example', 'https://evil.example/'])('never redirects off the site after sign-in (next=%s)', async nextPath => {

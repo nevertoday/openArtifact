@@ -38,6 +38,7 @@ export class PersonalPage {
     const body = html`<div class="personal" data-personal>
 ${model.isOwner ? PersonalPage.#ownerBar(model.m) : ''}
 <main class="personal__page" id="main" tabindex="-1">
+<div class="personal-brand">${PageShell.brandLink()}</div>
 ${PersonalPage.#header(model)}
 ${pinned ? PersonalPage.#cover(pinned, model) : ''}
 ${listedBelow.length > 0 ? PersonalPage.#years(listedBelow, model) : ''}

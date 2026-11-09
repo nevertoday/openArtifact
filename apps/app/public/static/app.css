@@ -1,6 +1,9 @@
 /* Only what the UI kit has no component for: the app frame, artifact covers, settings, login. The viewer has viewer.css. Kit tokens only,
    except the page-title size below, which the kit's scale has no step for. */
 
+/* The scrollbar's room is kept whether or not a page scrolls, so headers never jump between pages or under a dialog. */
+html { scrollbar-gutter: stable; }
+
 /* Type scale of the app's own pages. The kit sets 13px everywhere, which suits menus and toolbars; the pages people
    read get one step more, and the page title a clear jump above the section headings, so what matters is seen first. */
 :root { --app-title-size: 32px; --app-title-leading: 40px; }
@@ -94,7 +97,7 @@
 .artifact-cover__chips { position: absolute; inset: auto auto var(--space-2) var(--space-2); max-width: calc(100% - 72px); z-index: 1; display: flex; flex-wrap: wrap; gap: var(--space-1); pointer-events: none; }
 .artifact-chip--comments { position: absolute; inset: auto var(--space-2) var(--space-2) auto; z-index: 1; font-variant-numeric: tabular-nums; }
 .artifact-chip__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warning, #b45309); }
-[data-theme="dark"] .artifact-cover__preview { filter: brightness(.86) saturate(.95); }
+[data-theme="dark"] .artifact-cover__preview { filter: brightness(.94); }
 /* On hover the cover's page eases up a little, as if picked up; the kit already darkens the border at once. */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .artifact-cover__preview { transition: translate var(--motion-medium) var(--ease-out-quint); }

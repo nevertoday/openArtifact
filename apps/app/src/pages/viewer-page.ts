@@ -182,7 +182,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     const homeLink = workspaceName
       ? html`<a class="xxd-btn viewer-bar__home" data-variant="ghost" data-size="sm" href="/" aria-label="${model.m.viewer.bar.home}">${PageShell.icon('House')}<span class="viewer-bar__workspace">${workspaceName}</span></a><span class="viewer-bar__crumb" aria-hidden="true">/</span>`
       : html`<a class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" href="/" aria-label="${model.m.viewer.bar.home}" data-tooltip="${model.m.viewer.bar.home}" data-tooltip-placement="bottom-start">${PageShell.icon('House')}</a>`
-    const brandMark = html`<a class="xxd-btn viewer-bar__brand" data-variant="ghost" data-icon-only data-size="sm" href="/" aria-label="Open Artifact" data-tooltip="Open Artifact" data-tooltip-placement="bottom-start">${PageShell.icon('LayoutTemplate')}</a>`
+    const brandMark = html`<a class="xxd-btn viewer-bar__brand" data-variant="ghost" data-icon-only data-size="sm" href="/" aria-label="Open Artifact" data-tooltip="Open Artifact" data-tooltip-placement="bottom-start">${PageShell.brandMark(20)}</a>`
     return html`<header class="xxd-topbar viewer-bar">
   ${isVisitor ? brandMark : homeLink}
   <div class="viewer-bar__title">
@@ -383,8 +383,8 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     </div>
     <div class="xxd-dialog__body share-dialog__body" data-share-body><p class="viewer-drawer__status"><span class="xxd-spinner" aria-hidden="true"></span>${m.viewer.share.loading}</p></div>
     <div class="xxd-dialog__actions">
-      <span class="xxd-text share-dialog__url" data-variant="mono-secondary" data-share-url></span>
-      <button type="button" class="xxd-btn" data-share-to-x>${PageShell.xLogo(14)}${m.viewer.share.toX}</button>
+      <span class="xxd-text share-dialog__url" data-variant="caption" data-share-url></span>
+      <button type="button" class="xxd-btn" data-variant="ghost" data-share-to-x>${PageShell.xLogo(14)}${m.viewer.share.toX}</button>
       <button type="button" class="xxd-btn" data-copy-link data-copy-done="${m.viewer.share.linkCopied}">${PageShell.icon('Copy', 14)}${m.viewer.share.copyLink}</button>
       <button type="submit" class="xxd-btn" data-variant="primary" data-save-sharing disabled>${m.viewer.share.save}</button>
     </div>
