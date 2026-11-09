@@ -92,9 +92,10 @@ export class TestApp {
 
   /**
    * Tests sign the same people in many times a minute, so sign-in codes are limited loosely unless
-   * `productionSignInLimits` asks for the limits the app is deployed with.
+   * `productionSignInLimits` asks for the limits the app is deployed with. `tightPersonWriteLimit` lets one person
+   * write shared data 3 times a minute instead of 300, so a test can reach the limit without 301 requests.
    */
-  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean; abuseReportEmail?: string; noMailService?: boolean } = { allowedEmailDomains: 'example.com' }) {
+  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean; tightPersonWriteLimit?: boolean; abuseReportEmail?: string; noMailService?: boolean } = { allowedEmailDomains: 'example.com' }) {
     const appEnv: AppEnv = {
       DB: env.DB,
       FILES: env.FILES,
@@ -103,7 +104,7 @@ export class TestApp {
       SIGN_IN_ADDRESS_RATE_LIMITER: options.productionSignInLimits ? env.SIGN_IN_ADDRESS_RATE_LIMITER : env.LOOSE_SIGN_IN_RATE_LIMITER,
       REPORT_RATE_LIMITER: env.REPORT_RATE_LIMITER,
       SHARED_DATA_WRITE_RATE_LIMITER: env.SHARED_DATA_WRITE_RATE_LIMITER,
-      SHARED_DATA_PERSON_RATE_LIMITER: env.SHARED_DATA_PERSON_RATE_LIMITER,
+      SHARED_DATA_PERSON_RATE_LIMITER: options.tightPersonWriteLimit ? env.TIGHT_SHARED_DATA_PERSON_RATE_LIMITER : env.SHARED_DATA_PERSON_RATE_LIMITER,
       ...(options.abuseReportEmail === undefined ? {} : { ABUSE_REPORT_EMAIL: options.abuseReportEmail }),
       // The routes are given the recording mailer; MAILER only says a mail service is set up, as the deployment's would.
       ...(options.noMailService ? {} : { MAILER: 'console' }),
