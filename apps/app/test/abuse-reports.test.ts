@@ -111,6 +111,21 @@ describe('reporting a public page', () => {
     expect(app.mailer.sent.length).toBe(mailsBefore + 1)
   })
 
+  it('refuses a contact address carrying a line break, a control or a format character of any kind, storing nothing', async () => {
+    const page = await publicPage('Contact injection')
+    const mailsBefore = app.mailer.sent.length
+    const breaks = ['\u0085', '\u2028', '\u2029', '\u000b', '\u000c', '\r', '\n', '\u001b', '\u0000', '\u202e', '\u00a0']
+
+    const statuses = await Promise.all(breaks.map(async character => (await report(app, page.artifactId, { reason: 'spam', contactEmail: `visitor@mail.example${character}pnpm.takedown.other` })).status))
+    const plain = await report(app, page.artifactId, { reason: 'spam', contactEmail: 'visitor+tag@mail.example' })
+
+    expect(statuses).toEqual(breaks.map(() => 400))
+    expect(plain.status).toBe(201)
+    expect(await storedReports(page.artifactId)).toHaveLength(1)
+    expect(app.mailer.sent.length).toBe(mailsBefore + 1)
+    expect(app.mailer.lastTo(OPERATOR)?.text).toContain('Reply to: visitor+tag@mail.example, not signed in')
+  })
+
   it('takes reports only on pages anyone with the link can open', async () => {
     const workspacePage = await app.publish({ cookie: authorCookie }, 'Team only', '<h1>team</h1>', 'workspace')
     const colleagueCookie = await app.signIn('colleague@example.com')

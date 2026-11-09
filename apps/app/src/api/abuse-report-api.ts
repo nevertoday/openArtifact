@@ -8,7 +8,9 @@ import { JsonBody } from './json-body.ts'
 
 const MAX_DETAILS_LENGTH = 1000
 const MAX_EMAIL_LENGTH = 254
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+// \s misses U+0085 and most control characters, so controls, format characters (bidi overrides among them) and every
+// separator are refused by name.
+const EMAIL_PATTERN = /^[^\s@\p{Cc}\p{Cf}\p{Z}]+@[^\s@\p{Cc}\p{Cf}\p{Z}]+\.[^\s@\p{Cc}\p{Cf}\p{Z}]+$/u
 /** Enough for the operator to see a page is being reported, few enough that reports cannot flood their inbox. */
 const REPORTS_PER_ARTIFACT_PER_DAY = 20
 /** Report mail to the operator in any 24 hours, across every page; the reports past it are stored and counted in the daily digest. */
@@ -16,6 +18,10 @@ export const REPORT_MAILS_PER_DAY = 50
 const DAY_MS = 24 * 60 * 60 * 1000
 // Every way text can start a new line in a mail reader, so a reporter's words cannot pass for a line of ours.
 const LINE_BREAKS = /\r\n|[\r\n\v\f\u0085\u2028\u2029]/
+
+function oneLine(text: string): string {
+  return text.split(LINE_BREAKS).join(' ')
+}
 
 const REASON_WORDS: Record<AbuseReason, string> = {
   spam: 'spam',
@@ -120,9 +126,9 @@ export class AbuseReportApi {
       '',
       `Page:     ${pageUrl}`,
       `Reason:   ${REASON_WORDS[report.reason]}`,
-      `Reply to: ${report.reporterEmail ?? '(no address given)'}${report.signedIn ? ', signed in' : ', not signed in'}`,
+      `Reply to: ${report.reporterEmail === null ? '(no address given)' : oneLine(report.reporterEmail)}${report.signedIn ? ', signed in' : ', not signed in'}`,
       `Report:   ${report.reportId}`,
-      `Title:    ${summary.title.split(LINE_BREAKS).join(' ')}`,
+      `Title:    ${oneLine(summary.title)}`,
       '',
       ...(report.details === null ? ['Details:  (none)'] : ['Details, as the reporter wrote them:', ...report.details.split(LINE_BREAKS).map(line => `> ${line}`)]),
     ].join('\n')
