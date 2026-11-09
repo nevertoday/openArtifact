@@ -158,6 +158,22 @@ describe('publishes per person', () => {
     expect((await app.repositories.artifacts.findSummary(byAgent.body.artifactId ?? ''))?.version).toBe(3)
   })
 
+  it('gives the place back when a publish does not land, as on a version conflict', async () => {
+    const publisher = await newPublisher('conflicted')
+    const page = await publish({ cookie: publisher.cookie }, '<h1>one</h1>')
+    await addPastPublishes(publisher.userId, 297, Date.now() - 60 * 60 * 1000)
+    await publishVersion({ cookie: publisher.cookie }, page.body.artifactId ?? '', 1, '<h1>two</h1>')
+
+    const conflicts = []
+    for (const attempt of [1, 2, 3]) conflicts.push(await publishVersion({ cookie: publisher.cookie }, page.body.artifactId ?? '', 1, `<h1>stale ${attempt}</h1>`))
+    const lastPlace = await publishVersion({ cookie: publisher.cookie }, page.body.artifactId ?? '', 2, '<h1>three</h1>')
+    const overTheCap = await publishVersion({ cookie: publisher.cookie }, page.body.artifactId ?? '', 3, '<h1>four</h1>')
+
+    expect(conflicts.map(conflict => conflict.status)).toEqual([409, 409, 409])
+    expect(lastPlace.status).toBe(200)
+    expect(overTheCap.body.code).toBe('publish_limit_reached')
+  })
+
   it('does not take a publish from the day\'s allowance when the workspace is full', async () => {
     const publisher = await newPublisher('full-workspace')
     await addStoredArtifacts(publisher.workspaceId, publisher.userId, 1000)
