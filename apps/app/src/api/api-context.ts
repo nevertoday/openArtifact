@@ -56,7 +56,7 @@ export class ApiContext {
     this.repositories = fields.repositories
     this.gate = fields.gate
     this.requestIdentity = fields.requestIdentity
-    this.people = new People(fields.repositories.users, async () => (await this.messages()).server.deletedPerson)
+    this.people = new People(fields.repositories.users, async () => (await this.messages()).server)
     this.mailer = fields.mailer
     this.notifier = new Notifier(fields.repositories, fields.mailer, artifact => this.artifactUrl(artifact), fields.localeSignals.fallback)
     this.auth = fields.auth

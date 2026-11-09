@@ -150,7 +150,7 @@ export class ArtifactAccess {
   }
 
   #mayRestore(viewer: ArtifactViewer, removal: ArtifactRemoval): boolean {
-    if (removal.isPastRestoring(this.#now)) return false
+    if (removal.isPastRestoring(this.#now) || removal.byOperator) return false
     const authorMayRestore = this.#isAuthor(viewer) && !removal.removedAsAdmin
     return ArtifactAccess.#isAdmin(viewer) || authorMayRestore
   }

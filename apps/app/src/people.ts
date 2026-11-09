@@ -1,4 +1,4 @@
-import type { AuditEvent, UserDirectory } from '@open-artifact/core'
+import { ArtifactRemoval, type AuditEvent, type UserDirectory } from '@open-artifact/core'
 
 export interface PersonRef {
   userId: string
@@ -8,12 +8,12 @@ export interface PersonRef {
 /** How a person is named on screen: the name they set, else the part of their email before the @. */
 export class People {
   readonly #users: UserDirectory
-  readonly #deletedPersonName: () => Promise<string>
+  readonly #words: () => Promise<{ deletedPerson: string; operator: string }>
 
-  /** `deletedPersonName` words an account that no longer exists, in the request's language. */
-  constructor(users: UserDirectory, deletedPersonName: () => Promise<string>) {
+  /** `words` names an account that no longer exists and the operator who took a page down, in the request's language. */
+  constructor(users: UserDirectory, words: () => Promise<{ deletedPerson: string; operator: string }>) {
     this.#users = users
-    this.#deletedPersonName = deletedPersonName
+    this.#words = words
   }
 
   /** False until the person sets a name; until then others see the part of their email before the @. */
@@ -39,10 +39,11 @@ export class People {
   async namesOf(userIds: Iterable<string | null>): Promise<Map<string, string>> {
     const knownIds = [...userIds].filter((userId): userId is string => userId !== null)
     const profiles = await this.#users.profilesOf(knownIds)
-    const deletedPersonName = await this.#deletedPersonName()
+    const words = await this.#words()
     return new Map(knownIds.map(userId => {
       const profile = profiles.get(userId)
-      return [userId, profile ? People.displayName(profile) : deletedPersonName]
+      if (profile) return [userId, People.displayName(profile)]
+      return [userId, userId === ArtifactRemoval.OPERATOR ? words.operator : words.deletedPerson]
     }))
   }
 }
