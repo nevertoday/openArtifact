@@ -89,6 +89,10 @@ export class CloudflareSharedDataRepository implements SharedDataRepository {
     return (await this.#db.prepare('SELECT bytes FROM workspace_shared_usage WHERE workspace_id = ?').bind(workspaceId).first<number>('bytes')) ?? 0
   }
 
+  async deploymentBytes(): Promise<number> {
+    return (await this.#db.prepare('SELECT bytes FROM deployment_shared_usage WHERE id = 1').first<number>('bytes')) ?? 0
+  }
+
   static #documentOf(documentRow: DocumentRow): SharedDocument {
     return {
       collection: documentRow.collection,

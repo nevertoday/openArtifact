@@ -3,6 +3,10 @@
 -- summing documents, and triggers keep the counters exact on every insert, change and delete, the deletes a purged
 -- artifact cascades to included.
 --
+-- Keep writes to shared_documents to INSERT, INSERT ... ON CONFLICT DO UPDATE and DELETE. INSERT OR REPLACE does not
+-- fire the DELETE trigger (recursive_triggers is off), and an UPDATE of artifact_id moves bytes between artifacts the
+-- triggers below do not follow; either would leave the counters wrong.
+--
 -- size_bytes is computed from data, so every row has it, those written by a Worker deployed before this migration too.
 ALTER TABLE shared_documents ADD COLUMN size_bytes INTEGER GENERATED ALWAYS AS (length(CAST(data AS BLOB))) VIRTUAL;
 

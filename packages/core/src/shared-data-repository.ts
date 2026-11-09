@@ -45,4 +45,6 @@ export interface SharedDataRepository {
   deleteDocument(artifactId: string, collection: string, documentId: string): Promise<boolean>
   /** Bytes of shared data the workspace's artifacts keep, removed ones included until they are purged. */
   workspaceBytes(workspaceId: string): Promise<number>
+  /** Bytes of shared data the whole deployment keeps. */
+  deploymentBytes(): Promise<number>
 }
