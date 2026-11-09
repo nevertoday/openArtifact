@@ -22,4 +22,13 @@ export interface AbuseReports {
    * its id; null, and nothing stored, when it has that many already. Concurrent reports cannot both take the last place.
    */
   record(report: NewAbuseReport, cap: { max: number; since: number }): Promise<string | null>
+  /**
+   * Marks the report mailed to the operator when fewer than `cap.max` reports, across every page, were mailed after
+   * `cap.since`; false, and nothing marked, when that many were. Concurrent calls cannot both take the last place.
+   */
+  claimMail(reportId: string, mailedAt: number, cap: { max: number; since: number }): Promise<boolean>
+  /** Gives the place back, for a mail that could not be sent. */
+  releaseMail(reportId: string): Promise<void>
+  /** Reports stored after `since` that the operator was not mailed. */
+  countUnmailedSince(since: number): Promise<number>
 }

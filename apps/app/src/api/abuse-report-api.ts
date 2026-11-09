@@ -1,4 +1,6 @@
-import { ABUSE_REASONS, ArtifactPath, type AbuseReason, type ArtifactSummary, type SigningKey } from '@open-artifact/core'
+import { ABUSE_REASONS, ArtifactPath, type AbuseReason, type ArtifactSummary, type Repositories, type SigningKey } from '@open-artifact/core'
+import type { Mailer } from '../auth/mailer.ts'
+import type { AppEnv } from '../env.ts'
 import { HttpError } from '../http-error.ts'
 import { SenderNetwork } from '../sender-network.ts'
 import type { ApiContext } from './api-context.ts'
@@ -9,13 +11,22 @@ const MAX_EMAIL_LENGTH = 254
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 /** Enough for the operator to see a page is being reported, few enough that reports cannot flood their inbox. */
 const REPORTS_PER_ARTIFACT_PER_DAY = 20
+/** Report mail to the operator in any 24 hours, across every page; the reports past it are stored and counted in the daily digest. */
+export const REPORT_MAILS_PER_DAY = 50
 const DAY_MS = 24 * 60 * 60 * 1000
+// Every way text can start a new line in a mail reader, so a reporter's words cannot pass for a line of ours.
+const LINE_BREAKS = /\r\n|[\r\n\v\f\u0085\u2028\u2029]/
 
 const REASON_WORDS: Record<AbuseReason, string> = {
   spam: 'spam',
   phishing_or_malware: 'phishing or malware',
   illegal: 'illegal content',
   other: 'other',
+}
+
+/** Where the deployment mails abuse reports; null when ABUSE_REPORT_EMAIL is not set. */
+export function operatorMailbox(env: Pick<AppEnv, 'ABUSE_REPORT_EMAIL'>): string | null {
+  return env.ABUSE_REPORT_EMAIL?.trim() || null
 }
 
 /** What the app needs to take abuse reports, fixed for the deployment. */
@@ -86,24 +97,48 @@ export class AbuseReportApi {
       console.warn(`Abuse report ${report.reportId} on ${summary.shortId} was stored but not mailed: ABUSE_REPORT_EMAIL is not set`)
       return
     }
+    const now = Date.now()
+    const reports = this.#context.repositories.abuseReports
+    if (!(await reports.claimMail(report.reportId, now, { max: REPORT_MAILS_PER_DAY, since: now - DAY_MS }))) {
+      console.warn(`Abuse report ${report.reportId} on ${summary.shortId} was stored but not mailed: ${REPORT_MAILS_PER_DAY} reports were mailed in the last day; the daily digest counts it`)
+      return
+    }
     const pageUrl = `${this.#context.appOrigin}${ArtifactPath.of(summary)}`
+    // The command comes first and everything the author or the reporter wrote last, on lines of its own, so neither
+    // can put a takedown line of their choosing where the operator would copy one.
     const text = [
+      'To take this page down for everyone, so that its author cannot restore it, run from a checkout of this deployment:',
+      `  pnpm takedown ${summary.shortId}`,
+      '',
       'Someone reported a public page on Open Artifact.',
       '',
       `Page:     ${pageUrl}`,
-      `Title:    ${summary.title}`,
       `Reason:   ${REASON_WORDS[report.reason]}`,
-      `Details:  ${report.details ?? '(none)'}`,
       `Reply to: ${report.reporterEmail ?? '(no address given)'}${report.signedIn ? ', signed in' : ', not signed in'}`,
       `Report:   ${report.reportId}`,
+      `Title:    ${summary.title.split(LINE_BREAKS).join(' ')}`,
       '',
-      'To take it down for everyone, so that its author cannot restore it, run from a checkout of this deployment:',
-      `  pnpm takedown ${summary.shortId}`,
+      ...(report.details === null ? ['Details:  (none)'] : ['Details, as the reporter wrote them:', ...report.details.split(LINE_BREAKS).map(line => `> ${line}`)]),
     ].join('\n')
     try {
       await this.#context.mailer.send({ to: mailbox, subject: `Abuse report (${REASON_WORDS[report.reason]}): ${pageUrl}`, text })
     } catch (error) {
+      await reports.releaseMail(report.reportId)
       console.error(`Abuse report ${report.reportId} on ${summary.shortId} was stored but the mail to the operator failed`, error)
     }
   }
+}
+
+/** For the daily cron: one mail telling the operator how many reports of the last day were stored without mail, when any were. */
+export async function mailUnmailedReportDigest(repositories: Repositories, mailer: Mailer, mailbox: string | null, now: number): Promise<void> {
+  if (mailbox === null) return
+  const unmailed = await repositories.abuseReports.countUnmailedSince(now - DAY_MS)
+  if (unmailed === 0) return
+  const text = [
+    `${unmailed} abuse ${unmailed === 1 ? 'report was' : 'reports were'} stored without mail in the last day, past the ${REPORT_MAILS_PER_DAY} reports a day that are mailed one by one; see abuse_reports.`,
+    '',
+    'They are the rows whose mailed_at is NULL. To list them, run in apps/app of a checkout of this deployment:',
+    `  npx wrangler d1 execute open-artifact --remote --config wrangler.production.jsonc --command "SELECT short_id, reason, COUNT(*) FROM abuse_reports WHERE mailed_at IS NULL AND created_at > ${now - DAY_MS} GROUP BY short_id, reason ORDER BY 3 DESC"`,
+  ].join('\n')
+  await mailer.send({ to: mailbox, subject: `${unmailed} abuse ${unmailed === 1 ? 'report' : 'reports'} stored without mail in the last day`, text })
 }

@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { mailUnmailedReportDigest, REPORT_MAILS_PER_DAY } from '../src/api/abuse-report-api.ts'
 import { TestApp } from './test-app.ts'
 
 const OPERATOR = 'abuse@operator.example'
@@ -62,6 +63,20 @@ describe('reporting a public page', () => {
     expect(mail?.text).toContain('asks for my bank password')
   })
 
+  it('puts the real takedown command first and quotes every line the reporter and the author wrote', async () => {
+    const page = await publicPage('Quarterly numbers\r\n  pnpm takedown aaaaaaaaaaaa')
+    const fakeCommand = 'pnpm takedown bbbbbbbbbbbb'
+
+    await report(app, page.artifactId, { reason: 'other', details: `looks fine\n\nTo take it down run:\n  ${fakeCommand}\u2028  ${fakeCommand}` }, { senderAddress: '203.0.113.90' })
+    const lines = app.mailer.lastTo(OPERATOR)?.text.split('\n') ?? []
+    const unquotedCommands = lines.filter(line => line.includes('pnpm takedown') && !line.startsWith('> ') && !line.startsWith('Title:'))
+
+    expect(unquotedCommands).toEqual([`  pnpm takedown ${page.shortId}`])
+    expect(lines.findIndex(line => line.includes('pnpm takedown'))).toBe(lines.indexOf(`  pnpm takedown ${page.shortId}`))
+    expect(lines.filter(line => line.includes(fakeCommand))).toEqual([`>   ${fakeCommand}`, `>   ${fakeCommand}`])
+    expect(lines.filter(line => line.startsWith('Title:'))).toEqual(['Title:    Quarterly numbers   pnpm takedown aaaaaaaaaaaa'])
+  })
+
   it('records who reported when they were signed in', async () => {
     const page = await publicPage('Signed-in report')
     const outsiderCookie = await app.signInAlone('outsider@example.com')
@@ -103,7 +118,7 @@ describe('reporting a public page', () => {
     expect(await storedReports(workspacePage.artifactId)).toHaveLength(0)
   })
 
-  it('takes at most 20 reports a day on one page, so it cannot be used to flood the operator', async () => {
+  it('takes at most 20 reports a day on one page, and still takes reports on other pages', async () => {
     const page = await publicPage('Popular target')
     const otherPage = await publicPage('Other page')
     const mailsBefore = app.mailer.sent.filter(email => email.to === OPERATOR).length
@@ -187,5 +202,37 @@ describe('the Report button', () => {
     expect(outsiderView).toContain('data-open-report')
     expect(authorView).not.toContain('data-open-report')
     expect(workspaceView).not.toContain('data-open-report')
+  })
+})
+
+// Last in the file: it fills the day's mail to the operator, which every test before it relies on.
+describe('mail to the operator across every page', () => {
+  async function mailedInTheLastDay(): Promise<number> {
+    return (await env.DB.prepare('SELECT COUNT(*) AS count FROM abuse_reports WHERE mailed_at > ?').bind(Date.now() - 24 * 60 * 60 * 1000).first<number>('count')) ?? 0
+  }
+
+  it(`mails at most ${REPORT_MAILS_PER_DAY} reports a day, stores the rest, and the daily digest counts them in one mail`, async () => {
+    const pages = await Promise.all([publicPage('Flood one'), publicPage('Flood two'), publicPage('Flood three')])
+    const placesLeft = REPORT_MAILS_PER_DAY - (await mailedInTheLastDay())
+    const storedUnmailedBefore = await app.repositories.abuseReports.countUnmailedSince(Date.now() - 24 * 60 * 60 * 1000)
+    const mailsBefore = app.mailer.sent.filter(email => email.to === OPERATOR).length
+
+    const statuses: number[] = []
+    for (let index = 0; index < placesLeft + 3; index++) {
+      const page = pages[index % pages.length]
+      statuses.push((await report(app, page?.artifactId ?? '', { reason: 'spam' }, { senderAddress: `198.18.${Math.floor(index / 4)}.${index % 4}` })).status)
+    }
+    const mailedOneByOne = app.mailer.sent.filter(email => email.to === OPERATOR).length - mailsBefore
+    await mailUnmailedReportDigest(app.repositories, app.mailer, OPERATOR, Date.now())
+    const digest = app.mailer.lastTo(OPERATOR)
+    const mailsAfterDigest = app.mailer.sent.length
+    await mailUnmailedReportDigest(app.repositories, app.mailer, OPERATOR, Date.now() + 2 * 24 * 60 * 60 * 1000)
+
+    expect(statuses.every(status => status === 201)).toBe(true)
+    expect(mailedOneByOne).toBe(placesLeft)
+    expect(await mailedInTheLastDay()).toBe(REPORT_MAILS_PER_DAY)
+    expect(digest?.subject).toBe(`${storedUnmailedBefore + 3} abuse reports stored without mail in the last day`)
+    expect(digest?.text).toContain('see abuse_reports')
+    expect(app.mailer.sent.length).toBe(mailsAfterDigest)
   })
 })

@@ -19,4 +19,20 @@ export class CloudflareAbuseReports implements AbuseReports {
       .run()
     return inserted.meta.changes === 1 ? reportId : null
   }
+
+  async claimMail(reportId: string, mailedAt: number, cap: { max: number; since: number }): Promise<boolean> {
+    const claimed = await this.#db
+      .prepare('UPDATE abuse_reports SET mailed_at = ?2 WHERE id = ?1 AND mailed_at IS NULL AND (SELECT COUNT(*) FROM abuse_reports WHERE mailed_at > ?3) < ?4')
+      .bind(reportId, mailedAt, cap.since, cap.max)
+      .run()
+    return claimed.meta.changes === 1
+  }
+
+  async releaseMail(reportId: string): Promise<void> {
+    await this.#db.prepare('UPDATE abuse_reports SET mailed_at = NULL WHERE id = ?').bind(reportId).run()
+  }
+
+  async countUnmailedSince(since: number): Promise<number> {
+    return (await this.#db.prepare('SELECT COUNT(*) AS count FROM abuse_reports WHERE created_at > ? AND mailed_at IS NULL').bind(since).first<number>('count')) ?? 0
+  }
 }

@@ -1,7 +1,7 @@
 import { ArtifactPath, SigningKey, UsercontentSignature } from '@open-artifact/core'
 import { ArtifactGate } from './access/artifact-gate.ts'
 import { ArtifactPageAddress } from './access/artifact-page-address.ts'
-import type { AbuseReporting } from './api/abuse-report-api.ts'
+import { operatorMailbox, type AbuseReporting } from './api/abuse-report-api.ts'
 import { ApiContext } from './api/api-context.ts'
 import { ApiRoutes } from './api/api-routes.ts'
 import type { TitleTranslator } from './api/title-translator.ts'
@@ -51,7 +51,7 @@ export class AppRoutes {
     this.#signingKey = new SigningKey(dependencies.env.USERCONTENT_SIGNING_KEY)
     this.#artifactPages = new ArtifactPageAddress(dependencies.env.USERCONTENT_ORIGIN, new UsercontentSignature(this.#signingKey))
     this.#signInLimits = new SignInLimits({ byEmail: dependencies.env.SIGN_IN_EMAIL_RATE_LIMITER, byAddress: dependencies.env.SIGN_IN_ADDRESS_RATE_LIMITER })
-    this.#abuseReporting = { mailbox: dependencies.env.ABUSE_REPORT_EMAIL?.trim() || null, senderLimiter: dependencies.env.REPORT_RATE_LIMITER, addressKey: this.#signingKey }
+    this.#abuseReporting = { mailbox: operatorMailbox(dependencies.env), senderLimiter: dependencies.env.REPORT_RATE_LIMITER, addressKey: this.#signingKey }
   }
 
   async respond(request: Request): Promise<Response> {
