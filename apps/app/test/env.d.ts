@@ -12,6 +12,7 @@ declare global {
       SHARED_DATA_WRITE_RATE_LIMITER: RateLimit
       SHARED_DATA_PERSON_RATE_LIMITER: RateLimit
       LOOSE_SIGN_IN_RATE_LIMITER: RateLimit
+      TIGHT_SHARED_DATA_PERSON_RATE_LIMITER: RateLimit
       MIGRATIONS: D1Migration[]
     }
   }
