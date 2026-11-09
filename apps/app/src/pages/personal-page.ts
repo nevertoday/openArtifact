@@ -1,3 +1,4 @@
+import { avatarStyle } from '../../public/static/avatar.js'
 import type { Messages } from '../i18n/messages.ts'
 import { ArtifactPath, type ArtifactSummary, type Profile } from '@open-artifact/core'
 import { composePageShareText } from '../../public/static/share-text.js'
@@ -68,7 +69,7 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
     const shareText = composePageShareText(lead, model.entries.map(entry => entry.title), m.personal.shareQuote)
     const shareOnX = ShareCard.intentUrl(shareText, model.pageUrl)
     return html`<header class="personal-head">
-  <span class="personal-head__avatar" aria-hidden="true">${PageShell.initialOf(name)}</span>
+  <span class="personal-head__avatar" data-avatar style="${avatarStyle(name)}" aria-hidden="true">${PageShell.initialOf(name)}</span>
   <h1 class="personal-head__name">${name}<small>${m.personal.entryCount(model.entries.length)}</small></h1>
   <div class="personal-head__bio" data-bio-slot>${PersonalPage.#bio(m, profile.bio, isOwner)}</div>
   <a class="xxd-btn personal-head__share" data-size="sm" href="${shareOnX}" target="_blank" rel="noopener noreferrer">${PageShell.icon('Share2', 14)}${m.personal.sharePage}</a>
@@ -142,8 +143,14 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
   }
 
   static #empty(model: PersonalPageModel): SafeHtml {
-    const text = model.isOwner ? model.m.personal.empty.owner : model.m.personal.empty.visitor
-    return html`<div class="xxd-empty personal-empty"><p class="xxd-empty__text">${text}</p></div>`
+    const { empty } = model.m.personal
+    if (!model.isOwner) return html`<div class="xxd-empty personal-empty"><p class="xxd-empty__text">${empty.visitor}</p></div>`
+    return html`<div class="xxd-empty personal-empty">
+  ${PageShell.icon('LayoutGrid', 24)}
+  <h2 class="xxd-empty__title">${empty.ownerTitle}</h2>
+  <p class="xxd-empty__text">${empty.owner}</p>
+  <div class="xxd-empty__actions"><a class="xxd-btn" data-variant="primary" href="/?filter=mine">${empty.ownerAction}</a></div>
+</div>`
   }
 
   static #day(m: Messages, entry: ArtifactSummary): SafeHtml {

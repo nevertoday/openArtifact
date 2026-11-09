@@ -180,16 +180,19 @@ export class CoachMark {
     this.#button = button
     coach.querySelector('[data-dismiss-coach]').addEventListener('click', () => this.dismiss())
     window.addEventListener('resize', () => this.#place())
-    // Doing anything else with the page is as good as dismissing it.
-    document.addEventListener('pointerdown', event => { if (!coach.contains(event.target)) this.dismiss() })
+    // Doing anything else with the page, by pointer or by keyboard, is as good as dismissing it.
+    const dismissOutside = event => { if (!coach.contains(event.target)) this.dismiss() }
+    document.addEventListener('pointerdown', dismissOutside)
+    document.addEventListener('click', dismissOutside, true)
   }
 
   get isOpen() {
     return !this.#element.hidden
   }
 
-  showOnce() {
-    if (this.#wasSeen()) return
+  /** `busy` says whether a drawer or dialog is already open, so the hint does not land on top of it. */
+  showOnce(busy = () => false) {
+    if (this.#wasSeen() || busy() || document.querySelector('dialog[open]')) return
     const text = this.#element.querySelector('[data-coach-text]')
     if (writesByTouch()) text.replaceChildren(m.viewerClient.commentMode.coachTouch)
     else text.replaceChildren(...m.viewerClient.commentMode.coachKeys(element('kbd', { className: 'xxd-kbd' }, 'C')))
@@ -219,9 +222,18 @@ export class CoachMark {
   // Hangs under the comment-mode button, its arrow pointing at the button, inside the window.
   #place() {
     if (!this.isOpen) return
-    const button = this.#button.getBoundingClientRect()
     const area = this.#element.offsetParent.getBoundingClientRect()
     const width = this.#element.offsetWidth
+    // A phone's bar has no comment-mode button (a long press writes instead), so the hint hangs centred under the bar.
+    if (this.#button.offsetParent === null) {
+      const bar = this.#button.closest('header').getBoundingClientRect()
+      this.#element.style.left = `${Math.max(COMPOSER_EDGE, (area.width - width) / 2)}px`
+      this.#element.style.top = `${bar.bottom - area.top + COMPOSER_GAP}px`
+      this.#element.dataset.centred = ''
+      return
+    }
+    delete this.#element.dataset.centred
+    const button = this.#button.getBoundingClientRect()
     const left = Math.max(COMPOSER_EDGE, Math.min(button.right - area.left - width + COMPOSER_EDGE, area.width - width - COMPOSER_EDGE))
     this.#element.style.left = `${left}px`
     this.#element.style.top = `${button.bottom - area.top + COMPOSER_GAP}px`

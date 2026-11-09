@@ -53,6 +53,7 @@ ${PageShell.jsonData('settings-config', { userId: model.identity.userId, accessT
     const sectionLink = (section: SettingsSection) =>
       html`<a class="xxd-sidebar__item" href="/settings/${section}" ${model.section === section ? html`aria-current="page"` : ''}>${PageShell.icon(SETTINGS_SECTION_ICONS[section], 18)}<span>${model.m.settings.sections[section]}</span></a>`
     return html`<nav class="xxd-sidebar app-sidebar" aria-label="${model.m.settings.sidebar.label}"><div class="xxd-sidebar__body">
+  <a class="xxd-sidebar__item settings-back" href="/">${PageShell.icon('ArrowLeft', 18)}<span>${model.m.settings.sidebar.back}</span></a>
   <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">${model.m.settings.sidebar.personal}</div>${sectionLink('profile')}${sectionLink('agents')}</div>
   <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">${model.identity.membership.workspace.name}</div>${sectionLink('members')}${sectionLink('workspace')}</div>
 </div></nav>`
@@ -123,7 +124,7 @@ ${SettingsPage.#appearanceSection(m)}`
       const name = People.displayName(member)
       const isSelf = member.userId === identity.userId
       return html`<tr data-member-row="${member.userId}">
-    <td><span class="xxd-cluster"><span class="xxd-avatar" data-size="sm" aria-hidden="true">${PageShell.initialOf(name)}</span><span>${name}${isSelf ? html`<span class="xxd-text" data-variant="secondary">${m.settings.members.you}</span>` : ''}</span></span></td>
+    <td><span class="xxd-cluster">${PageShell.avatar(name, { size: 'sm' })}<span>${name}${isSelf ? html`<span class="xxd-text" data-variant="secondary">${m.settings.members.you}</span>` : ''}</span></span></td>
     <td><span class="xxd-text" data-variant="secondary">${member.email}</span></td>
     ${isAdmin ? SettingsPage.#memberControls(m, member, name, identity.userId, adminCount) : html`<td>${ArtifactLabels.role(m, member.role)}</td>`}
   </tr>`

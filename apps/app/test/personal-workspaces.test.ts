@@ -69,7 +69,7 @@ describe('a personal workspace', () => {
     const personalCount = await env.DB.prepare('SELECT COUNT(*) AS personal FROM workspaces WHERE personal_of = ?').bind(user.userId).first<number>('personal')
 
     expect(new Set(answers.map(answer => answer.workspace.workspaceId)).size).toBe(1)
-    expect(answers[0]?.workspace).toMatchObject({ name: 'parallel的工作区', role: 'admin', personalOf: user.userId })
+    expect(answers[0]?.workspace).toMatchObject({ name: 'parallel 的工作区', role: 'admin', personalOf: user.userId })
     expect(personalCount).toBe(1)
   })
 
@@ -295,7 +295,7 @@ describe('the pages', () => {
     const items = [...home.matchAll(/role="menuitemradio" aria-checked="(true|false)" data-switch-workspace="([^"]+)"[^>]*>.*?<span class="app-workspace-menu__name">([^<]+)<\/span>(<span class="xxd-badge"[^>]*>个人<\/span>)?/g)]
 
     expect(items.map(([, checked, , name, personalBadge]) => [name, checked, personalBadge !== undefined])).toEqual([
-      ['menu的工作区', 'false', true],
+      ['menu 的工作区', 'false', true],
       ['我的团队', 'true', false],
     ])
     expect(home).toContain('data-xxd-dialog-open="new-workspace-dialog">')

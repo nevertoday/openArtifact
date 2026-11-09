@@ -103,7 +103,7 @@ export class ShareXPanel extends EventTarget {
       this.#share = savedSharing.share
       this.#render()
       Xxd.toast(m.viewerClient.shareX.fixed, { tone: 'success', within: this.#dialog })
-      this.dispatchEvent(new CustomEvent('saved', { detail: { label: this.#visibilityLabels[savedSharing.visibility] } }))
+      this.dispatchEvent(new CustomEvent('saved', { detail: { label: this.#visibilityLabels[savedSharing.visibility], visibility: savedSharing.visibility } }))
     } catch (error) {
       fixButton.removeAttribute('aria-busy')
       Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#dialog })

@@ -1,3 +1,4 @@
+import { avatarStyle } from './avatar.js'
 import { api, confirmArtifactRemoval, element, initialOf, m, readJsonData, removalText, removeArtifact, restoreArtifact, dateText, timeElement, userMessageOf } from './common.js'
 
 const settingsConfig = readJsonData('settings-config')
@@ -133,6 +134,7 @@ class AgentConnection {
   #pollTimer = null
   #setupStep = document.getElementById('connect-setup')
   #checkStep = document.getElementById('connect-check')
+  #upcomingSteps = document.querySelector('[data-connect-upcoming]')
   #status = document.getElementById('connect-status')
 
   constructor() {
@@ -145,6 +147,7 @@ class AgentConnection {
     this.#setupStep.querySelector('[data-token-name]').textContent = createdToken.name
     this.#setupStep.hidden = false
     this.#checkStep.hidden = false
+    this.#upcomingSteps.hidden = true
     this.#showStatus(AgentConnection.#waiting(m.client.settings.connection.waiting))
     this.#stopWatching()
     this.#pollTimer = setInterval(() => this.#checkWhileVisible(), POLL_INTERVAL_MS)
@@ -159,6 +162,7 @@ class AgentConnection {
     this.#fillToken('')
     this.#setupStep.hidden = true
     this.#checkStep.hidden = true
+    this.#upcomingSteps.hidden = false
   }
 
   #fillToken(tokenValue) {
@@ -281,7 +285,10 @@ function wireProfileForm() {
 
 function showAccountName(name) {
   for (const accountName of document.querySelectorAll('[data-account-name]')) accountName.textContent = name
-  for (const accountInitial of document.querySelectorAll('[data-account-initial]')) accountInitial.textContent = initialOf(name)
+  for (const accountInitial of document.querySelectorAll('[data-account-initial]')) {
+    accountInitial.textContent = initialOf(name)
+    accountInitial.setAttribute('style', avatarStyle(name))
+  }
   document.querySelector('[data-account-button]')?.setAttribute('aria-label', m.shell.accountMenu(name))
 }
 

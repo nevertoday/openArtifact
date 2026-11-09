@@ -39,8 +39,9 @@ export class ViewerTopBar extends EventTarget {
     else Xxd.rollText(badge, String(count))
   }
 
-  showVisibility(label) {
+  showVisibility({ label, visibility }) {
     for (const visibilityLabel of document.querySelectorAll('[data-visibility-label]')) visibilityLabel.textContent = label
+    for (const badge of document.querySelectorAll('.viewer-visibility[data-visibility]')) badge.dataset.visibility = visibility
   }
 
   showDataCount(count) {

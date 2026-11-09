@@ -1,8 +1,10 @@
-import { api, dateText, element, initialOf, m, submitOnce, userMessageOf } from '../common.js'
+import { avatarStyle } from '../avatar.js'
+import { api, dateText, element, icon, initialOf, m, submitOnce, userMessageOf } from '../common.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const SHARE_LINK_PREFIX = '#share='
 const GRANT_ROLES = ['viewer', 'commenter', 'editor']
+const VISIBILITY_ICONS = { private: 'Lock', specified: 'UserRound', workspace: 'Users', public_link: 'Globe' }
 
 // A person is known by their address, which names the same person before and after they sign up; only a deleted account has none.
 function grantKeyOf(grant) {
@@ -228,10 +230,10 @@ export class ShareDialog extends EventTarget {
         this.#draft.visibility = visibility
         this.#render()
       })
-      return element('label', { className: 'xxd-choice', for: `visibility-${visibility}` }, radio,
-        element('span', {}, this.#visibilityLabels[visibility], element('small', {}, isDisabled ? m.viewerClient.share.publicLinksOff : m.viewerClient.share.visibilityDescriptions[visibility])))
+      return element('label', { className: 'share-reach', for: `visibility-${visibility}` }, radio, icon(VISIBILITY_ICONS[visibility], 18),
+        element('span', { className: 'share-reach__text' }, element('b', {}, this.#visibilityLabels[visibility]), element('small', {}, isDisabled ? m.viewerClient.share.publicLinksOff : m.viewerClient.share.visibilityDescriptions[visibility])))
     }
-    return element('fieldset', { className: 'xxd-choices share-section' }, element('legend', { className: 'share-section__title' }, m.viewerClient.share.whoCanSee),
+    return element('fieldset', { className: 'share-section share-reaches' }, element('legend', { className: 'share-section__title' }, m.viewerClient.share.whoCanSee),
       choice('private'),
       choice('specified'),
       choice('workspace'),
@@ -271,7 +273,7 @@ export class ShareDialog extends EventTarget {
       ? element('span', { className: 'xxd-badge', 'data-tone': 'action' }, m.viewerClient.share.addedOnSave)
       : grant.pending ? element('span', { className: 'xxd-badge', 'data-share-pending': true }, m.viewerClient.share.invited) : null
     return element('li', { className: 'xxd-list__item share-person' },
-      element('span', { className: 'xxd-avatar', 'data-size': 'sm', 'aria-hidden': 'true' }, initialOf(label)),
+      element('span', { className: 'xxd-avatar', 'data-size': 'sm', 'data-avatar': '', style: avatarStyle(label), 'aria-hidden': 'true' }, initialOf(label)),
       element('span', { className: 'xxd-list__main' }, element('span', { className: 'xxd-list__title xxd-cluster' }, label, badge), element('span', { className: 'xxd-list__meta' }, grant.name === null ? '' : grant.email ?? '')),
       ShareDialog.#selectBox(roleSelect),
       element('button', { type: 'button', className: 'xxd-btn', 'data-variant': 'danger-outline', 'data-size': 'sm', onClick: () => { this.#draft.removePerson(grantKey); this.#render() } }, m.viewerClient.share.remove),
@@ -395,7 +397,7 @@ export class ShareDialog extends EventTarget {
       this.#draft = new SharingDraft(savedSharing)
       Xxd.closeDialog(this.#dialog)
       Xxd.toast(m.viewerClient.share.saved, { tone: 'success', within: this.#stage })
-      this.dispatchEvent(new CustomEvent('saved', { detail: { label: this.#visibilityLabels[savedSharing.visibility] } }))
+      this.dispatchEvent(new CustomEvent('saved', { detail: { label: this.#visibilityLabels[savedSharing.visibility], visibility: savedSharing.visibility } }))
     } catch (error) {
       Xxd.toast(userMessageOf(error), { tone: 'danger', within: this.#dialog })
     }

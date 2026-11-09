@@ -35,6 +35,7 @@ export class AgentConnectSection {
     const { m } = model
     return html`<div class="xxd-settings agent-connect">
 ${AgentConnectSection.#namingStep(m)}
+<ol class="connect-upcoming" data-connect-upcoming aria-label="${m.settings.agents.upcoming}"><li>${m.settings.agents.setup.title}</li><li>${m.settings.agents.check.title}</li></ol>
 ${AgentConnectSection.#setupStep(model)}
 ${AgentConnectSection.#checkStep(m)}
 <section class="xxd-stack" aria-labelledby="tokens-title">

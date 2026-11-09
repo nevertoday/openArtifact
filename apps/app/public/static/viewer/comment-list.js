@@ -1,3 +1,4 @@
+import { avatarStyle } from '../avatar.js'
 import { element, icon, initialOf, m, submitOnce, timeElement, userMessageOf } from '../common.js'
 import { MODIFIER_KEY } from './comment-mode.js'
 import { COMMENT_FILTERS } from './comment-threads.js'
@@ -18,6 +19,7 @@ export class CommentList extends EventTarget {
   #drawer
   #stage
   #canComment
+  /** Asked on each render: a tablet can gain or lose a keyboard while the page is open. */
   #byTouch
   #handoff
   #filter = 'open'
@@ -42,6 +44,7 @@ export class CommentList extends EventTarget {
     threads.addEventListener('change', () => this.render())
     listElement.addEventListener('focusout', () => setTimeout(() => this.#renderIfWaiting()))
     this.#renderFoot()
+    matchMedia('(pointer: coarse)').addEventListener('change', () => this.#renderFoot())
   }
 
   get activeId() {
@@ -173,7 +176,7 @@ export class CommentList extends EventTarget {
     const foot = this.#element.querySelector('[data-drawer-foot]')
     foot.hidden = !this.#canComment
     if (!this.#canComment) return
-    if (this.#byTouch) foot.replaceChildren(m.viewerClient.comments.footTouch)
+    if (this.#byTouch()) foot.replaceChildren(m.viewerClient.comments.footTouch)
     else foot.replaceChildren(...m.viewerClient.comments.footKeys(element('kbd', { className: 'xxd-kbd' }, 'C'), element('kbd', { className: 'xxd-kbd' }, 'J'), element('kbd', { className: 'xxd-kbd' }, 'K')))
   }
 
@@ -217,7 +220,7 @@ export class CommentList extends EventTarget {
   }
 
   #emptyState() {
-    const noCommentsYet = this.#canComment ? (this.#byTouch ? m.viewerClient.comments.writeFirstTouch : m.viewerClient.comments.writeFirstPointer) : m.viewerClient.comments.noCommentsYet
+    const noCommentsYet = this.#canComment ? (this.#byTouch() ? m.viewerClient.comments.writeFirstTouch : m.viewerClient.comments.writeFirstPointer) : m.viewerClient.comments.noCommentsYet
     const hasComments = this.#threads.count('all') > 0
     const emptyText = {
       open: hasComments ? m.viewerClient.comments.emptyOpen : noCommentsYet,
@@ -495,7 +498,7 @@ export class CommentList extends EventTarget {
     const byAgent = reply.postedVia !== null
     const who = byAgent
       ? [element('span', { className: 'comment-agent-mark', 'aria-hidden': 'true' }, icon('SquareTerminal', 14)), element('b', { className: 'comment-thread__author' }, reply.postedVia), element('span', { className: 'xxd-badge' }, m.viewerClient.comments.onBehalfBadge(reply.author.name))]
-      : [element('span', { className: 'xxd-avatar', 'data-size': 'sm', 'aria-hidden': 'true' }, initialOf(reply.author.name)), element('b', { className: 'comment-thread__author' }, reply.author.name)]
+      : [element('span', { className: 'xxd-avatar', 'data-size': 'sm', 'data-avatar': '', style: avatarStyle(reply.author.name), 'aria-hidden': 'true' }, initialOf(reply.author.name)), element('b', { className: 'comment-thread__author' }, reply.author.name)]
     const deleteReply = this.#canComment && reply.canDelete ? CommentList.#deleteButton(() => this.#deleteReply(thread, reply), m.viewerClient.comments.deleteReplyLabel(reply.postedVia ?? reply.author.name)) : null
     return element('li', { className: 'comment-reply', 'data-agent': byAgent }, element('div', { className: 'comment-thread__meta' }, who, timeElement(reply.createdAt), deleteReply), element('p', {}, reply.body))
   }

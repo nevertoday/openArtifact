@@ -49,9 +49,9 @@ describe('login page', () => {
     const fromSharedLink = await pageText('/login?next=/a/some-artifact')
     const plain = await pageText('/login')
 
-    expect(fromSharedLink).toContain('登录后会打开你刚才的页面。')
-    expect(plain).not.toContain('登录后会打开你刚才的页面。')
-    expect(plain).toContain('输入邮箱，我们发一个 6 位验证码，不用密码。')
+    expect(fromSharedLink).toContain('你要打开的页面需要登录后才能看。登录后会直接打开它。')
+    expect(plain).not.toContain('你要打开的页面需要登录后才能看。登录后会直接打开它。')
+    expect(plain).toContain('输入邮箱，我们发一个 6 位验证码。新邮箱会自动注册，不用密码。')
   })
 
   it.each(['//evil.example/steal', '/\t/evil.example', '/\\evil.example', 'https://evil.example/'])('never redirects off the site after sign-in (next=%s)', async nextPath => {
@@ -211,10 +211,13 @@ describe('home page', () => {
 
     const authorHome = await pageText('/', authorCookie)
     const newcomerHome = await pageText('/', newcomerCookie)
-    const cardOf = (title: string) => authorHome.slice(authorHome.indexOf(`title="${title}"`), authorHome.indexOf('</a>', authorHome.indexOf(`title="${title}"`)))
+    const cardOf = (title: string) => {
+      const titleAt = authorHome.indexOf(`title="${title}"`)
+      return authorHome.slice(authorHome.lastIndexOf('<a class="xxd-card artifact-card"', titleAt), authorHome.indexOf('</a>', titleAt))
+    }
 
     expect(cardOf('Team roadmap')).not.toContain('工作区内可见')
-    expect(cardOf('Private notes')).toContain('<span class="xxd-badge">私有</span>')
+    expect(cardOf('Private notes')).toMatch(/<span class="artifact-chip" data-visibility="private">.*私有<\/span>/)
     expect(cardOf('Team roadmap')).not.toContain('>v1</span>')
     expect(cardOf('Revised brief')).toContain('<span class="xxd-mono">v2</span>')
     expect(newcomerHome).toMatch(/href="\/\?filter=mine"[^>]*>.*?我发布的<\/span><span class="xxd-badge"\s+title="0 个 artifact"><\/span>/)
@@ -397,7 +400,7 @@ describe('settings', () => {
   })
 
   it('shows a person icon on the account button until the person chooses a name, then their initial', async () => {
-    const accountAvatar = (markup: string) => markup.match(/<span class="xxd-avatar" data-account-initial>(.*?)<\/span>/)?.[1]
+    const accountAvatar = (markup: string) => markup.match(/<span class="xxd-avatar"[^>]*data-account-initial[^>]*>(.*?)<\/span>/)?.[1]
     const unnamedCookie = await app.signIn('xavier.unnamed@example.com')
 
     const before = accountAvatar(await pageText('/', unnamedCookie))

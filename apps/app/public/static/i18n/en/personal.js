@@ -27,7 +27,9 @@ export default /** @satisfies {import('../messages').Messages['personal']} */ ({
   unpin: 'Unpin',
   editSummary: 'Edit summary',
   empty: {
-    owner: 'Nothing listed yet. Open a document, turn on its public link under “Share”, then turn on “List on my page”.',
+    ownerTitle: 'Your page is empty so far',
+    owner: 'Open a page, turn on its public link under “Share”, then turn on “List on my page”, and it shows up here.',
+    ownerAction: 'Pick one',
     visitor: 'Nothing public here yet.',
   },
 })

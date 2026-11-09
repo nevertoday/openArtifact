@@ -1,11 +1,11 @@
 /* A person's public page: a slim header, the pinned artifact as the cover, then the rest by year. */
-.personal { --personal-ease: var(--ease-out-quint); --personal-accent: var(--warning-text); min-height: 100vh; background: var(--paper); color: var(--ink); }
-.personal__page { width: min(1120px, 100% - 32px); margin: 0 auto; padding: 72px 0 64px; outline: none; }
+.personal { --personal-ease: var(--ease-out-quint); --personal-accent: var(--warning-text); min-height: 100vh; display: flex; flex-direction: column; background: var(--paper); color: var(--ink); }
+.personal__page { width: min(1120px, 100% - 32px); margin: 0 auto; padding: 72px 0 40px; outline: none; flex: 1; display: flex; flex-direction: column; }
 
 .personal-owner-bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-1) var(--space-4); padding: 10px var(--space-4); background: var(--wash); border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--text-sm); }
 
 .personal-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-1) 14px; padding-bottom: var(--space-5); border-bottom: 1px solid var(--line); }
-.personal-head__avatar { grid-row: span 2; display: grid; place-items: center; width: 44px; height: 44px; background: var(--ink); color: var(--paper); font-weight: 700; font-size: 18px; }
+.personal-head__avatar { grid-row: span 2; display: grid; place-items: center; width: 48px; height: 48px; font-size: 19px; }
 .personal-head__name { margin: 0; font-size: 17px; font-weight: 650; }
 .personal-head__name small { margin-inline-start: 10px; font-size: var(--text-sm); font-weight: var(--weight-regular); color: var(--muted); font-variant-numeric: tabular-nums; }
 .personal-head__bio { grid-column: 2; min-width: 0; font-size: 14px; line-height: 1.55; color: var(--muted); }
@@ -71,7 +71,7 @@
 .personal-peek iframe { width: 1440px; height: 945px; border: 0; background: #fff; transform: scale(calc(320 / 1440)); transform-origin: 0 0; }
 
 .personal-empty { margin-top: var(--space-8); }
-.personal__colophon { margin-top: 72px; font-size: var(--text-xs); color: var(--muted); }
+.personal__colophon { margin-top: auto; padding-top: 72px; font-size: var(--text-xs); color: var(--muted); }
 .personal__colophon a { color: inherit; }
 
 @media (prefers-reduced-motion: reduce) {

@@ -34,7 +34,9 @@ export default {
   unpin: '取消置顶',
   editSummary: '改摘要',
   empty: {
-    owner: '还没有列出的文档。打开一篇文档，在「分享」里打开公开链接，再打开「列在我的主页」。',
+    ownerTitle: '你的主页还是空的',
+    owner: '打开一篇页面，在「分享」里打开公开链接，再打开「列在我的主页」，它就会出现在这里。',
+    ownerAction: '去挑一篇',
     visitor: '这里还没有公开的文档。',
   },
 }

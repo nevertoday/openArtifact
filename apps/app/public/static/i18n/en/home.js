@@ -11,7 +11,7 @@ export default /** @satisfies {import('../messages').Messages['home']} */ ({
     waiting_for_my_agent: 'Waiting for my agent',
   },
   filterDescriptions: {
-    all: 'Artifacts published by your teammates and their agents. The whole workspace can see them by default.',
+    all: 'Artifacts published by the people in this workspace and their agents.',
     mine: 'What you published, and what your agents published for you.',
     shared: 'Artifacts whose authors added you to the share list, whichever workspace they are in.',
     removed: 'Deleted artifacts are hidden from everyone. You can restore them for 30 days, then they\'re deleted for good; or delete one forever now to free its space at once.',
@@ -25,7 +25,7 @@ export default /** @satisfies {import('../messages').Messages['home']} */ ({
     text: name => `Your teammates see “${name}” in comments and notifications. Pick a name they'll recognize.`,
     action: 'Set name',
   },
-  headingAll: 'All artifacts',
+  headingAll: 'All',
   headingByAgent: agent => `Published with ${agent}`,
   descriptionByAgent: agent => `Artifacts published with ${agent}.`,
   resultCount: artifacts,
@@ -50,6 +50,7 @@ export default /** @satisfies {import('../messages').Messages['home']} */ ({
   fromWorkspace: workspace => `From the workspace “${workspace}”`,
   unresolvedComments: ({ count, forAgent }) => `${count} unresolved ${count === 1 ? 'comment' : 'comments'}${forAgent > 0 ? ` · ${forAgent} for an agent` : ''}`,
   empty: {
+    firstSteps: ['Give your agent a token under “Connect agents”', 'Have it publish a design doc, report or dashboard here', 'Comment right on the page and pick “For agent” to have it make the change'],
     searchTitle: search => `Nothing found for “${search}”`,
     searchText: 'Search looks at titles, authors\' names and the agent that published each artifact.',
     clearSearch: 'Clear search',
