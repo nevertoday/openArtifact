@@ -55,6 +55,13 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
       failed: message => `Couldn't delete it. ${message}`,
     },
   },
+  purge: {
+    confirmTitle: title => `Delete “${title}” forever?`,
+    confirmMessage: 'All its versions, comments and shared data are deleted now and cannot be restored. The space they took is freed at once.',
+    confirm: 'Delete forever',
+    done: title => `Deleted “${title}” forever`,
+    failed: message => `Couldn't delete it forever. ${message}`,
+  },
   restore: {
     done: title => `Restored “${title}”`,
     open: 'Open',

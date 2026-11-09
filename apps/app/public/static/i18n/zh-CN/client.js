@@ -65,6 +65,16 @@ export default {
       failed: message => `删除失败：${message}`,
     },
   },
+  purge: {
+    /** @param {string} title */
+    confirmTitle: title => `永久删除「${title}」？`,
+    confirmMessage: '它的所有版本、评论和共享数据会立即彻底删除，不能恢复，占用的存储空间立即释放。',
+    confirm: '永久删除',
+    /** @param {string} title */
+    done: title => `已永久删除「${title}」`,
+    /** @param {string} message */
+    failed: message => `永久删除失败：${message}`,
+  },
   restore: {
     /** @param {string} title */
     done: title => `已恢复「${title}」`,

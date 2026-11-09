@@ -26,7 +26,9 @@ export interface Publication {
   newArtifact: boolean
 }
 
-const FREE_SPACE_HINT = 'remove artifacts the workspace no longer needs on the web page (Remove, in an artifact\'s menu)'
+const REMOVE_HINT = "remove artifacts the workspace no longer needs on the web page (Remove, in an artifact's menu)"
+// A removed artifact's files count until the purge 30 days later, so removing alone frees no space.
+const FREE_SPACE_HINT = `${REMOVE_HINT}, then delete them forever under Recently deleted (最近删除) on the home page, or wait 30 days for the purge`
 
 /** Refuses a publish or a restore before anything is written when it would go over a limit. */
 export class PublishLimits {
@@ -97,7 +99,7 @@ export class PublishLimits {
     if (usage.activeArtifacts < WORKSPACE_LIMITS.activeArtifacts) return
     const message =
       `this workspace already has ${usage.activeArtifacts} artifacts, its limit of ${WORKSPACE_LIMITS.activeArtifacts}; nothing was ${outcome}. ` +
-      `To make room, ${FREE_SPACE_HINT}` +
+      `To make room, ${REMOVE_HINT}` +
       '; a removed artifact stops counting at once. Or publish a new version of an existing artifact instead'
     throw new HttpError(403, 'workspace_quota_reached', message)
   }

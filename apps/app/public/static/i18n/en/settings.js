@@ -111,7 +111,7 @@ export default /** @satisfies {import('../messages').Messages['settings']} */ ({
       artifactCount: ({ used, max }) => `${used.toLocaleString('en')} of ${max.toLocaleString('en')}`,
       storageSize: ({ usedMb, maxGb }) => `${usedMb.toLocaleString('en', { maximumFractionDigits: 1 })} MB of ${maxGb} GB`,
       sharedDataSize: ({ usedMb }) => `Of the storage, ${usedMb.toLocaleString('en', { maximumFractionDigits: 1 })} MB is data that pages keep for their visitors (shared data).`,
-      help: ({ maxArtifacts, maxGb }) => `A workspace holds up to ${maxArtifacts.toLocaleString('en')} artifacts and ${maxGb} GB of files and shared data, every version's files included. A removed artifact stops counting toward the number at once, but its files and data keep their space until it's purged 30 days later.`,
+      help: ({ maxArtifacts, maxGb }) => `A workspace holds up to ${maxArtifacts.toLocaleString('en')} artifacts and ${maxGb} GB of files and shared data, every version's files included. A removed artifact stops counting toward the number at once, but its files and data keep their space until it's purged 30 days later, or until you delete it forever under Recently deleted.`,
     },
     lifecycle: {
       title: 'Leave or delete',
@@ -138,6 +138,7 @@ export default /** @satisfies {import('../messages').Messages['settings']} */ ({
       events: {
         'artifact.removed': ({ actor, takenDown, title }) => `${actor} ${takenDown ? 'took down' : 'deleted'} “${title}”`,
         'artifact.restored': ({ actor, title }) => `${actor} restored “${title}”`,
+        'artifact.purged': ({ actor, title }) => `${actor} deleted “${title}” forever`,
         'artifact.renamed': ({ actor, from, to }) => `${actor} renamed “${from}” to “${to}”`,
         'member.removed': ({ actor, target }) => `${actor} removed ${target} from the workspace`,
         'member.role_changed': ({ actor, target, role }) => `${actor} changed ${target}'s role to ${role}`,

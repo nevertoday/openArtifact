@@ -93,6 +93,7 @@ const API_ROUTES: ApiRoute[] = [
   route('PATCH', '/api/artifacts/:artifactId', (apis, request, params) => apis.artifacts.rename(request, param(params, 'artifactId'))),
   route('DELETE', '/api/artifacts/:artifactId', (apis, request, params) => apis.artifacts.remove(request, param(params, 'artifactId'))),
   route('POST', '/api/artifacts/:artifactId/restore', (apis, request, params) => apis.artifacts.restoreRemoved(request, param(params, 'artifactId'))),
+  route('POST', '/api/artifacts/:artifactId/purge', (apis, request, params) => apis.artifacts.purgeRemoved(request, param(params, 'artifactId'))),
   route('GET', '/api/artifacts/:artifactId/versions', (apis, request, params) => apis.artifacts.listVersions(request, param(params, 'artifactId'))),
   route('GET', '/api/artifacts/:artifactId/versions/:version(\\d+)/page', (apis, request, params) =>
     apis.artifacts.versionPage(request, param(params, 'artifactId'), Number(param(params, 'version'))),

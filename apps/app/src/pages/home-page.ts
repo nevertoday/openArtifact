@@ -212,7 +212,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     return html`<p class="xxd-text home-result-line" data-variant="secondary" role="status">${line}</p>`
   }
 
-  // Removed artifacts have no page to open; the list offers only 恢复 until they are purged.
+  // Removed artifacts have no page to open; the list offers 恢复, and 永久删除 to free their space before the purge.
   static #removedSection(removedArtifacts: OpenedArtifact[], model: HomeModel): SafeHtml {
     const { m } = model
     const header = html`<header class="xxd-page-header">
@@ -227,7 +227,8 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     <td>${summary.title}</td>
     <td><span class="xxd-text" data-variant="secondary">${ArtifactLabels.removedBy(m, model.authorNames.get(removal.removedBy) ?? '', removal.removedAsAdmin)} · ${PageShell.relativeTime(m, removal.removedAt, model.now)}</span></td>
     <td><span class="xxd-text" data-variant="secondary">${ArtifactLabels.purgeIn(m, removal.purgeAt, model.now)}</span></td>
-    <td class="xxd-table__actions"><button type="button" class="xxd-btn" data-size="xs" data-restore-artifact="${summary.artifactId}" data-title="${summary.title}">${PageShell.icon('RotateCcw', 14)}${m.home.removedTable.restore}</button></td>
+    <td class="xxd-table__actions"><button type="button" class="xxd-btn" data-size="xs" data-restore-artifact="${summary.artifactId}" data-title="${summary.title}">${PageShell.icon('RotateCcw', 14)}${m.home.removedTable.restore}</button>
+      <button type="button" class="xxd-btn" data-size="xs" data-variant="danger" data-purge-artifact="${summary.artifactId}" data-title="${summary.title}">${PageShell.icon('Trash2', 14)}${m.home.removedTable.purge}</button></td>
   </tr>`
     }
     return html`${header}<div class="xxd-table-wrap"><table class="xxd-table">

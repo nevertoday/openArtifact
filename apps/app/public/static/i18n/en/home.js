@@ -14,7 +14,7 @@ export default /** @satisfies {import('../messages').Messages['home']} */ ({
     all: 'Artifacts published by your teammates and their agents. The whole workspace can see them by default.',
     mine: 'What you published, and what your agents published for you.',
     shared: 'Artifacts whose authors added you to the share list, whichever workspace they are in.',
-    removed: 'Deleted artifacts are hidden from everyone. You can restore them for 30 days, then they\'re deleted for good.',
+    removed: 'Deleted artifacts are hidden from everyone. You can restore them for 30 days, then they\'re deleted for good; or delete one forever now to free its space at once.',
     waiting_for_me: 'Comments are waiting for your reply.',
     waiting_for_my_agent: 'Comments for an agent are still open, waiting for your agent.',
   },
@@ -36,6 +36,7 @@ export default /** @satisfies {import('../messages').Messages['home']} */ ({
     kept: 'Kept',
     actions: 'Actions',
     restore: 'Restore',
+    purge: 'Delete forever',
   },
   searchPlaceholder: 'Search titles, authors or agents',
   sidebar: {

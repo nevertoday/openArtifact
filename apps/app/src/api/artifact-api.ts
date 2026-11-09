@@ -197,6 +197,26 @@ export class ArtifactApi {
     return Response.json({ artifactId, title: summary.title, url: this.#context.artifactUrl(summary) })
   }
 
+  /**
+   * Deletes a removed artifact for good now instead of in 30 days, so its files stop counting at once. Whoever may
+   * restore it may do this; nobody may for a page the operator took down, which the operator keeps until the purge.
+   */
+  async purgeRemoved(request: Request, artifactId: string): Promise<Response> {
+    const identity = await this.#context.requireIdentity()
+    const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canRestore', 'delete this artifact forever')
+    const purgedNow = await this.#context.repositories.artifacts.purgeRemovedNow(artifactId, ArtifactRemoval.purgeCutoff(Date.now()))
+    if (!purgedNow) throw HttpError.notFound(`removed artifact ${artifactId}`)
+    await this.#context.repositories.auditLog.record({
+      workspaceId: summary.workspaceId,
+      actorId: identity.userId,
+      action: 'artifact.purged',
+      targetType: 'artifact',
+      targetId: artifactId,
+      detail: { title: summary.title },
+    })
+    return Response.json({ artifactId, title: summary.title })
+  }
+
   async listVersions(request: Request, artifactId: string): Promise<Response> {
     await this.#context.gate.require(artifactId, await this.#context.identity(), request, 'canSeeVersions', 'see the versions of this artifact')
     const versionHistory = await this.#context.repositories.artifacts.listVersions(artifactId)

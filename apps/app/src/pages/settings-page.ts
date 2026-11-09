@@ -346,6 +346,7 @@ ${SettingsPage.#lifecycleSection(m, identity)}`
       case 'artifact.removed':
         return events[auditEvent.action]({ actor, takenDown: auditEvent.detail.removedAsAdmin, title: auditEvent.detail.title })
       case 'artifact.restored':
+      case 'artifact.purged':
         return events[auditEvent.action]({ actor, title: auditEvent.detail.title })
       case 'artifact.renamed':
         return events[auditEvent.action]({ actor, from: auditEvent.detail.from, to: auditEvent.detail.to })

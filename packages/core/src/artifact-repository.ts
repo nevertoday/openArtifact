@@ -158,5 +158,11 @@ export interface ArtifactRepository extends ArtifactFileSource {
    * Purges at most `limit` artifacts; the next call takes the rest.
    */
   purgeRemovedBefore(cutoff: number, limit: number): Promise<void>
+  /**
+   * Purges one removed artifact now, as purgeRemovedBefore does once it is past restoring. It is made past restoring
+   * as of `cutoff` first, so nobody can restore it meanwhile and a crash part way leaves it to the daily purge.
+   * Returns false, and changes nothing, when the artifact is missing or not removed.
+   */
+  purgeRemovedNow(artifactId: string, cutoff: number): Promise<boolean>
   usageOf(workspaceId: string): Promise<WorkspaceUsage>
 }

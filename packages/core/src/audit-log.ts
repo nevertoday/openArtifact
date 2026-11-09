@@ -4,6 +4,7 @@ import type { WorkspaceRole } from './workspace-repository.ts'
 export type AuditChange =
   | { action: 'artifact.removed'; targetType: 'artifact'; targetId: string; detail: { title: string; removedAsAdmin: boolean } }
   | { action: 'artifact.restored'; targetType: 'artifact'; targetId: string; detail: { title: string } }
+  | { action: 'artifact.purged'; targetType: 'artifact'; targetId: string; detail: { title: string } }
   | { action: 'artifact.renamed'; targetType: 'artifact'; targetId: string; detail: { from: string; to: string } }
   | { action: 'member.removed'; targetType: 'member'; targetId: string; detail: Record<string, never> }
   | { action: 'member.role_changed'; targetType: 'member'; targetId: string; detail: { from: WorkspaceRole; to: WorkspaceRole } }

@@ -273,11 +273,20 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
   // Deleting the row cascades to its versions, file rows, comments, grants and shared data.
   async purgeRemovedBefore(cutoff: number, limit: number): Promise<void> {
     const { results: purgedRows } = await this.#db.prepare(`SELECT id FROM artifacts WHERE ${PAST_RESTORING} LIMIT ?`).bind(cutoff, cutoff, limit).all<{ id: string }>()
-    for (const { id: artifactId } of purgedRows) {
-      await this.#deleteObjectsUnder(CloudflareArtifactRepository.#artifactPrefix(artifactId))
-      await this.#deleteObjectsUnder(CloudflareShareCardImages.prefixOf(artifactId))
-      await this.#db.prepare(`DELETE FROM artifacts WHERE id = ? AND (${PAST_RESTORING})`).bind(artifactId, cutoff, cutoff).run()
-    }
+    for (const { id: artifactId } of purgedRows) await this.#purge(artifactId, cutoff)
+  }
+
+  async purgeRemovedNow(artifactId: string, cutoff: number): Promise<boolean> {
+    const madePastRestoring = await this.#db.prepare('UPDATE artifacts SET removed_at = MIN(removed_at, ?) WHERE id = ? AND removed_at IS NOT NULL').bind(cutoff, artifactId).run()
+    if (madePastRestoring.meta.changes !== 1) return false
+    await this.#purge(artifactId, cutoff)
+    return true
+  }
+
+  async #purge(artifactId: string, cutoff: number): Promise<void> {
+    await this.#deleteObjectsUnder(CloudflareArtifactRepository.#artifactPrefix(artifactId))
+    await this.#deleteObjectsUnder(CloudflareShareCardImages.prefixOf(artifactId))
+    await this.#db.prepare(`DELETE FROM artifacts WHERE id = ? AND (${PAST_RESTORING})`).bind(artifactId, cutoff, cutoff).run()
   }
 
   async usageOf(workspaceId: string): Promise<WorkspaceUsage> {

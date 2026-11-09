@@ -69,7 +69,7 @@ export class AgentGuide {
 - Give the page a short \`<title>\`, support light and dark themes, work at phone width, and write in the language the person uses.
 
 ### Limits
-- A workspace holds at most ${WORKSPACE_LIMITS.activeArtifacts} active artifacts and ${WORKSPACE_LIMITS.storedBytes / 1024 ** 3} GiB of files and shared data, every version's files counted; a removed artifact's files and data count until it is purged 30 days later. Past either, publish and update answer \`workspace_quota_reached\` and save nothing. Tell your person, who can remove artifacts they no longer need; prefer a new version of an existing artifact to a new artifact.
+- A workspace holds at most ${WORKSPACE_LIMITS.activeArtifacts} active artifacts and ${WORKSPACE_LIMITS.storedBytes / 1024 ** 3} GiB of files and shared data, every version's files counted; a removed artifact's files and data count until it is purged 30 days later. Past either, publish and update answer \`workspace_quota_reached\` and save nothing. Tell your person: a removed artifact stops counting toward the number at once, but its space comes back only when they remove it and then delete it forever under Recently deleted (最近删除) on the home page, or 30 days later. Prefer a new version of an existing artifact to a new artifact.
 - One person may publish (a new artifact or a new version) at most ${PUBLISHES_PER_PERSON_PER_DAY} times in any 24 hours, across every workspace and token. Past that, publish and update answer 429 \`publish_limit_reached\`; do not retry in a loop.
 
 ### Update, never overwrite blindly
