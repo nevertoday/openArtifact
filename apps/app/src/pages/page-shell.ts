@@ -35,6 +35,7 @@ export type IconName =
   | 'MailCheck'
   | 'MailX'
   | 'MessageSquare'
+  | 'MessageSquarePlus'
   | 'MessageSquareText'
   | 'Pen'
   | 'Plus'

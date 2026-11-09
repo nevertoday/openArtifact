@@ -6,7 +6,7 @@ export default {
   colophon: product => ['用 ', product, ' 发布'],
   ownerBar: {
     text: '这是你的主页，别人看到的就是这样。在页面的「分享」里打开「列在我的主页」，它就会出现在这里。',
-    back: '回到工作台',
+    back: '回到工作区',
   },
   /** @param {{ name: string, count: number }} p */
   shareLead: ({ name, count }) => `${name} 在 Open Artifact 上的 ${count} 篇文章：`,
@@ -36,7 +36,7 @@ export default {
   empty: {
     ownerTitle: '你的主页还是空的',
     owner: '打开一篇页面，在「分享」里打开公开链接，再打开「列在我的主页」，它就会出现在这里。',
-    ownerAction: '去挑一篇',
+    ownerAction: '挑选要展示的页面',
     visitor: '这里还没有公开的页面。',
   },
 }

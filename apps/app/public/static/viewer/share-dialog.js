@@ -131,6 +131,7 @@ export class ShareDialog extends EventTarget {
   #stage
   #draft = null
   #emailToAdd = ''
+  #peopleOpen = false
 
   constructor(dialog, config, stage) {
     super()
@@ -172,6 +173,7 @@ export class ShareDialog extends EventTarget {
   /** Opens the dialog; with `askedBy`, the member who asked for access is filled in, one click from being added. */
   async open({ askedBy = null } = {}) {
     this.#draft = null
+    this.#peopleOpen = false
     this.#body.replaceChildren(element('p', { className: 'viewer-drawer__status' }, element('span', { className: 'xxd-spinner', 'aria-hidden': 'true' }), m.viewerClient.share.loading))
     this.#refreshSaveButton()
     Xxd.openDialog(this.#dialog)
@@ -243,6 +245,16 @@ export class ShareDialog extends EventTarget {
 
   #peopleSection() {
     if (!this.#draft.peopleApply) return null
+    // The whole workspace already sees the page, so giving one person more stays one quiet click away until it is wanted.
+    if (this.#draft.visibility === 'workspace' && this.#draft.grants.size === 0 && !this.#peopleOpen && !this.#emailToAdd) {
+      const reveal = element('button', { type: 'button', className: 'xxd-btn share-people-reveal', 'data-variant': 'ghost', 'data-size': 'sm' }, icon('UserPlus', 14), m.viewerClient.share.givePersonMore)
+      reveal.addEventListener('click', () => {
+        this.#peopleOpen = true
+        this.#render()
+        this.#dialog.querySelector('#grant-email')?.focus()
+      })
+      return reveal
+    }
     const emailInput = element('input', { className: 'xxd-input', 'data-size': 'sm', id: 'grant-email', type: 'email', required: true, placeholder: m.viewerClient.share.emailPlaceholder, 'aria-label': m.viewerClient.share.emailLabel, list: 'workspace-members', value: this.#emailToAdd, 'data-error-type': m.viewerClient.share.emailInvalid })
     const roleSelect = ShareDialog.#roleSelect(this.#draft.roleForNewPerson, 'grant-role')
     const addForm = element('form', { className: 'share-grant-form', 'data-xxd-validate': true },

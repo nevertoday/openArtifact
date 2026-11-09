@@ -87,18 +87,19 @@ ${AgentConnectSection.render(model)}`
   static #profileSection(m: Messages, identity: Identity): SafeHtml {
     const { profile } = m.settings
     return html`${SettingsPage.#pageHeader(m.settings.sections.profile)}
+<div class="profile-identity">
+  ${PageShell.avatar(identity.name, { size: 'lg', accountInitial: true, content: identity.hasChosenName ? undefined : PageShell.icon('UserRound', 20) })}
+  <div class="xxd-text-pair"><span class="xxd-text profile-identity__name" data-account-name>${identity.name}</span><span class="xxd-text profile-email" data-variant="secondary" aria-label="${profile.emailLabel}">${identity.email} · ${profile.emailHelp}</span></div>
+</div>
 <form class="xxd-stack profile-form" id="profile-form" data-xxd-validate>
   <div class="xxd-field">
     <label class="xxd-label" for="profile-name">${profile.nameLabel}</label>
-    <input class="xxd-input" id="profile-name" name="name" required maxlength="60" value="${identity.hasChosenName ? identity.name : ''}" placeholder="${identity.name}" autocomplete="name" aria-describedby="profile-name-help" data-error-required="${profile.nameRequired}">
+    <div class="profile-form__row">
+      <input class="xxd-input" id="profile-name" name="name" required maxlength="60" value="${identity.hasChosenName ? identity.name : ''}" placeholder="${identity.name}" autocomplete="name" aria-describedby="profile-name-help" data-error-required="${profile.nameRequired}">
+      <button type="submit" class="xxd-btn" data-variant="primary" disabled>${m.settings.save}</button>
+    </div>
     <p class="xxd-help" id="profile-name-help">${profile.nameHelp}</p>
   </div>
-  <div class="xxd-field">
-    <span class="xxd-label" id="profile-email-label">${profile.emailLabel}</span>
-    <p class="xxd-text profile-email" aria-labelledby="profile-email-label">${identity.email}</p>
-    <p class="xxd-help">${profile.emailHelp}</p>
-  </div>
-  <div><button type="submit" class="xxd-btn" data-variant="primary" disabled>${m.settings.save}</button></div>
 </form>
 ${SettingsPage.#appearanceSection(m)}`
   }
@@ -107,10 +108,10 @@ ${SettingsPage.#appearanceSection(m)}`
   static #appearanceSection(m: Messages): SafeHtml {
     const { profile } = m.settings
     const choice = (theme: ThemeChoice) =>
-      html`<label class="xxd-choice" for="theme-${theme}"><input type="radio" class="xxd-radio" name="theme" id="theme-${theme}" value="${theme}" ${theme === 'system' ? new SafeHtml('checked') : ''}><span>${profile.themes[theme]}</span></label>`
-    return html`<fieldset class="xxd-choices" aria-describedby="appearance-help">
+      html`<label class="theme-tile" for="theme-${theme}"><input type="radio" class="xxd-radio" name="theme" id="theme-${theme}" value="${theme}" ${theme === 'system' ? new SafeHtml('checked') : ''}><span class="theme-tile__preview" data-preview="${theme}" aria-hidden="true"><i></i><i></i><b></b></span><span>${profile.themes[theme]}</span></label>`
+    return html`<fieldset class="theme-tiles" aria-describedby="appearance-help">
   <legend class="xxd-label">${profile.appearance}</legend>
-  ${THEME_CHOICES.map(choice)}
+  <div class="theme-tiles__row">${THEME_CHOICES.map(choice)}</div>
   <p class="xxd-help" id="appearance-help">${profile.appearanceHelp}</p>
 </fieldset>`
   }
@@ -156,7 +157,7 @@ ${isAdmin ? SettingsPage.#inviteSection(m) : ''}
   <form class="invite-form" id="invite-email-form" novalidate>
     <div class="xxd-field invite-form__emails">
       <label class="xxd-label" for="invite-emails">${invite.emailsLabel}</label>
-      <textarea class="xxd-textarea" id="invite-emails" name="emails" rows="2" data-autosize placeholder="name@example.com" aria-describedby="invite-emails-help"></textarea>
+      <textarea class="xxd-textarea" id="invite-emails" name="emails" rows="1" data-autosize placeholder="name@example.com" aria-describedby="invite-emails-help"></textarea>
       <p class="xxd-help" id="invite-emails-help">${invite.emailsHelp}</p>
     </div>
     <div class="xxd-cluster invite-form__actions">
@@ -179,14 +180,15 @@ ${isAdmin ? SettingsPage.#inviteSection(m) : ''}
     const isLastAdmin = member.role === 'admin' && adminCount === 1
     const roleLocked = isSelf && isLastAdmin
     const roleOption = (role: WorkspaceMember['role']) => html`<option value="${role}" ${member.role === role ? new SafeHtml('selected') : ''}>${ArtifactLabels.role(m, role)}</option>`
-    return html`<td>
-      <label class="xxd-select" data-size="sm"><span class="xxd-sr-only">${m.settings.members.roleOf(name)}</span><select data-member-role="${member.userId}" data-name="${name}" ${roleLocked ? new SafeHtml('disabled') : ''}>${roleOption('admin')}${roleOption('member')}</select></label>
-      ${roleLocked ? html`<p class="xxd-text member-reason" data-variant="caption">${m.settings.members.lastAdmin}</p>` : ''}
-    </td>
-    <td class="xxd-table__actions">
-      <button type="button" class="xxd-btn" data-variant="danger-outline" data-size="xs" data-remove-member="${member.userId}" data-name="${name}" ${isSelf ? new SafeHtml('disabled') : ''}>${m.settings.members.remove}</button>
-      ${isSelf ? html`<p class="xxd-text member-reason" data-variant="caption">${m.settings.members.cannotRemoveSelf}</p>` : ''}
-    </td>`
+    // What cannot change is shown as plain text with its reason on hover, not as a disabled control with a caption.
+    const roleCell = roleLocked
+      ? html`<span class="member-role" tabindex="0" data-tooltip="${m.settings.members.lastAdmin}">${ArtifactLabels.role(m, member.role)}</span>`
+      : html`<label class="xxd-select" data-size="sm"><span class="xxd-sr-only">${m.settings.members.roleOf(name)}</span><select data-member-role="${member.userId}" data-name="${name}">${roleOption('admin')}${roleOption('member')}</select></label>`
+    const removeCell = isSelf
+      ? html`<span class="xxd-sr-only">${m.settings.members.cannotRemoveSelf}</span>`
+      : html`<button type="button" class="xxd-btn" data-variant="danger-outline" data-size="xs" data-remove-member="${member.userId}" data-name="${name}">${m.settings.members.remove}</button>`
+    return html`<td>${roleCell}</td>
+    <td class="xxd-table__actions">${removeCell}</td>`
   }
 
   static #workspaceSection(model: SettingsModel): SafeHtml {
@@ -267,10 +269,12 @@ ${SettingsPage.#lifecycleSection(m, identity)}`
     return html`<form class="xxd-stack workspace-name-form" id="workspace-name-form" data-xxd-validate>
   <div class="xxd-field">
     <label class="xxd-label" for="workspace-name">${workspace.nameLabel}</label>
-    <input class="xxd-input" id="workspace-name" name="name" required maxlength="40" value="${identity.membership.workspace.name}" aria-describedby="workspace-name-help" data-error-required="${workspace.nameRequired}">
+    <div class="profile-form__row">
+      <input class="xxd-input" id="workspace-name" name="name" required maxlength="40" value="${identity.membership.workspace.name}" aria-describedby="workspace-name-help" data-error-required="${workspace.nameRequired}">
+      <button type="submit" class="xxd-btn" data-variant="primary" disabled>${m.settings.save}</button>
+    </div>
     <p class="xxd-help" id="workspace-name-help">${workspace.nameHelp}</p>
   </div>
-  <div><button type="submit" class="xxd-btn" data-variant="primary">${m.settings.save}</button></div>
 </form>`
   }
 

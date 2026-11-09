@@ -10,6 +10,10 @@
 .viewer-bar__home { flex: 0 1 auto; min-width: 0; max-width: 220px; color: var(--muted); }
 .viewer-bar__workspace { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viewer-bar__crumb { flex: none; color: var(--muted-2); }
+/* With one version there is no history to open: the label stays as a quiet fact, without its menu. */
+.viewer-version[data-only-version] { pointer-events: none; color: var(--muted); }
+.viewer-version[data-only-version] > [data-xxd-icon] { display: none; }
+.viewer-bar__author { flex: none; color: var(--muted); font-size: var(--text-xs); white-space: nowrap; }
 .viewer-bar__title { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; }
 .viewer-bar__name { min-width: 0; overflow: hidden; padding: 2px var(--space-1-5); color: var(--ink); font: var(--weight-medium) var(--text-sm) / var(--leading-sm) var(--font-body); white-space: nowrap; text-overflow: ellipsis; }
 .viewer-bar__name:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
@@ -211,6 +215,7 @@ button.viewer-visibility { cursor: pointer; }
 @media (max-width: 480px) { .share-reaches { grid-template-columns: minmax(0, 1fr); } }
 /* The member list is a suggestion list, not a menu, so the browser's drop-down arrow goes. */
 #grant-email::-webkit-calendar-picker-indicator { display: none !important; }
+.share-people-reveal { justify-self: start; color: var(--muted); }
 .share-section__title { margin: 0; color: var(--ink); font: var(--weight-medium) var(--text-sm) / var(--leading-sm) var(--font-body); }
 .share-grant-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--gap-items); }
 .share-grant-form__email { flex: 1 1 200px; }

@@ -306,7 +306,11 @@ function wireThemeChoice() {
 
 function wireWorkspaceNameForm() {
   const workspaceNameForm = document.getElementById('workspace-name-form')
-  workspaceNameForm?.addEventListener('submit', async event => {
+  if (!workspaceNameForm) return
+  const nameInput = document.getElementById('workspace-name')
+  const savedName = nameInput.value.trim()
+  nameInput.addEventListener('input', () => { workspaceNameForm.querySelector('[type="submit"]').disabled = nameInput.value.trim() === savedName })
+  workspaceNameForm.addEventListener('submit', async event => {
     event.preventDefault()
     const saveButton = event.submitter
     saveButton.disabled = true

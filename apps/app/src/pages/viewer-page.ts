@@ -188,11 +188,12 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   <div class="viewer-bar__title">
     <span class="viewer-bar__name" tabindex="0" data-tooltip="${summary.title}" data-tooltip-placement="bottom-start" data-artifact-title>${summary.title}</span>
     ${permissions.canSeeVersions ? ViewerPage.#versionPicker(model) : ''}
+    ${isVisitor && model.authorName ? html`<span class="viewer-bar__author">${model.m.viewer.bar.byAuthor(model.authorName)}</span>` : ''}
   </div>
   <div class="viewer-bar__end">
     ${isVisitor ? '' : ViewerPage.#visibilityBadge(model)}
     ${permissions.canReadComments ? ViewerPage.#commentCountButton(model.m) : ''}
-    ${permissions.canComment ? html`<button type="button" class="xxd-btn viewer-comment-mode" data-variant="ghost" data-size="sm" aria-pressed="false" aria-keyshortcuts="C" data-tooltip="${model.m.viewer.bar.commentModeTooltip}" data-comment-mode>${PageShell.icon('Plus')}<span class="viewer-bar__label">${model.m.viewer.bar.comment}</span></button>` : ''}
+    ${permissions.canComment ? html`<button type="button" class="xxd-btn viewer-comment-mode" data-variant="ghost" data-size="sm" data-icon-only aria-pressed="false" aria-keyshortcuts="C" aria-label="${model.m.viewer.bar.comment}" data-tooltip="${model.m.viewer.bar.commentModeTooltip}" data-comment-mode>${PageShell.icon('MessageSquarePlus')}</button>` : ''}
     ${permissions.canManageSharing ? html`<button type="button" class="xxd-btn" data-variant="primary" data-size="sm" data-open-share>${model.m.viewer.bar.share}</button>` : ''}
     ${ViewerPage.#canReport(model) ? html`<button type="button" class="xxd-btn viewer-report" data-variant="ghost" data-size="sm" data-icon-only aria-haspopup="dialog" aria-label="${model.m.viewer.report.open}" data-tooltip="${model.m.viewer.report.open}" data-open-report>${PageShell.icon('Flag', 14)}</button>` : ''}
     ${isVisitor ? '' : ViewerPage.#moreMenu(model)}
@@ -238,7 +239,8 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   }
 
   static #versionPicker(model: ViewerModel): SafeHtml {
-    return html`<button type="button" class="xxd-btn viewer-version" data-variant="ghost" data-size="sm" data-xxd-menu="version-menu" aria-label="${model.m.viewer.version.picker(model.shownVersion)}" data-version-button><span data-version-label>v${model.shownVersion}</span>${PageShell.icon('ChevronDown', 14)}</button>
+    const onlyVersion = model.openedArtifact.summary.version === 1 ? new SafeHtml('data-only-version') : ''
+    return html`<button type="button" class="xxd-btn viewer-version" data-variant="ghost" data-size="sm" data-xxd-menu="version-menu" ${onlyVersion} aria-label="${model.m.viewer.version.picker(model.shownVersion)}" data-version-button><span data-version-label>v${model.shownVersion}</span>${PageShell.icon('ChevronDown', 14)}</button>
 <div class="xxd-menu viewer-version-menu" id="version-menu" role="menu" popover aria-label="${model.m.viewer.version.menu}" data-version-menu></div>`
   }
 

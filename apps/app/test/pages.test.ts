@@ -414,7 +414,7 @@ describe('settings', () => {
 
   it('offers the three colour schemes on the profile page, following the system until the browser says otherwise', async () => {
     const profile = await pageText('/settings/profile', authorCookie)
-    const themeChoices = [...profile.matchAll(/<input type="radio" class="xxd-radio" name="theme" id="theme-\w+" value="(\w+)" ?(checked)?><span>([^<]+)<\/span>/g)].map(match => ({ value: match[1], checked: Boolean(match[2]), label: match[3] }))
+    const themeChoices = [...profile.matchAll(/<input type="radio" class="xxd-radio" name="theme" id="theme-\w+" value="(\w+)" ?(checked)?>.*?<\/span><span>([^<]+)<\/span>/g)].map(match => ({ value: match[1], checked: Boolean(match[2]), label: match[3] }))
 
     expect(profile).toContain('<legend class="xxd-label">外观</legend>')
     expect(themeChoices).toEqual([

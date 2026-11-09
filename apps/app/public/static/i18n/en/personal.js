@@ -29,7 +29,7 @@ export default /** @satisfies {import('../messages').Messages['personal']} */ ({
   empty: {
     ownerTitle: 'Your page is empty so far',
     owner: 'Open a page, turn on its public link under “Share”, then turn on “List on my page”, and it shows up here.',
-    ownerAction: 'Pick one',
+    ownerAction: 'Pick pages to show',
     visitor: 'Nothing public here yet.',
   },
 })

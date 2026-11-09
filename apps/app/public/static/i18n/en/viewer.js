@@ -11,6 +11,7 @@ export default /** @satisfies {import('../messages').Messages['viewer']} */ ({
   },
   full: { back: 'Back to the page' },
   bar: {
+    byAuthor: name => `by ${name}`,
     home: 'Home',
     commentModeTooltip: 'Comment mode (C)',
     comment: 'Comment',

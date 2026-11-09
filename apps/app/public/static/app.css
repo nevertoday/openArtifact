@@ -3,6 +3,8 @@
 
 /* The scrollbar's room is kept whether or not a page scrolls, so headers never jump between pages or under a dialog. */
 html { scrollbar-gutter: stable; }
+/* The reserved strip takes the colour of what runs beside it: the login form's panel. */
+:root:has(.login-panel) { background: var(--paper-raised); }
 
 /* Type scale of the app's own pages. The kit sets 13px everywhere, which suits menus and toolbars; the pages people
    read get one step more, and the page title a clear jump above the section headings, so what matters is seen first. */
@@ -62,7 +64,11 @@ html { scrollbar-gutter: stable; }
   .app-sidebar .xxd-sidebar__group { display: flex; flex: none; }
   .app-sidebar .xxd-sidebar__group + .xxd-sidebar__group { margin-top: 0; }
   .app-sidebar .xxd-sidebar__label { display: none; }
-  .app-sidebar .xxd-sidebar__item { width: auto; }
+  .app-sidebar .xxd-sidebar__item { width: auto; border-radius: 999px; }
+  /* As a row of chips the selected one is filled; the desktop's edge rule would read as a stray line. */
+  .app-sidebar .xxd-sidebar__item[aria-current=page] { box-shadow: none; border-radius: 999px; }
+  .home-name-nudge { border-radius: var(--r-md); }
+  .home-name-nudge span { white-space: normal; }
   .app-main { padding-inline: var(--space-4); }
 }
 
@@ -199,6 +205,7 @@ html { scrollbar-gutter: stable; }
 /* The card hangs from a fixed top, so a banner appearing above the form never makes it jump. */
 .login-panel { flex: 1 1 420px; min-width: 0; display: grid; justify-items: center; align-content: start; padding: clamp(var(--space-8), 22vh, 240px) var(--space-4) var(--space-6); background: var(--paper-raised); }
 .login-panel { position: relative; }
+@media (min-width: 641px) { .login-panel { align-content: center; padding-top: var(--space-8); } }
 .login-panel__locale { position: absolute; inset-block-start: var(--space-4); inset-inline-end: var(--space-4); }
 .login-card { max-width: 380px; padding-block: 0; }
 .login-card .xxd-banner { justify-self: stretch; text-align: left; }
@@ -229,6 +236,31 @@ html { scrollbar-gutter: stable; }
 .home-first-steps li { counter-increment: first-step; display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--paper); color: var(--ink); font-size: var(--text-sm); line-height: 1.55; }
 .home-first-steps li::before { content: counter(first-step); display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--paper); font-size: var(--text-xs); font-weight: var(--weight-strong); }
 @media (max-width: 640px) { .home-first-steps { grid-template-columns: minmax(0, 1fr); } }
+/* Appearance: three small pictures of the app to pick from, the way the result will look. */
+.theme-tiles { margin: 0; padding: 0; border: 0; }
+.theme-tiles__row { display: grid; grid-template-columns: repeat(3, minmax(0, 132px)); gap: var(--space-3); margin-top: var(--space-2); }
+.theme-tile { position: relative; display: grid; gap: var(--space-2); justify-items: start; cursor: pointer; font-size: var(--text-sm); }
+.theme-tile > input { position: absolute; opacity: 0; pointer-events: none; }
+.theme-tile__preview { display: grid; grid-template-rows: 8px 6px 1fr; gap: 6px; width: 100%; aspect-ratio: 4 / 3; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: #fdfcfb; }
+.theme-tile__preview i { width: 60%; border-radius: 3px; background: #141413; }
+.theme-tile__preview i + i { width: 85%; background: #d6d2cb; }
+.theme-tile__preview b { border-radius: 5px; background: #fff; box-shadow: 0 0 0 1px #ebe8e4; }
+.theme-tile__preview[data-preview="dark"] { background: #171612; }
+.theme-tile__preview[data-preview="dark"] i { background: #f3f0ea; }
+.theme-tile__preview[data-preview="dark"] i + i { background: #4c483f; }
+.theme-tile__preview[data-preview="dark"] b { background: #201f1a; box-shadow: 0 0 0 1px #312f28; }
+.theme-tile__preview[data-preview="system"] { background: linear-gradient(135deg, #fdfcfb 50%, #171612 50%); }
+.theme-tile__preview[data-preview="system"] b { background: linear-gradient(135deg, #fff 50%, #201f1a 50%); }
+.theme-tile:has(input:checked) .theme-tile__preview { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.theme-tile:has(input:focus-visible) .theme-tile__preview { outline: 2px solid var(--action); outline-offset: 2px; }
+.theme-tile:has(input:checked) { font-weight: var(--weight-medium); }
+.profile-identity { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-6); }
+.profile-identity > .xxd-avatar { --avatar-size: 48px; font-size: 19px; }
+.profile-identity__name { font-weight: var(--weight-medium); font-size: var(--text-md); }
+.profile-form__row { display: flex; gap: var(--space-2); max-width: 520px; }
+.profile-form__row > .xxd-input { flex: 1; min-width: 0; }
+.profile-form + .theme-tiles { margin-top: var(--space-8); padding-top: var(--space-6); border-top: 1px solid var(--line); }
+.member-role { color: var(--muted); border-bottom: 1px dotted var(--line-strong); cursor: help; }
 .settings-back { margin-bottom: var(--space-3); color: var(--muted); }
 /* A row's remove or revoke is quiet red text until the row is pointed at, so a long table is not a wall of red boxes. */
 td .xxd-btn[data-variant="danger-outline"][data-size="xs"]:not(:hover, :focus-visible) { border-color: transparent; background: transparent; }
@@ -236,7 +268,7 @@ td .xxd-btn[data-variant="danger-outline"][data-size="xs"]:not(:hover, :focus-vi
 /* Steps 2 and 3 of Agent access, named but quiet until a token exists, so the way ahead is visible from the start. */
 .connect-upcoming { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .connect-upcoming[hidden] { display: none; }
-.connect-upcoming li { padding: var(--space-3) var(--space-4); border: 1px dashed var(--line-strong); border-radius: var(--r-md); color: var(--muted); font-weight: var(--weight-medium); }
+.connect-upcoming li { padding: var(--space-3) var(--space-4); border-radius: var(--r-md); background: var(--wash); color: var(--muted); font-weight: var(--weight-medium); }
 
 /* X's mark sits on the text baseline like the kit's icons, in whatever colour the control's text is. */
 .app-x-logo { flex: none; vertical-align: -2px; }

@@ -62,6 +62,7 @@ export class VersionHistory extends EventTarget {
     if (fetched) {
       this.#records = new Map(fetched.versions.map(record => [record.version, record]))
       this.#latest = Math.max(...this.#records.keys())
+      this.#button.toggleAttribute('data-only-version', this.#latest === 1)
     }
     if (this.#historyLoaded !== 'yes') this.#historyLoaded = fetched ? 'yes' : 'failed'
     if (this.#menu.matches(':popover-open')) this.#renderMenu()

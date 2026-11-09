@@ -65,7 +65,7 @@ describe('server-rendered pages in English', () => {
     const profile = await englishPage('/settings/profile', adminCookie)
 
     expect(profile).toContain('<legend class="xxd-label">Appearance</legend>')
-    expect(profile).toMatch(/value="system" checked><span>System<\/span>/)
+    expect(profile).toMatch(/value="system" checked>.*?<\/span><span>System<\/span>/)
     expect(profile).toContain("You sign in with your email, so it can&#39;t be changed.")
     expect(chineseLines(profile)).toEqual([])
   })
