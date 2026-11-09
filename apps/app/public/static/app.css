@@ -259,7 +259,7 @@ html { scrollbar-gutter: stable; }
 .profile-identity__name { font-weight: var(--weight-medium); font-size: var(--text-md); }
 .profile-form__row { display: flex; gap: var(--space-2); max-width: 520px; }
 .profile-form__row > .xxd-input { flex: 1; min-width: 0; }
-.profile-form + .theme-tiles { margin-top: var(--space-8); padding-top: var(--space-6); border-top: 1px solid var(--line); }
+.profile-form + .theme-tiles { margin-top: var(--space-8); }
 .member-role { color: var(--muted); border-bottom: 1px dotted var(--line-strong); cursor: help; }
 .settings-back { margin-bottom: var(--space-3); color: var(--muted); }
 /* A row's remove or revoke is quiet red text until the row is pointed at, so a long table is not a wall of red boxes. */
