@@ -5,6 +5,7 @@ import { INVITE_COOKIE } from '../auth/admission.ts'
 import { WORKSPACE_COOKIE, type Identity } from '../auth/request-identity.ts'
 import { AgentGuide } from '../guide/agent-guide.ts'
 import { PersonalPages } from '../personal-pages.ts'
+import { SenderNetwork } from '../sender-network.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { HttpError } from '../http-error.ts'
 import { LOCALE_COOKIE } from '../i18n/resolve-locale.ts'
@@ -244,8 +245,8 @@ export class PageRoutes {
     const passwordHash = summary?.sharing.publicLinkPasswordHash ?? null
     if (!summary || passwordHash === null) return MessagePages.notFound(await this.#context.messages(), requestedPath)
     // Each guess costs a PBKDF2 run, so guessing is limited per visitor and artifact.
-    const visitorAddress = request.headers.get('CF-Connecting-IP') ?? 'unknown'
-    const { success: withinAttemptLimit } = await this.#settings.unlockRateLimiter.limit({ key: `${summary.artifactId}:${visitorAddress}` })
+    const visitorNetwork = SenderNetwork.of(request) ?? 'unknown'
+    const { success: withinAttemptLimit } = await this.#settings.unlockRateLimiter.limit({ key: `${summary.artifactId}:${visitorNetwork}` })
     if (!withinAttemptLimit) return PageRoutes.#backToPasswordPrompt(requestedPath, 'wait')
     const formData = await request.formData()
     const password = String(formData.get('password') ?? '')

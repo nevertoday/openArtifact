@@ -1,5 +1,6 @@
 import { ABUSE_REASONS, ArtifactPath, type AbuseReason, type ArtifactSummary, type SigningKey } from '@open-artifact/core'
 import { HttpError } from '../http-error.ts'
+import { SenderNetwork } from '../sender-network.ts'
 import type { ApiContext } from './api-context.ts'
 import { JsonBody } from './json-body.ts'
 
@@ -21,9 +22,9 @@ const REASON_WORDS: Record<AbuseReason, string> = {
 export interface AbuseReporting {
   /** Where reports are mailed; null stores them only. */
   mailbox: string | null
-  /** Reports sent from one network address. */
+  /** Reports sent from one sender network (see SenderNetwork). */
   senderLimiter: RateLimit
-  /** Keys the stored hash of the sender's address, so it cannot be reversed by hashing every address. */
+  /** Keys the stored hash of the sender's network, so it cannot be reversed by hashing every address. */
   addressKey: SigningKey
 }
 
@@ -36,8 +37,8 @@ export class AbuseReportApi {
   }
 
   async report(request: Request, artifactId: string): Promise<Response> {
-    const senderAddress = request.headers.get('CF-Connecting-IP')
-    await this.#ensureSenderAllowed(senderAddress)
+    const senderNetwork = SenderNetwork.of(request)
+    await this.#ensureSenderAllowed(senderNetwork)
     const identity = await this.#context.identity()
     const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canView', 'report this artifact')
     // Pages inside a workspace are its admins' business; only pages strangers can open reach the operator.
@@ -55,7 +56,7 @@ export class AbuseReportApi {
         details,
         reporterEmail,
         reporterId: identity?.userId ?? null,
-        ipHash: senderAddress === null ? null : await this.#context.abuseReporting.addressKey.sign(`abuse-report-sender:${senderAddress}`),
+        ipHash: senderNetwork === null ? null : await this.#context.abuseReporting.addressKey.sign(`abuse-report-sender:${senderNetwork}`),
         createdAt: now,
       },
       { max: REPORTS_PER_ARTIFACT_PER_DAY, since: now - DAY_MS },
@@ -65,10 +66,9 @@ export class AbuseReportApi {
     return Response.json({ reportId }, { status: 201 })
   }
 
-  // Cloudflare always names the sender; a request without it comes from local development or tests.
-  async #ensureSenderAllowed(senderAddress: string | null): Promise<void> {
-    if (senderAddress === null) return
-    const { success } = await this.#context.abuseReporting.senderLimiter.limit({ key: senderAddress })
+  async #ensureSenderAllowed(senderNetwork: string | null): Promise<void> {
+    if (senderNetwork === null) return
+    const { success } = await this.#context.abuseReporting.senderLimiter.limit({ key: senderNetwork })
     if (!success) throw new HttpError(429, 'rate_limited', 'too many reports from this network; wait a minute and try again')
   }
 

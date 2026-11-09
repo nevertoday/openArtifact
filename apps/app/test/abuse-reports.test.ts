@@ -129,6 +129,17 @@ describe('reporting a public page', () => {
     expect(await storedReports(page.artifactId)).toHaveLength(5)
   })
 
+  it('counts every IPv6 address of one /64 as one sender', async () => {
+    const page = await publicPage('IPv6 limit')
+
+    const statuses: number[] = []
+    for (let index = 0; index < 6; index++) statuses.push((await report(app, page.artifactId, { reason: 'other' }, { senderAddress: `2001:db8:44:1::${index + 1}` })).status)
+    const nextNetwork = await report(app, page.artifactId, { reason: 'other' }, { senderAddress: '2001:db8:44:2::1' })
+
+    expect(statuses).toEqual([201, 201, 201, 201, 201, 429])
+    expect(nextNetwork.status).toBe(201)
+  })
+
   it('stores the report and still answers when mailing the operator fails', async () => {
     const failingApp = new TestApp({ allowedEmailDomains: 'example.com', abuseReportEmail: OPERATOR })
     const cookie = await failingApp.signIn('failing-author@example.com')

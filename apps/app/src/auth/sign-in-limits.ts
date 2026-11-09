@@ -1,10 +1,11 @@
 import { HttpError } from '../http-error.ts'
+import { SenderNetwork } from '../sender-network.ts'
 import { OpenArtifactAuth } from './open-artifact-auth.ts'
 
 export interface SignInLimiters {
   /** Codes mailed to one address: keeps anyone from filling a person's inbox. */
   byEmail: RateLimit
-  /** Codes asked for from one network address: keeps one sender from mailing many addresses. */
+  /** Codes asked for from one sender network (see SenderNetwork): keeps one sender from mailing many addresses. */
   byAddress: RateLimit
 }
 
@@ -40,11 +41,10 @@ export class SignInLimits {
     return success
   }
 
-  // Cloudflare always names the sender; a request without it comes from local development or tests.
   async #addressAllowed(request: Request): Promise<boolean> {
-    const senderAddress = request.headers.get('CF-Connecting-IP')
-    if (senderAddress === null) return true
-    const { success } = await this.#limiters.byAddress.limit({ key: senderAddress })
+    const senderNetwork = SenderNetwork.of(request)
+    if (senderNetwork === null) return true
+    const { success } = await this.#limiters.byAddress.limit({ key: senderNetwork })
     return success
   }
 }
