@@ -12,6 +12,7 @@ import {
   type Publication,
   type PublishResult,
   type VersionOrigin,
+  type WorkspaceUsage,
 } from '@open-artifact/core'
 import { CloudflareShareCardImages } from './cloudflare-share-card-images.ts'
 
@@ -276,6 +277,18 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
       await this.#deleteObjectsUnder(CloudflareShareCardImages.prefixOf(artifactId))
       await this.#db.prepare(`DELETE FROM artifacts WHERE id = ? AND (${PAST_RESTORING})`).bind(artifactId, cutoff, cutoff).run()
     }
+  }
+
+  async usageOf(workspaceId: string): Promise<WorkspaceUsage> {
+    const usageRow = await this.#db
+      .prepare(
+        `SELECT (SELECT COUNT(*) FROM artifacts WHERE workspace_id = ?1 AND removed_at IS NULL) AS active_artifacts,
+                (SELECT COALESCE(SUM(artifact_files.size_bytes), 0) FROM artifacts JOIN artifact_files ON artifact_files.artifact_id = artifacts.id
+                 WHERE artifacts.workspace_id = ?1) AS stored_bytes`,
+      )
+      .bind(workspaceId)
+      .first<{ active_artifacts: number; stored_bytes: number }>()
+    return { activeArtifacts: usageRow?.active_artifacts ?? 0, storedBytes: usageRow?.stored_bytes ?? 0 }
   }
 
   async #deleteObjectsUnder(prefix: string): Promise<void> {

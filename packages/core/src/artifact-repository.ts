@@ -97,6 +97,14 @@ export interface ArtifactVersionContent {
   files: ArtifactFile[]
 }
 
+/** What a workspace holds, for the limits on what it may store. */
+export interface WorkspaceUsage {
+  /** Artifacts not removed. */
+  activeArtifacts: number
+  /** Every stored version's files, removed artifacts included until they are purged. */
+  storedBytes: number
+}
+
 export type PublishResult =
   | { status: 'published'; version: number }
   | { status: 'conflict'; currentVersion: number }
@@ -146,4 +154,5 @@ export interface ArtifactRepository extends ArtifactFileSource {
    * Purges at most `limit` artifacts; the next call takes the rest.
    */
   purgeRemovedBefore(cutoff: number, limit: number): Promise<void>
+  usageOf(workspaceId: string): Promise<WorkspaceUsage>
 }

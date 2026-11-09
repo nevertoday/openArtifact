@@ -36,6 +36,7 @@ export default {
     share_text_too_long: '这段文案加上链接超过了 X 的 280 字限制，请删短一些。',
     workspace_changed: '你在另一个标签页切换了工作区。请刷新页面后再操作。',
     mail_limit_reached: '今天发出的邀请或分享邮件已经到上限，这次没有发出，也没有保存。请明天再试。',
+    workspace_quota_reached: '这个工作区的 artifact 数量或存储空间已到上限，这次没有保存。删掉不用的 artifact 再试，用量见「工作区设置」。',
     workspace_deleted: '这个工作区已被删除。',
     personal_workspace: '个人工作区不能离开或删除，它的主人也始终是管理员。',
   }),

@@ -1,3 +1,5 @@
+import { WORKSPACE_LIMITS } from '../api/publish-limits.ts'
+
 export type GuideFormat = 'agents-md' | 'claude-skill' | 'cursor-rule' | 'llms-txt'
 
 /** The formats the settings page offers to copy; llms.txt is served at its own address instead. */
@@ -65,6 +67,9 @@ export class AgentGuide {
 - Scripts load only from your own files and https://cdnjs.cloudflare.com, https://cdn.jsdelivr.net/npm, https://unpkg.com. Fonts from Google Fonts. No other network access.
 - The page runs in a sandbox on its own origin: no cookies, and \`localStorage\` throws. Keep state in shared data (below).
 - Give the page a short \`<title>\`, support light and dark themes, work at phone width, and write in the language the person uses.
+
+### Limits
+- A workspace holds at most ${WORKSPACE_LIMITS.activeArtifacts} active artifacts and ${WORKSPACE_LIMITS.storedBytes / 1024 ** 3} GiB of files, every version's files counted; a removed artifact's files count until it is purged 30 days later. Past either, publish and update answer \`workspace_quota_reached\` and save nothing. Tell your person, who can remove artifacts they no longer need; prefer a new version of an existing artifact to a new artifact.
 
 ### Update, never overwrite blindly
 1. \`read\` the artifact; note its \`version\`.

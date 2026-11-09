@@ -296,13 +296,14 @@ export class PageRoutes {
   }
 
   async #settingsPage(identity: Identity, section: SettingsSection): Promise<Response> {
-    const [accessTokens, members, administration] = await Promise.all([
+    const [accessTokens, members, administration, usage] = await Promise.all([
       this.#context.repositories.accessTokens.listForUser(identity.userId),
       this.#context.repositories.workspaces.listMembers(identity.membership.workspace.workspaceId),
       section === 'workspace' ? this.#workspaceAdministration(identity) : null,
+      section === 'workspace' ? this.#context.repositories.artifacts.usageOf(identity.membership.workspace.workspaceId) : null,
     ])
     const guideFiles = new AgentGuide(this.#context.appOrigin, this.#settings.mcpUrl).files()
-    return SettingsPage.render({ m: await this.#context.messages(), identity, section, mcpUrl: this.#settings.mcpUrl, appOrigin: this.#context.appOrigin, accessTokens, guideFiles, members, administration, now: Date.now() })
+    return SettingsPage.render({ m: await this.#context.messages(), identity, section, mcpUrl: this.#settings.mcpUrl, appOrigin: this.#context.appOrigin, accessTokens, guideFiles, members, administration, usage, now: Date.now() })
   }
 
   // Only an admin sees every artifact's metadata and the audit log; a member gets null.

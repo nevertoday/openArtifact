@@ -28,6 +28,7 @@ export type ErrorCode =
   | 'share_text_too_long'
   | 'rate_limited'
   | 'mail_limit_reached'
+  | 'workspace_quota_reached'
   | 'workspace_changed'
   | 'workspace_deleted'
   | 'personal_workspace'

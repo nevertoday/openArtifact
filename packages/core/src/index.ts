@@ -19,6 +19,7 @@ export type {
   Publication,
   PublishResult,
   VersionOrigin,
+  WorkspaceUsage,
 } from './artifact-repository.ts'
 export { ArtifactRemoval, RESTORE_WINDOW } from './artifact-removal.ts'
 export type { AuditAction, AuditChange, AuditEvent, AuditLog, NewAuditEvent } from './audit-log.ts'

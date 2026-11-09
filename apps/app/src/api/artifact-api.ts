@@ -38,10 +38,12 @@ export class ArtifactApi {
     const listed = ArtifactApi.#listedOnCreate(requestBody, identity, visibility)
     const publicLinkExpiry = PublicLinkExpiry.of(requestBody, identity, { visibilityBefore: null, visibilityAfter: visibility, savedExpiresAt: null, listedAfter: listed }, Date.now())
     const files = ArtifactFileJson.filesFrom(requestBody.raw('files'))
+    const workspaceId = identity.membership.workspace.workspaceId
+    await this.#context.publishLimits.ensureRoomToPublish(workspaceId, files, { newArtifact: true })
     const [englishTitle, excerpt] = await Promise.all([this.#englishTitle('', requestedSlug, title), PageExcerpt.of(files)])
     const slug = ArtifactSlug.forNewArtifact(requestedSlug, title, englishTitle)
     const createdArtifact = await this.#context.repositories.artifacts.create({
-      workspaceId: identity.membership.workspace.workspaceId,
+      workspaceId,
       authorId: identity.userId,
       publishedVia: identity.agentClient,
       note: requestBody.optionalText('note', MAX_NOTE_LENGTH),
@@ -110,6 +112,7 @@ export class ArtifactApi {
     const newSummary = requestBody.optionalText('summary', MAX_SUMMARY_LENGTH)
     const newShareText = requestBody.has('shareText') ? { shareText: ArtifactApi.#shareTextFrom(requestBody) } : null
     const baseVersion = requestBody.boolean('force', false) ? openedArtifact.summary.version : requestBody.positiveInteger('baseVersion', BASE_VERSION_HINT)
+    await this.#context.publishLimits.ensureRoomToPublish(openedArtifact.summary.workspaceId, files, { newArtifact: false })
     const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
       authorId: identity.userId,
       publishedVia: identity.agentClient,
@@ -170,6 +173,7 @@ export class ArtifactApi {
   async restoreRemoved(request: Request, artifactId: string): Promise<Response> {
     const identity = await this.#context.requireIdentity()
     const { summary } = await this.#context.gate.require(artifactId, identity, request, 'canRestore', 'restore this artifact')
+    await this.#context.publishLimits.ensureRoomToRestore(summary.workspaceId)
     const restoredNow = await this.#context.repositories.artifacts.restore(artifactId)
     if (!restoredNow) throw HttpError.notFound(`removed artifact ${artifactId}`)
     await this.#context.repositories.auditLog.record({
@@ -220,6 +224,7 @@ export class ArtifactApi {
     const [olderVersion, versionHistory] = await Promise.all([this.#context.repositories.artifacts.readVersion(artifactId, version), this.#context.repositories.artifacts.listVersions(artifactId)])
     const olderVersionRecord = versionHistory.find(versionRecord => versionRecord.version === version)
     if (!olderVersion || !olderVersionRecord) throw HttpError.notFound(`version ${version} of artifact ${artifactId}`)
+    await this.#context.publishLimits.ensureRoomToPublish(openedArtifact.summary.workspaceId, olderVersion.files, { newArtifact: false })
     const publishResult = await this.#context.repositories.artifacts.publishOnTopOf(artifactId, baseVersion, {
       authorId: identity.userId,
       // The files are the older version's, so the source people see stays the one that made them.

@@ -104,6 +104,14 @@ export default /** @satisfies {import('../messages').Messages['settings']} */ ({
       help: 'Turning this off ends every existing public link at once. Members can still view artifacts inside the workspace.',
       state: enabled => `${enabled ? 'Allowed' : 'Off'} · Only admins can change this`,
     },
+    usage: {
+      title: 'Usage',
+      artifacts: 'Artifacts',
+      storage: 'Storage',
+      artifactCount: ({ used, max }) => `${used.toLocaleString('en')} of ${max.toLocaleString('en')}`,
+      storageSize: ({ usedMb, maxGb }) => `${usedMb.toLocaleString('en', { maximumFractionDigits: 1 })} MB of ${maxGb} GB`,
+      help: ({ maxArtifacts, maxGb }) => `A workspace holds up to ${maxArtifacts.toLocaleString('en')} artifacts and ${maxGb} GB of files, every version's files included. A removed artifact stops counting toward the number at once, but its files keep their space until it's purged 30 days later.`,
+    },
     lifecycle: {
       title: 'Leave or delete',
       personalNote: "This is your personal workspace. It can't be left or deleted, and you always stay its admin. You can rename it and invite others into it.",

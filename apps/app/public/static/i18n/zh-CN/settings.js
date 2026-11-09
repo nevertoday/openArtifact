@@ -112,6 +112,17 @@ export default {
       /** @param {boolean} enabled */
       state: enabled => `${enabled ? '已允许' : '已关闭'} · 只有管理员可以修改`,
     },
+    usage: {
+      title: '用量',
+      artifacts: 'Artifact',
+      storage: '存储空间',
+      /** @param {{ used: number, max: number }} count */
+      artifactCount: ({ used, max }) => `${used.toLocaleString('zh-CN')} / ${max.toLocaleString('zh-CN')} 个`,
+      /** @param {{ usedMb: number, maxGb: number }} size */
+      storageSize: ({ usedMb, maxGb }) => `${usedMb.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} MB / ${maxGb} GB`,
+      /** @param {{ maxArtifacts: number, maxGb: number }} limits */
+      help: ({ maxArtifacts, maxGb }) => `每个工作区最多 ${maxArtifacts.toLocaleString('zh-CN')} 个 artifact、${maxGb} GB 文件，每个版本的文件都算。删除的 artifact 立即不占数量，但它的文件要到 30 天后彻底清除时才释放空间。`,
+    },
     lifecycle: {
       title: '离开或删除',
       personalNote: '这是你的个人工作区，不能离开或删除，你一直是它的管理员。可以改名，也可以邀请别人进来一起用。',

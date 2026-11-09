@@ -1,10 +1,11 @@
 import type { Messages } from '../i18n/messages.ts'
-import { ArtifactPath, ArtifactRemoval, type AccessToken, type AuditEvent, type WorkspaceMember } from '@open-artifact/core'
+import { ArtifactPath, ArtifactRemoval, type AccessToken, type AuditEvent, type WorkspaceMember, type WorkspaceUsage } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import type { GuideFile, GuidePackFormat } from '../guide/agent-guide.ts'
 import { AgentConnectSection } from './agent-connect-section.ts'
 import { INVITE_LIFETIME_DAYS } from '../api/invite-api.ts'
+import { WORKSPACE_LIMITS } from '../api/publish-limits.ts'
 import { People } from '../people.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
 import { html, SafeHtml } from './html.ts'
@@ -30,6 +31,8 @@ export interface SettingsModel {
   guideFiles: GuideFile<GuidePackFormat>[]
   members: WorkspaceMember[]
   administration: WorkspaceAdministration | null
+  /** Shown on the workspace section only; null elsewhere. */
+  usage: WorkspaceUsage | null
   now: number
 }
 
@@ -196,9 +199,38 @@ ${administration ? SettingsPage.#workspaceNameForm(m, identity) : ''}
     </div>
   </div>
 </section>
+${model.usage ? SettingsPage.#usageSection(m, model.usage) : ''}
 ${administration ? SettingsPage.#contentSection(model.m, administration, identity, model.now) : ''}
 ${administration ? SettingsPage.#auditSection(model.m, administration, model.now) : ''}
 ${SettingsPage.#lifecycleSection(m, identity)}`
+  }
+
+  static #usageSection(m: Messages, usage: WorkspaceUsage): SafeHtml {
+    const { usage: words } = m.settings.workspace
+    const maxGb = WORKSPACE_LIMITS.storedBytes / 1024 ** 3
+    const meter = (id: string, label: string, value: string, used: number, max: number) => {
+      const share = Math.min(used / max, 1)
+      const tone = share >= 0.9 ? 'danger' : share >= 0.75 ? 'warning' : null
+      return html`<div class="xxd-meter" ${tone ? html`data-tone="${tone}"` : ''} style="--value: ${share.toFixed(4)}" data-usage="${id}">
+        <div class="xxd-meter__head"><span>${label}</span><span>${value}</span></div>
+        <div class="xxd-meter__track" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${used}" aria-valuetext="${value}"><div class="xxd-meter__fill"></div></div>
+      </div>`
+    }
+    return html`<section class="xxd-group" aria-labelledby="usage-title">
+  <h2 class="xxd-group__title" id="usage-title">${words.title}</h2>
+  <div class="xxd-group__body">
+    <div class="xxd-row"><div class="xxd-row__text xxd-stack workspace-usage">
+      ${meter('artifacts', words.artifacts, words.artifactCount({ used: usage.activeArtifacts, max: WORKSPACE_LIMITS.activeArtifacts }), usage.activeArtifacts, WORKSPACE_LIMITS.activeArtifacts)}
+      ${meter('storage', words.storage, words.storageSize({ usedMb: SettingsPage.#shownMegabytes(usage.storedBytes), maxGb }), usage.storedBytes, WORKSPACE_LIMITS.storedBytes)}
+      <span class="xxd-row__desc">${words.help({ maxArtifacts: WORKSPACE_LIMITS.activeArtifacts, maxGb })}</span>
+    </div></div>
+  </div>
+</section>`
+  }
+
+  // A few pages weigh a few kilobytes, which would round to 0 MB and read as nothing stored.
+  static #shownMegabytes(bytes: number): number {
+    return bytes === 0 ? 0 : Math.max(bytes / 1024 ** 2, 0.1)
   }
 
   // Last on the page, since it ends the person's or everyone's access; a personal workspace only says why it has none.
