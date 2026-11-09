@@ -16,11 +16,12 @@
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "open-artifact-files" }],
   // Daily purge of artifacts removed more than 30 days ago.
   "triggers": { "crons": ["30 3 * * *"] },
-  // Public-link password attempts per visitor address and artifact.
+  // Public-link password attempts per visitor address and artifact, sign-in codes, and abuse reports per sender address.
   "ratelimits": [
     { "name": "UNLOCK_RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
     { "name": "SIGN_IN_EMAIL_RATE_LIMITER", "namespace_id": "1002", "simple": { "limit": 3, "period": 60 } },
-    { "name": "SIGN_IN_ADDRESS_RATE_LIMITER", "namespace_id": "1003", "simple": { "limit": 20, "period": 60 } }
+    { "name": "SIGN_IN_ADDRESS_RATE_LIMITER", "namespace_id": "1003", "simple": { "limit": 20, "period": 60 } },
+    { "name": "REPORT_RATE_LIMITER", "namespace_id": "1004", "simple": { "limit": 5, "period": 60 } }
   ],
   // Cloudflare Email Service, used when MAILER=cloudflare; MAIL_FROM must be on a domain verified there.
   "send_email": [{ "name": "EMAIL" }],

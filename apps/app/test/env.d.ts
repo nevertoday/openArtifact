@@ -8,6 +8,7 @@ declare global {
       UNLOCK_RATE_LIMITER: RateLimit
       SIGN_IN_EMAIL_RATE_LIMITER: RateLimit
       SIGN_IN_ADDRESS_RATE_LIMITER: RateLimit
+      REPORT_RATE_LIMITER: RateLimit
       LOOSE_SIGN_IN_RATE_LIMITER: RateLimit
       MIGRATIONS: D1Migration[]
     }

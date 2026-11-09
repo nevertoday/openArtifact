@@ -20,6 +20,7 @@ export type IconName =
   | 'Database'
   | 'ExternalLink'
   | 'FileX'
+  | 'Flag'
   | 'Ellipsis'
   | 'Globe'
   | 'History'

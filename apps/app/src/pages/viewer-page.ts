@@ -1,5 +1,5 @@
 import type { Messages } from '../i18n/messages.ts'
-import { ArtifactPath, ArtifactRemoval } from '@open-artifact/core'
+import { ABUSE_REASONS, ArtifactPath, ArtifactRemoval } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
@@ -69,6 +69,7 @@ ${permissions.canComment ? ViewerPage.#coachMark(model.m) : ''}
 </div>
 ${permissions.canManageSharing ? ViewerPage.#shareDialog(model.m) : ''}
 ${permissions.canManageSharing ? ViewerPage.#shareXDialog(model.m) : ''}
+${ViewerPage.#canReport(model) ? ViewerPage.#reportDialog(model.m) : ''}
 ${ViewerPage.#shortcutSheet(model)}
 ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     return PageShell.render({
@@ -186,10 +187,47 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     ${permissions.canReadComments ? ViewerPage.#commentCountButton(model.m) : ''}
     ${permissions.canComment ? html`<button type="button" class="xxd-btn viewer-comment-mode" data-variant="ghost" data-size="sm" aria-pressed="false" aria-keyshortcuts="C" data-tooltip="${model.m.viewer.bar.commentModeTooltip}" data-comment-mode>${PageShell.icon('Plus')}<span class="viewer-bar__label">${model.m.viewer.bar.comment}</span></button>` : ''}
     ${permissions.canManageSharing ? html`<button type="button" class="xxd-btn" data-variant="primary" data-size="sm" data-open-share>${model.m.viewer.bar.share}</button>` : ''}
+    ${ViewerPage.#canReport(model) ? html`<button type="button" class="xxd-btn viewer-report" data-variant="ghost" data-size="sm" aria-haspopup="dialog" data-open-report>${PageShell.icon('Flag', 14)}${model.m.viewer.report.open}</button>` : ''}
     ${isVisitor ? '' : ViewerPage.#moreMenu(model)}
     ${model.identity ? PageShell.accountControls(model.m, model.identity) : ViewerPage.#signInLink(model)}
   </div>
 </header>`
+  }
+
+  // Only a page strangers can open reaches the operator; inside a workspace, its admins deal with it.
+  static #canReport(model: ViewerModel): boolean {
+    return ViewerPage.isPublicLinkVisitor(model.openedArtifact) && model.openedArtifact.summary.sharing.visibility === 'public_link'
+  }
+
+  static #reportDialog(m: Messages): SafeHtml {
+    const { report } = m.viewer
+    const reasonChoice = (reason: (typeof ABUSE_REASONS)[number], index: number) =>
+      html`<label class="xxd-choice" for="report-reason-${reason}"><input type="radio" class="xxd-radio" name="reason" id="report-reason-${reason}" value="${reason}" ${index === 0 ? new SafeHtml('checked') : ''}><span>${report.reasons[reason]}</span></label>`
+    return html`<dialog class="xxd-dialog" data-size="sm" id="report-dialog" aria-labelledby="report-title" aria-describedby="report-intro">
+  <form class="xxd-stack" data-report-form data-xxd-validate>
+    <div class="xxd-dialog__head">
+      <h2 class="xxd-dialog__title" id="report-title">${report.title}</h2>
+      <button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" aria-label="${report.close}" data-xxd-dialog-close>${PageShell.icon('X')}</button>
+    </div>
+    <div class="xxd-dialog__body xxd-stack">
+      <p class="xxd-text" data-variant="secondary" id="report-intro">${report.intro}</p>
+      <fieldset class="xxd-choices"><legend class="xxd-label">${report.reasonLabel}</legend>${ABUSE_REASONS.map(reasonChoice)}</fieldset>
+      <div class="xxd-field">
+        <label class="xxd-label" for="report-details">${report.detailsLabel}</label>
+        <textarea class="xxd-textarea" id="report-details" name="details" rows="3" maxlength="1000" placeholder="${report.detailsPlaceholder}"></textarea>
+      </div>
+      <div class="xxd-field">
+        <label class="xxd-label" for="report-contact">${report.contactLabel}</label>
+        <input class="xxd-input" type="email" id="report-contact" name="contactEmail" maxlength="254" autocomplete="email" aria-describedby="report-contact-help" data-error-type="${report.contactInvalid}">
+        <p class="xxd-help" id="report-contact-help">${report.contactHelp}</p>
+      </div>
+    </div>
+    <div class="xxd-dialog__actions">
+      <button type="button" class="xxd-btn ui-dialog-cancel" data-xxd-dialog-close>${report.cancel}</button>
+      <button type="submit" class="xxd-btn" data-variant="primary">${report.submit}</button>
+    </div>
+  </form>
+</dialog>`
   }
 
   static #versionPicker(model: ViewerModel): SafeHtml {

@@ -8,6 +8,7 @@ import { CommentPins } from './comment-pins.js'
 import { CommentThreads } from './comment-threads.js'
 import { DataView } from './data-view.js'
 import { LiveUpdates } from './live-updates.js'
+import { ReportDialog } from './report-dialog.js'
 import { ShareDialog } from './share-dialog.js'
 import { ShareXPanel } from './share-x-panel.js'
 import { ViewerTopBar } from './top-bar.js'
@@ -98,6 +99,8 @@ if (commentMode) {
 
 const shareDialogElement = document.getElementById('share-dialog')
 const shareDialog = shareDialogElement ? new ShareDialog(shareDialogElement, config, stage) : null
+const reportButton = viewer.querySelector('[data-open-report]')
+if (reportButton) new ReportDialog({ button: reportButton, dialog: document.getElementById('report-dialog'), artifactId: config.artifactId })
 const shareXElement = document.getElementById('share-x-dialog')
 const shareXPanel = shareXElement ? new ShareXPanel(shareXElement, config) : null
 topBar.addEventListener('renamed', event => {

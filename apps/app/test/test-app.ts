@@ -94,13 +94,15 @@ export class TestApp {
    * Tests sign the same people in many times a minute, so sign-in codes are limited loosely unless
    * `productionSignInLimits` asks for the limits the app is deployed with.
    */
-  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean } = { allowedEmailDomains: 'example.com' }) {
+  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean; abuseReportEmail?: string } = { allowedEmailDomains: 'example.com' }) {
     const appEnv: AppEnv = {
       DB: env.DB,
       FILES: env.FILES,
       UNLOCK_RATE_LIMITER: env.UNLOCK_RATE_LIMITER,
       SIGN_IN_EMAIL_RATE_LIMITER: options.productionSignInLimits ? env.SIGN_IN_EMAIL_RATE_LIMITER : env.LOOSE_SIGN_IN_RATE_LIMITER,
       SIGN_IN_ADDRESS_RATE_LIMITER: options.productionSignInLimits ? env.SIGN_IN_ADDRESS_RATE_LIMITER : env.LOOSE_SIGN_IN_RATE_LIMITER,
+      REPORT_RATE_LIMITER: env.REPORT_RATE_LIMITER,
+      ...(options.abuseReportEmail === undefined ? {} : { ABUSE_REPORT_EMAIL: options.abuseReportEmail }),
       ...(options.allowedEmailDomains === undefined ? {} : { ALLOWED_EMAIL_DOMAINS: options.allowedEmailDomains }),
       USERCONTENT_ORIGIN,
       MCP_ORIGIN: 'http://mcp.test',

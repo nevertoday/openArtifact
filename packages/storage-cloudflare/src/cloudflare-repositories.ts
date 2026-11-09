@@ -1,4 +1,5 @@
 import type { Repositories } from '@open-artifact/core'
+import { CloudflareAbuseReports } from './cloudflare-abuse-reports.ts'
 import { CloudflareAccessTokenRepository } from './cloudflare-access-token-repository.ts'
 import { CloudflareArtifactAccessRepository } from './cloudflare-artifact-access-repository.ts'
 import { CloudflareArtifactRepository } from './cloudflare-artifact-repository.ts'
@@ -31,5 +32,6 @@ export function cloudflareRepositories(db: D1Database, files: R2Bucket): Reposit
     shareCardImages: new CloudflareShareCardImages(files),
     outboundMail: new CloudflareOutboundMailLog(db),
     publishLog: new CloudflarePublishLog(db),
+    abuseReports: new CloudflareAbuseReports(db),
   }
 }

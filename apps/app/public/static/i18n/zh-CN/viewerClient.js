@@ -335,4 +335,9 @@ export default {
     previewLabel: '卡片预览',
     previewMissing: '列在主页上之后才会生成卡片图。',
   },
+  report: {
+    sent: '已提交举报，谢谢。',
+    /** @param {string} message */
+    failed: message => `没有提交成功：${message}`,
+  },
 }

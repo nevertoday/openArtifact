@@ -1,3 +1,4 @@
+export { CloudflareAbuseReports } from './cloudflare-abuse-reports.ts'
 export { CloudflareAccessTokenRepository } from './cloudflare-access-token-repository.ts'
 export { CloudflareArtifactAccessRepository } from './cloudflare-artifact-access-repository.ts'
 export { CloudflareArtifactRepository } from './cloudflare-artifact-repository.ts'

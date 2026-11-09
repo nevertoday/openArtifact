@@ -8,6 +8,7 @@ import { HttpError } from '../http-error.ts'
 import { Notifier } from '../notifications/notifier.ts'
 import { People } from '../people.ts'
 import { PersonalPages } from '../personal-pages.ts'
+import type { AbuseReporting } from './abuse-report-api.ts'
 import { MailLimits } from './mail-limits.ts'
 import { PublishLimits } from './publish-limits.ts'
 import type { TitleTranslator } from './title-translator.ts'
@@ -25,6 +26,7 @@ export interface ApiContextFields {
   appOrigin: string
   artifactPages: ArtifactPageAddress
   titleTranslator: TitleTranslator
+  abuseReporting: AbuseReporting
   /** What the request says about language before anyone is identified; the account's choice is added later. */
   localeSignals: Omit<LocaleSignals, 'account'>
 }
@@ -46,6 +48,7 @@ export class ApiContext {
   readonly titleTranslator: TitleTranslator
   readonly mailLimits: MailLimits
   readonly publishLimits: PublishLimits
+  readonly abuseReporting: AbuseReporting
   readonly #localeSignals: Omit<LocaleSignals, 'account'>
   #locale: Promise<Locale> | null = null
 
@@ -64,6 +67,7 @@ export class ApiContext {
     this.titleTranslator = fields.titleTranslator
     this.mailLimits = new MailLimits(fields.repositories.outboundMail)
     this.publishLimits = new PublishLimits(fields.repositories)
+    this.abuseReporting = fields.abuseReporting
     this.#localeSignals = fields.localeSignals
   }
 

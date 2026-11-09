@@ -1,3 +1,4 @@
+import type { AbuseReports } from './abuse-reports.ts'
 import type { AccessTokenRepository } from './access-token-repository.ts'
 import type { ArtifactAccessRepository } from './artifact-access-repository.ts'
 import type { ArtifactRepository } from './artifact-repository.ts'
@@ -30,4 +31,5 @@ export interface Repositories {
   shareCardImages: ShareCardImages
   outboundMail: OutboundMailLog
   publishLog: PublishLog
+  abuseReports: AbuseReports
 }
