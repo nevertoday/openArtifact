@@ -1,17 +1,26 @@
-import type { ArtifactFile, Repositories, WorkspaceUsage } from '@open-artifact/core'
+import type { ArtifactFile, Repositories, SharedDataBudgets, WorkspaceUsage } from '@open-artifact/core'
 import { HttpError } from '../http-error.ts'
 
-/** How much one workspace may hold; the settings page shows the same numbers. */
+/**
+ * How much one workspace may hold; the settings page shows the same numbers. Files live in R2 and shared data in the
+ * database, so each has its own limit.
+ */
 export const WORKSPACE_LIMITS = {
   activeArtifacts: 1000,
-  storedBytes: 1024 ** 3,
+  fileBytes: 1024 ** 3,
+  sharedDataBytes: 50 * 1024 ** 2,
 } as const
 
-/** How much shared data one artifact's page may keep: plenty for a poll, a sign-up sheet or a tracker, and a bound on what anonymous visitors can write. */
-export const SHARED_DATA_LIMITS = {
-  maxDocuments: 2000,
-  maxBytes: 5 * 1024 ** 2,
-} as const
+/**
+ * How much shared data may be kept. A page's budget is plenty for a poll, a sign-up sheet or a tracker and bounds what
+ * anonymous visitors can write; the deployment's keeps the database (10 GB for a D1 database) room for everything else.
+ */
+export const SHARED_DATA_BUDGETS: SharedDataBudgets = {
+  artifactDocuments: 2000,
+  artifactBytes: 5 * 1024 ** 2,
+  workspaceBytes: WORKSPACE_LIMITS.sharedDataBytes,
+  deploymentBytes: 5 * 1024 ** 3,
+}
 
 /** Publishes (new artifacts and new versions) one person may make in any 24 hours, across every workspace and token. */
 export const PUBLISHES_PER_PERSON_PER_DAY = 300
@@ -72,21 +81,11 @@ export class PublishLimits {
     const usage = await this.#repositories.artifacts.usageOf(workspaceId)
     if (newArtifact) PublishLimits.#ensureArtifactRoom(usage, 'published')
     const addedBytes = PublishLimits.bytesOf(files)
-    if (usage.storedBytes + addedBytes <= WORKSPACE_LIMITS.storedBytes) return
+    if (usage.fileBytes + addedBytes <= WORKSPACE_LIMITS.fileBytes) return
     const message =
-      `this workspace stores ${PublishLimits.#size(usage.storedBytes)} of the ${PublishLimits.#size(WORKSPACE_LIMITS.storedBytes)} it may store, ` +
+      `this workspace stores ${PublishLimits.#size(usage.fileBytes)} of files, of the ${PublishLimits.#size(WORKSPACE_LIMITS.fileBytes)} it may store, ` +
       `and these files add ${PublishLimits.#size(addedBytes)}; nothing was published. Every version's files count, and a removed artifact's ` +
       `files count until it is purged 30 days after removal. To make room, ${FREE_SPACE_HINT}, or publish smaller files`
-    throw new HttpError(413, 'workspace_quota_reached', message)
-  }
-
-  /** A page's shared data counts in its workspace's storage, so a full workspace takes no more of it. */
-  async ensureRoomForSharedData(workspaceId: string, documentBytes: number): Promise<void> {
-    const usage = await this.#repositories.artifacts.usageOf(workspaceId)
-    if (usage.storedBytes + documentBytes <= WORKSPACE_LIMITS.storedBytes) return
-    const message =
-      `this workspace stores ${PublishLimits.#size(usage.storedBytes)} of the ${PublishLimits.#size(WORKSPACE_LIMITS.storedBytes)} it may store, ` +
-      `its pages' shared data included; nothing was saved. To make room, delete shared data the pages no longer need, or ${FREE_SPACE_HINT}`
     throw new HttpError(413, 'workspace_quota_reached', message)
   }
 

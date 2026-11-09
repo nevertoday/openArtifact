@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers'
 import { beforeAll, describe, expect, it } from 'vitest'
-import type { Membership } from '@open-artifact/core'
+import { ArtifactRemoval, type Membership } from '@open-artifact/core'
 import {
   CloudflareAccessTokenRepository,
   CloudflareArtifactAccessRepository,
@@ -14,7 +14,7 @@ import {
 
 const artifactRepository = new CloudflareArtifactRepository(env.DB, env.FILES)
 const workspaceRepository = new CloudflareWorkspaceRepository(env.DB)
-const ROOMY = { maxDocuments: 2000, maxBytes: 5 * 1024 ** 2 }
+const ROOMY = { artifactDocuments: 2000, artifactBytes: 5 * 1024 ** 2, workspaceBytes: 50 * 1024 ** 2, deploymentBytes: 5 * 1024 ** 3 }
 
 async function createWorkspace(name: string, creatorId: string, createdAt: number): Promise<Membership> {
   const membership = await workspaceRepository.create(name, creatorId, createdAt, { max: Number.MAX_SAFE_INTEGER })
@@ -284,7 +284,7 @@ describe('artifact access, comments and shared data', () => {
     const updatedDocument = await sharedDataRepository.putDocument(artifactId, 'signups', 'lin', { session: 'Afternoon' }, reviewerId, ROOMY)
     await sharedDataRepository.putDocument(artifactId, 'votes', 'anonymous-1', { choice: 'A' }, null, ROOMY)
 
-    expect(updatedDocument).toMatchObject({ data: { session: 'Afternoon' }, createdBy: authorId, updatedBy: reviewerId })
+    expect(updatedDocument).toMatchObject({ status: 'saved', document: { data: { session: 'Afternoon' }, createdBy: authorId, updatedBy: reviewerId } })
     expect(await sharedDataRepository.listCollections(artifactId)).toEqual([
       { collection: 'signups', documentCount: 1 },
       { collection: 'votes', documentCount: 1 },
@@ -294,27 +294,75 @@ describe('artifact access, comments and shared data', () => {
     expect(await sharedDataRepository.listDocuments(artifactId, 'votes')).toEqual([])
   })
 
-  it('keeps an artifact\'s shared data within its cap on documents and bytes, even under concurrent writes', async () => {
+  it('keeps an artifact\'s shared data within its budget of documents and bytes, even under concurrent writes', async () => {
     const sharedDataRepository = new CloudflareSharedDataRepository(env.DB)
     const { artifactId } = await createArtifactIn(workspaceId, authorId)
     const { artifactId: otherArtifactId } = await createArtifactIn(workspaceId, authorId)
-    const documentCap = { maxDocuments: 5, maxBytes: 1_000_000 }
+    const documentBudget = { ...ROOMY, artifactDocuments: 5 }
 
-    const racing = await Promise.all(Array.from({ length: 12 }, (_, index) => sharedDataRepository.putDocument(artifactId, 'votes', `v${index}`, { choice: index }, null, documentCap)))
-    const savedId = racing.find(saved => saved !== null)?.documentId ?? ''
-    const replacedWhenFull = await sharedDataRepository.putDocument(artifactId, 'votes', savedId, { choice: 'changed' }, null, documentCap)
-    const otherArtifact = await sharedDataRepository.putDocument(otherArtifactId, 'votes', 'v0', { choice: 0 }, null, documentCap)
-    const byteCap = { maxDocuments: 100, maxBytes: 30 }
-    const fitting = await sharedDataRepository.putDocument(otherArtifactId, 'notes', 'n', { text: 'x'.repeat(4) }, null, byteCap)
-    const overBytes = await sharedDataRepository.putDocument(otherArtifactId, 'notes', 'm', { text: '汉' }, null, byteCap)
-    const shrinking = await sharedDataRepository.putDocument(otherArtifactId, 'notes', 'n', { text: '' }, null, byteCap)
+    const racing = await Promise.all(Array.from({ length: 12 }, (_, index) => sharedDataRepository.putDocument(artifactId, 'votes', `v${index}`, { choice: index }, null, documentBudget)))
+    const saved = racing.flatMap(write => (write.status === 'saved' ? [write.document] : []))
+    const replacedWhenFull = await sharedDataRepository.putDocument(artifactId, 'votes', saved[0]?.documentId ?? '', { choice: 'changed' }, null, documentBudget)
+    const otherArtifact = await sharedDataRepository.putDocument(otherArtifactId, 'votes', 'v0', { choice: 0 }, null, documentBudget)
+    const byteBudget = { ...ROOMY, artifactBytes: 30 }
+    const fitting = await sharedDataRepository.putDocument(otherArtifactId, 'notes', 'n', { text: 'x'.repeat(4) }, null, byteBudget)
+    const overBytes = await sharedDataRepository.putDocument(otherArtifactId, 'notes', 'm', { text: '汉' }, null, byteBudget)
+    const shrinking = await sharedDataRepository.putDocument(otherArtifactId, 'notes', 'n', { text: '' }, null, byteBudget)
 
-    expect(racing.filter(saved => saved !== null)).toHaveLength(5)
-    expect(replacedWhenFull?.data).toEqual({ choice: 'changed' })
-    expect(otherArtifact).not.toBeNull()
-    expect(fitting).not.toBeNull()
-    expect(overBytes).toBeNull()
-    expect(shrinking).not.toBeNull()
+    expect(saved).toHaveLength(5)
+    expect(racing.filter(write => write.status === 'over_budget')).toEqual(Array.from({ length: 7 }, () => ({ status: 'over_budget', budget: 'artifact' })))
+    expect(replacedWhenFull).toMatchObject({ status: 'saved', document: { data: { choice: 'changed' } } })
+    expect(otherArtifact.status).toBe('saved')
+    expect(fitting.status).toBe('saved')
+    expect(overBytes).toEqual({ status: 'over_budget', budget: 'artifact' })
+    expect(shrinking.status).toBe('saved')
+  })
+
+  it('keeps a workspace\'s and the deployment\'s shared data within their budgets, counting every artifact, and says which refused', async () => {
+    const sharedDataRepository = new CloudflareSharedDataRepository(env.DB)
+    const budgetWorkspaceId = (await createWorkspace('Budget team', authorId, Date.now())).workspace.workspaceId
+    const [first, second] = await Promise.all([createArtifactIn(budgetWorkspaceId, authorId), createArtifactIn(budgetWorkspaceId, authorId)])
+    const twelveBytes = { text: 'x' }
+    const workspaceBudget = { ...ROOMY, workspaceBytes: 25 }
+
+    const racing = await Promise.all(
+      [first, second, first, second].map(({ artifactId }, index) => sharedDataRepository.putDocument(artifactId, 'notes', `n${index}`, twelveBytes, null, workspaceBudget)),
+    )
+    const usedBytes = await sharedDataRepository.workspaceBytes(budgetWorkspaceId)
+    const deploymentBytes = (await env.DB.prepare('SELECT bytes FROM deployment_shared_usage').first<number>('bytes')) ?? 0
+    const overDeployment = await sharedDataRepository.putDocument(first.artifactId, 'notes', 'late', twelveBytes, null, { ...ROOMY, deploymentBytes: deploymentBytes + 11 })
+    const fitsDeployment = await sharedDataRepository.putDocument(first.artifactId, 'notes', 'late', twelveBytes, null, { ...ROOMY, deploymentBytes: deploymentBytes + 12 })
+
+    expect(racing.filter(write => write.status === 'saved')).toHaveLength(2)
+    expect(racing.filter(write => write.status === 'over_budget')).toEqual([
+      { status: 'over_budget', budget: 'workspace' },
+      { status: 'over_budget', budget: 'workspace' },
+    ])
+    expect(usedBytes).toBe(24)
+    expect(overDeployment).toEqual({ status: 'over_budget', budget: 'deployment' })
+    expect(fitsDeployment.status).toBe('saved')
+  })
+
+  it('takes deleted and purged documents off the workspace\'s and the deployment\'s shared data', async () => {
+    const sharedDataRepository = new CloudflareSharedDataRepository(env.DB)
+    const deploymentBytes = () => env.DB.prepare('SELECT bytes FROM deployment_shared_usage').first<number>('bytes')
+    const countedWorkspaceId = (await createWorkspace('Counted team', authorId, Date.now())).workspace.workspaceId
+    const { artifactId } = await createArtifactIn(countedWorkspaceId, authorId)
+    const before = await deploymentBytes()
+
+    await sharedDataRepository.putDocument(artifactId, 'notes', 'kept', { text: 'kept' }, null, ROOMY)
+    await sharedDataRepository.putDocument(artifactId, 'notes', 'gone', { text: 'gone' }, null, ROOMY)
+    await sharedDataRepository.putDocument(artifactId, 'notes', 'kept', { text: 'kept, longer' }, null, ROOMY)
+    const whileStored = await sharedDataRepository.workspaceBytes(countedWorkspaceId)
+    await sharedDataRepository.deleteDocument(artifactId, 'notes', 'gone')
+    const afterDelete = await sharedDataRepository.workspaceBytes(countedWorkspaceId)
+    await artifactRepository.remove(artifactId, new ArtifactRemoval(Date.now(), authorId, false))
+    await artifactRepository.purgeRemovedNow(artifactId, Date.now())
+
+    expect(whileStored).toBe(JSON.stringify({ text: 'kept, longer' }).length + JSON.stringify({ text: 'gone' }).length)
+    expect(afterDelete).toBe(JSON.stringify({ text: 'kept, longer' }).length)
+    expect(await sharedDataRepository.workspaceBytes(countedWorkspaceId)).toBe(0)
+    expect(await deploymentBytes()).toBe(before)
   })
 
   it('accepts a token only while it is neither revoked nor expired, and says which it is', async () => {

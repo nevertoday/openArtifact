@@ -119,7 +119,8 @@ describe('storage per workspace', () => {
 
     expect(settings).toContain('2 / 1,000 个')
     expect(settings).toContain('300 MB / 1 GB')
-    expect(settings).toMatch(/data-usage="storage"[^>]*>/)
+    expect(settings).toMatch(/data-usage="files"[^>]*>/)
+    expect(settings.match(/data-usage="shared-data"[\s\S]*?<\/div>\s*<\/div>/)?.[0]).toContain('0 MB / 50 MB')
   })
 })
 

@@ -32,10 +32,13 @@ export interface SettingsModel {
   members: WorkspaceMember[]
   administration: WorkspaceAdministration | null
   /** Shown on the workspace section only; null elsewhere. */
-  usage: WorkspaceUsage | null
+  usage: SettingsUsage | null
   now: number
 }
 
+
+/** What the workspace holds, files and shared data apart, since each has its own limit. */
+export type SettingsUsage = WorkspaceUsage & { sharedDataBytes: number }
 
 export class SettingsPage {
   static render(model: SettingsModel): Response {
@@ -205,9 +208,10 @@ ${administration ? SettingsPage.#auditSection(model.m, administration, model.now
 ${SettingsPage.#lifecycleSection(m, identity)}`
   }
 
-  static #usageSection(m: Messages, usage: WorkspaceUsage): SafeHtml {
+  static #usageSection(m: Messages, usage: SettingsUsage): SafeHtml {
     const { usage: words } = m.settings.workspace
-    const maxGb = WORKSPACE_LIMITS.storedBytes / 1024 ** 3
+    const maxGb = WORKSPACE_LIMITS.fileBytes / 1024 ** 3
+    const maxSharedDataMb = WORKSPACE_LIMITS.sharedDataBytes / 1024 ** 2
     const meter = (id: string, label: string, value: string, used: number, max: number) => {
       const share = Math.min(used / max, 1)
       const tone = share >= 0.9 ? 'danger' : share >= 0.75 ? 'warning' : null
@@ -221,9 +225,9 @@ ${SettingsPage.#lifecycleSection(m, identity)}`
   <div class="xxd-group__body">
     <div class="xxd-row"><div class="xxd-row__text xxd-stack workspace-usage">
       ${meter('artifacts', words.artifacts, words.artifactCount({ used: usage.activeArtifacts, max: WORKSPACE_LIMITS.activeArtifacts }), usage.activeArtifacts, WORKSPACE_LIMITS.activeArtifacts)}
-      ${meter('storage', words.storage, words.storageSize({ usedMb: SettingsPage.#shownMegabytes(usage.storedBytes), maxGb }), usage.storedBytes, WORKSPACE_LIMITS.storedBytes)}
-      <span class="xxd-row__desc" data-usage="shared-data">${words.sharedDataSize({ usedMb: SettingsPage.#shownMegabytes(usage.sharedDataBytes) })}</span>
-      <span class="xxd-row__desc">${words.help({ maxArtifacts: WORKSPACE_LIMITS.activeArtifacts, maxGb })}</span>
+      ${meter('files', words.files, words.filesSize({ usedMb: SettingsPage.#shownMegabytes(usage.fileBytes), maxGb }), usage.fileBytes, WORKSPACE_LIMITS.fileBytes)}
+      ${meter('shared-data', words.sharedData, words.sharedDataSize({ usedMb: SettingsPage.#shownMegabytes(usage.sharedDataBytes), maxMb: maxSharedDataMb }), usage.sharedDataBytes, WORKSPACE_LIMITS.sharedDataBytes)}
+      <span class="xxd-row__desc">${words.help({ maxArtifacts: WORKSPACE_LIMITS.activeArtifacts, maxGb, maxSharedDataMb })}</span>
     </div></div>
   </div>
 </section>`

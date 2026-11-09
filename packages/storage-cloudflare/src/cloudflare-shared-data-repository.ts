@@ -1,12 +1,23 @@
-import type { SharedCollection, SharedDataCap, SharedDataRepository, SharedDocument } from '@open-artifact/core'
+import type { SharedCollection, SharedDataBudget, SharedDataBudgets, SharedDataRepository, SharedDocument, SharedDocumentWrite } from '@open-artifact/core'
 
 const DOCUMENT_COLUMNS = 'collection, id, data, created_by, updated_by, created_at, updated_at'
 
-/** How shared data is measured, the same way for the cap on one artifact and the usage of a workspace. */
-export const SharedDataBytes = {
-  /** A document's JSON in UTF-8 bytes. */
-  OF_DATA: 'length(CAST(data AS BLOB))',
-} as const
+// What a write adds, the document it replaces taken off, and the counters it would add to (kept by the triggers of
+// migration 0022). Parameters: ?1 artifact, ?2 collection, ?3 document id, ?4 data.
+const WRITE_CHANGE = `WITH change AS (
+  SELECT length(CAST(?4 AS BLOB)) - COALESCE(replaced.size_bytes, 0) AS added_bytes, replaced.id IS NULL AS added_documents
+  FROM (SELECT 1) LEFT JOIN shared_documents AS replaced ON replaced.artifact_id = ?1 AND replaced.collection = ?2 AND replaced.id = ?3
+)`
+const BUDGET_ROWS = `FROM change, deployment_shared_usage, artifacts
+  LEFT JOIN artifact_shared_usage ON artifact_shared_usage.artifact_id = artifacts.id
+  LEFT JOIN workspace_shared_usage ON workspace_shared_usage.workspace_id = artifacts.workspace_id
+  WHERE artifacts.id = ?1`
+// Parameters: ?7 to ?10, the budgets in the order of SharedDataBudgets.
+const WITHIN: Record<SharedDataBudget, string> = {
+  artifact: `COALESCE(artifact_shared_usage.documents, 0) + change.added_documents <= ?7 AND COALESCE(artifact_shared_usage.bytes, 0) + change.added_bytes <= ?8`,
+  workspace: 'COALESCE(workspace_shared_usage.bytes, 0) + change.added_bytes <= ?9',
+  deployment: 'deployment_shared_usage.bytes + change.added_bytes <= ?10',
+}
 
 interface DocumentRow {
   collection: string
@@ -41,30 +52,41 @@ export class CloudflareSharedDataRepository implements SharedDataRepository {
     return documentRows.map(CloudflareSharedDataRepository.#documentOf)
   }
 
-  // The cap is checked in the statement that writes, so concurrent writes cannot together go past it.
-  async putDocument(artifactId: string, collection: string, documentId: string, data: unknown, actorId: string | null, cap: SharedDataCap): Promise<SharedDocument | null> {
-    const now = Date.now()
+  // The budgets are checked in the statement that writes, against counters its own triggers update, so concurrent
+  // writes cannot together go past them. Only a refusal reads them again, to say which budget refused.
+  async putDocument(artifactId: string, collection: string, documentId: string, data: unknown, actorId: string | null, budgets: SharedDataBudgets): Promise<SharedDocumentWrite> {
+    const bindings = [artifactId, collection, documentId, JSON.stringify(data), actorId, Date.now(), budgets.artifactDocuments, budgets.artifactBytes, budgets.workspaceBytes, budgets.deploymentBytes]
     const documentRow = await this.#db
       .prepare(
-        `INSERT INTO shared_documents (artifact_id, collection, id, data, created_by, updated_by, created_at, updated_at)
-         SELECT ?1, ?2, ?3, ?4, ?5, ?5, ?6, ?6
-         WHERE (SELECT COUNT(*) FROM shared_documents WHERE artifact_id = ?1 AND NOT (collection = ?2 AND id = ?3)) < ?7
-           AND (SELECT COALESCE(SUM(${SharedDataBytes.OF_DATA}), 0) FROM shared_documents WHERE artifact_id = ?1 AND NOT (collection = ?2 AND id = ?3))
-               + length(CAST(?4 AS BLOB)) <= ?8
+        `${WRITE_CHANGE}
+         INSERT INTO shared_documents (artifact_id, collection, id, data, created_by, updated_by, created_at, updated_at)
+         SELECT ?1, ?2, ?3, ?4, ?5, ?5, ?6, ?6 ${BUDGET_ROWS} AND ${WITHIN.artifact} AND ${WITHIN.workspace} AND ${WITHIN.deployment}
          ON CONFLICT (artifact_id, collection, id) DO UPDATE SET data = excluded.data, updated_by = excluded.updated_by, updated_at = excluded.updated_at
          RETURNING ${DOCUMENT_COLUMNS}`,
       )
-      .bind(artifactId, collection, documentId, JSON.stringify(data), actorId, now, cap.maxDocuments, cap.maxBytes)
+      .bind(...bindings)
       .first<DocumentRow>()
-    return documentRow ? CloudflareSharedDataRepository.#documentOf(documentRow) : null
+    if (documentRow) return { status: 'saved', document: CloudflareSharedDataRepository.#documentOf(documentRow) }
+    const fitRow = await this.#db
+      .prepare(`${WRITE_CHANGE} SELECT ${WITHIN.artifact} AS artifact, ${WITHIN.workspace} AS workspace, ${WITHIN.deployment} AS deployment ${BUDGET_ROWS}`)
+      .bind(...bindings)
+      .first<Record<SharedDataBudget, number>>()
+    if (!fitRow) return { status: 'not_found' }
+    const budget = (['artifact', 'workspace', 'deployment'] as const).find(candidate => !fitRow[candidate]) ?? 'artifact'
+    return { status: 'over_budget', budget }
   }
 
   async deleteDocument(artifactId: string, collection: string, documentId: string): Promise<boolean> {
-    const deletion = await this.#db
-      .prepare('DELETE FROM shared_documents WHERE artifact_id = ? AND collection = ? AND id = ?')
+    // RETURNING, since the changes D1 reports count the rows the counting triggers change too.
+    const deleted = await this.#db
+      .prepare('DELETE FROM shared_documents WHERE artifact_id = ? AND collection = ? AND id = ? RETURNING id')
       .bind(artifactId, collection, documentId)
-      .run()
-    return deletion.meta.changes === 1
+      .first<string>('id')
+    return deleted !== null
+  }
+
+  async workspaceBytes(workspaceId: string): Promise<number> {
+    return (await this.#db.prepare('SELECT bytes FROM workspace_shared_usage WHERE workspace_id = ?').bind(workspaceId).first<number>('bytes')) ?? 0
   }
 
   static #documentOf(documentRow: DocumentRow): SharedDocument {

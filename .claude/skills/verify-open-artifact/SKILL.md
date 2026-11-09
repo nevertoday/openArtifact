@@ -69,7 +69,7 @@ Stable handles in this UI are ids and `data-*` attributes. Use them, not text or
 - personal page: `[data-entry]`, `.personal-cover`, `.personal-share`, `[data-pin]`, `[data-edit-summary]`, `[data-edit-bio]`
 - login: `#email-step`, `#login-email`, `#code-step`, `#login-code`, `[data-sent-to]`
 - language: `form[action="/locale"] button[value=en]`; the kit's confirm dialog: `dialog[role=alertdialog] button[value=confirm]`
-- settings › workspace (`/settings/workspace`): `[data-usage=artifacts]`, `[data-usage=storage]` (use against the limits; storage includes shared data), `[data-usage=shared-data]` (the shared-data part of it)
+- settings › workspace (`/settings/workspace`): `[data-usage=artifacts]`, `[data-usage=files]` and `[data-usage=shared-data]` (two meters, each against its own limit)
 - settings › agents (`/settings/agents`): `#create-token-form`, `#token-name`, `#token-scope-publish`, `#token-scope-full`, `#connect-token-value`
 - password gate: `#public-link-password`, `form:has(#public-link-password) [type=submit]`
 

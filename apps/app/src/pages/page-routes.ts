@@ -14,7 +14,7 @@ import { LoginPage } from './login-page.ts'
 import { MessagePages, type PasswordPrompt } from './message-pages.ts'
 import { PersonalPage } from './personal-page.ts'
 import { ProfileShareCard, ShareCard } from '../share/share-card.ts'
-import { SettingsPage, type WorkspaceAdministration } from './settings-page.ts'
+import { SettingsPage, type SettingsUsage, type WorkspaceAdministration } from './settings-page.ts'
 import { SETTINGS_SECTIONS, type SettingsSection } from './settings-sections.ts'
 import { ViewerPage, type Byline, type OlderVersion, type ViewerModel } from './viewer-page.ts'
 
@@ -301,10 +301,15 @@ export class PageRoutes {
       this.#context.repositories.accessTokens.listForUser(identity.userId),
       this.#context.repositories.workspaces.listMembers(identity.membership.workspace.workspaceId),
       section === 'workspace' ? this.#workspaceAdministration(identity) : null,
-      section === 'workspace' ? this.#context.repositories.artifacts.usageOf(identity.membership.workspace.workspaceId) : null,
+      section === 'workspace' ? this.#workspaceUsage(identity.membership.workspace.workspaceId) : null,
     ])
     const guideFiles = new AgentGuide(this.#context.appOrigin, this.#settings.mcpUrl).files()
     return SettingsPage.render({ m: await this.#context.messages(), identity, section, mcpUrl: this.#settings.mcpUrl, appOrigin: this.#context.appOrigin, accessTokens, guideFiles, members, administration, usage, now: Date.now() })
+  }
+
+  async #workspaceUsage(workspaceId: string): Promise<SettingsUsage> {
+    const [usage, sharedDataBytes] = await Promise.all([this.#context.repositories.artifacts.usageOf(workspaceId), this.#context.repositories.sharedData.workspaceBytes(workspaceId)])
+    return { ...usage, sharedDataBytes }
   }
 
   // Only an admin sees every artifact's metadata and the audit log; a member gets null.

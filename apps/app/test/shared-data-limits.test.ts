@@ -1,8 +1,10 @@
 import { env } from 'cloudflare:workers'
 import { describe, expect, it } from 'vitest'
+import { purgePastRestoring } from '../src/purge.ts'
 import { TestApp } from './test-app.ts'
 
 const MIB = 1024 ** 2
+const DAY = 24 * 60 * 60 * 1000
 const app = new TestApp()
 
 interface Me {
@@ -56,7 +58,7 @@ describe('shared data per page', () => {
 
     expect([lastPlace.status, overTheCap.status, changed.status]).toEqual([200, 413, 200])
     expect(overTheCap.body.code).toBe('shared_data_full')
-    expect(overTheCap.body.error).toContain('2000 documents or 5 MB one page may keep; nothing was saved')
+    expect(overTheCap.body.error).toContain("this page's shared data would then be more than the 2000 documents or 5 MB one page may keep; nothing was saved")
     expect(stored).toBe(2000)
   })
 
@@ -74,24 +76,55 @@ describe('shared data per page', () => {
 })
 
 describe('shared data in the workspace', () => {
-  it('counts in the workspace\'s storage, shows on its settings page, and is refused once the workspace is full', async () => {
+  it('has its own 50 MB, shown apart from files on the settings page, and refuses past it while files can still be published', async () => {
     const author = await newAuthor('data-usage')
-    const artifactId = await openPage(author.cookie, 'Tracker')
-    await addDocuments(artifactId, 3, MIB)
+    const [filler, nearlyFull, poll] = [await openPage(author.cookie, 'Filler'), await openPage(author.cookie, 'Nearly full'), await openPage(author.cookie, 'Poll')]
+    await addDocuments(filler, 49, MIB)
+    await addDocuments(nearlyFull, 1, MIB - 40 * 1024)
 
     const settings = await (await app.request('/settings/workspace', { cookie: author.cookie })).text()
-    await env.DB.prepare(`INSERT INTO artifact_files (artifact_id, upload_id, path, content_type, size_bytes) SELECT id, current_upload_id, 'big.bin', 'application/octet-stream', ?2 FROM artifacts WHERE id = ?1`)
-      .bind(artifactId, 1024 ** 3 - 3 * MIB)
-      .run()
-    const refused = await put(artifactId, 'vote', { choice: 'A' })
-    const publishRefused = await app.json<{ code: string }>('/api/artifacts', { method: 'POST', cookie: author.cookie, body: { title: 'More', files: [{ path: 'index.html', content: 'x' }] } })
+    const fits = await put(poll, 'small', { a: 1 })
+    const refused = await put(poll, 'more', { text: 'x'.repeat(50 * 1024) })
+    const filesStillFit = await app.json<{ code?: string }>('/api/artifacts', { method: 'POST', cookie: author.cookie, body: { title: 'More', files: [{ path: 'index.html', content: 'x' }] } })
 
-    expect(settings.match(/data-usage="storage"[\s\S]*?<\/div>\s*<\/div>/)?.[0]).toContain('3 MB / 1 GB')
-    expect(settings).toContain('其中 3 MB 是页面为访客保存的数据')
+    expect(settings.match(/data-usage="files"[\s\S]*?<\/div>\s*<\/div>/)?.[0]).toContain('0.1 MB / 1 GB')
+    expect(settings.match(/data-usage="shared-data"[\s\S]*?<\/div>\s*<\/div>/)?.[0]).toContain('50 MB / 50 MB')
+    expect(fits.status).toBe(200)
     expect(refused.status).toBe(413)
-    expect(refused.body.code).toBe('workspace_quota_reached')
-    expect(refused.body.error).toContain("its pages' shared data included")
-    expect(publishRefused.body.code).toBe('workspace_quota_reached')
+    expect(refused.body.code).toBe('shared_data_full')
+    expect(refused.body.error).toContain("the shared data of this workspace's pages would then be more than the 50 MB one workspace may keep; nothing was saved")
+    expect(filesStillFit.status).toBe(201)
+  })
+
+  it('goes back to nothing as documents are deleted, an artifact is deleted forever or purged, and the workspace is purged', async () => {
+    const author = await newAuthor('data-freed')
+    const sharedDataOf = (workspaceId: string) => app.repositories.sharedData.workspaceBytes(workspaceId)
+    const deploymentBytes = () => env.DB.prepare('SELECT bytes FROM deployment_shared_usage').first<number>('bytes')
+    const deploymentBefore = await deploymentBytes()
+    const created = await app.request('/api/workspaces', { method: 'POST', cookie: author.cookie, body: { name: 'Data team' } })
+    const teamId = ((await created.json()) as { workspace: { workspaceId: string } }).workspace.workspaceId
+    const [personalCookie, teamCookie] = [`${author.cookie}; oa_workspace=${author.workspaceId}`, `${author.cookie}; oa_workspace=${teamId}`]
+    const [kept, deletedForever, purged] = [await openPage(personalCookie, 'Kept'), await openPage(personalCookie, 'Deleted forever'), await openPage(personalCookie, 'Purged')]
+    const inTeam = (await app.publish({ cookie: teamCookie }, 'Team page')).artifactId
+    for (const artifactId of [kept, deletedForever, purged]) await put(artifactId, 'vote', { choice: 'A' }, { cookie: personalCookie })
+    await put(inTeam, 'vote', { choice: 'A' }, { cookie: teamCookie })
+    const whileStored = [await sharedDataOf(author.workspaceId), await sharedDataOf(teamId)]
+
+    await app.request(`/api/artifacts/${kept}/data/votes/vote`, { method: 'DELETE', cookie: personalCookie })
+    for (const artifactId of [deletedForever, purged]) await app.request(`/api/artifacts/${artifactId}`, { method: 'DELETE', cookie: personalCookie })
+    await app.request(`/api/artifacts/${deletedForever}/purge`, { method: 'POST', cookie: personalCookie })
+    await env.DB.prepare('UPDATE artifacts SET removed_at = ? WHERE id = ?').bind(Date.now() - 31 * DAY, purged).run()
+    await app.request('/api/workspace', { method: 'DELETE', cookie: teamCookie })
+    await env.DB.prepare('UPDATE workspaces SET deleted_at = ? WHERE id = ?').bind(Date.now() - 31 * DAY, teamId).run()
+    await purgePastRestoring(app.repositories, Date.now())
+    await purgePastRestoring(app.repositories, Date.now())
+
+    expect(whileStored.every(bytes => bytes > 0)).toBe(true)
+    expect(await sharedDataOf(author.workspaceId)).toBe(0)
+    expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM workspaces WHERE id = ?').bind(teamId).first<number>('count')).toBe(0)
+    expect(await sharedDataOf(teamId)).toBe(0)
+    expect(await env.DB.prepare('SELECT COUNT(*) AS count FROM artifact_shared_usage WHERE artifact_id IN (?, ?, ?, ?)').bind(kept, deletedForever, purged, inTeam).first<number>('count')).toBe(0)
+    expect(await deploymentBytes()).toBe(deploymentBefore)
   })
 })
 

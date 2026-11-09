@@ -34,7 +34,7 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
     workspace_changed: 'You switched workspace in another tab. Reload this page and try again.',
     mail_limit_reached: "You've reached today's limit on invite and share emails, so nothing was sent or saved. Try again tomorrow.",
     rate_limited: 'Too many tries. Wait a little and try again.',
-    shared_data_full: "This page's shared data has reached its limit, so nothing was saved. Delete data the page no longer needs and try again.",
+    shared_data_full: "There's no more room for shared data on this page or in its workspace, so nothing was saved. Delete data that pages no longer need and try again.",
     workspace_limit_reached: "You've created 10 workspaces, the most one person may besides your personal one, so none was created. A deleted workspace counts until it's purged 30 days later.",
     publish_limit_reached: "You've reached the limit on publishes in 24 hours, so nothing was published. Try again later.",
     workspace_quota_reached: 'This workspace has reached its limit on artifacts or storage, so nothing was saved. Remove artifacts you no longer need and try again; see the usage in Workspace settings.',

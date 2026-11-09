@@ -86,7 +86,7 @@ pnpm run check   # 存储边界检查、类型检查、全部测试（Workers �
 
 ### 上限
 
-每个工作区最多 1,000 个未删除的 artifact、1 GiB 文件和共享数据，每个版本的文件都算；删除的 artifact 立即不占数量，它的文件和数据要到 30 天后彻底清除、或在「最近删除」里永久删除后才不算。每个页面最多 2,000 条共享数据、5 MB。每个人 24 小时内最多发布 300 次（新 artifact 和新版本都算，所有工作区和 token 合计），除个人工作区外最多创建 10 个工作区。超过上限时，API 返回 `workspace_quota_reached`（403 或 413）、`shared_data_full`（413）、`publish_limit_reached`（429）或 `workspace_limit_reached`（403），什么都不写入。数字定义在 `apps/app/src/api/publish-limits.ts` 和 `apps/app/src/api/workspace-api.ts`；设置 › 工作区设置 里能看到工作区的用量。
+每个工作区最多 1,000 个未删除的 artifact、1 GiB 文件（每个版本的文件都算）和 50 MB 共享数据；删除的 artifact 立即不占数量，它的文件和数据要到 30 天后彻底清除、或在「最近删除」里永久删除后才不算。每个页面最多 2,000 条共享数据、5 MB，整个部署最多 5 GB。每个人 24 小时内最多发布 300 次（新 artifact 和新版本都算，所有工作区和 token 合计），除个人工作区外最多创建 10 个工作区。超过上限时，API 返回 `workspace_quota_reached`（403 或 413）、`shared_data_full`（413，整个部署满了时是 507）、`publish_limit_reached`（429）或 `workspace_limit_reached`（403），什么都不写入。数字定义在 `apps/app/src/api/publish-limits.ts` 和 `apps/app/src/api/workspace-api.ts`；设置 › 工作区设置 里能看到工作区的用量。
 
 ### 用 GitHub 或 Google 登录
 

@@ -37,7 +37,7 @@ export default {
     workspace_changed: '你在另一个标签页切换了工作区。请刷新页面后再操作。',
     mail_limit_reached: '今天发出的邀请或分享邮件已经到上限，这次没有发出，也没有保存。请明天再试。',
     rate_limited: '操作太频繁了，请稍后再试。',
-    shared_data_full: '这个页面的共享数据已到上限，这次没有保存。删掉页面不再需要的数据再试。',
+    shared_data_full: '这个页面或它所在工作区的共享数据已到上限，这次没有保存。删掉页面不再需要的数据再试。',
     workspace_limit_reached: '你已经创建了 10 个工作区，除个人工作区外每人最多 10 个，这次没有创建。删除的工作区在 30 天后彻底清除前仍然算在内。',
     publish_limit_reached: '你 24 小时内发布的次数已到上限，这次没有发布。请稍后再试。',
     workspace_quota_reached: '这个工作区的 artifact 数量或存储空间已到上限，这次没有保存。删掉不用的 artifact 再试，用量见「工作区设置」。',

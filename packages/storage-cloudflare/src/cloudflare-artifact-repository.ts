@@ -15,7 +15,6 @@ import {
   type WorkspaceUsage,
 } from '@open-artifact/core'
 import { CloudflareShareCardImages } from './cloudflare-share-card-images.ts'
-import { SharedDataBytes } from './cloudflare-shared-data-repository.ts'
 
 const SUMMARY_SELECT = `
   SELECT artifacts.id, artifacts.short_id, artifacts.slug, artifacts.workspace_id, artifacts.title, artifacts.author_id, artifacts.visibility,
@@ -294,14 +293,11 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
       .prepare(
         `SELECT (SELECT COUNT(*) FROM artifacts WHERE workspace_id = ?1 AND removed_at IS NULL) AS active_artifacts,
                 (SELECT COALESCE(SUM(artifact_files.size_bytes), 0) FROM artifacts JOIN artifact_files ON artifact_files.artifact_id = artifacts.id
-                 WHERE artifacts.workspace_id = ?1) AS file_bytes,
-                (SELECT COALESCE(SUM(${SharedDataBytes.OF_DATA}), 0) FROM artifacts JOIN shared_documents ON shared_documents.artifact_id = artifacts.id
-                 WHERE artifacts.workspace_id = ?1) AS shared_data_bytes`,
+                 WHERE artifacts.workspace_id = ?1) AS file_bytes`,
       )
       .bind(workspaceId)
-      .first<{ active_artifacts: number; file_bytes: number; shared_data_bytes: number }>()
-    const sharedDataBytes = usageRow?.shared_data_bytes ?? 0
-    return { activeArtifacts: usageRow?.active_artifacts ?? 0, storedBytes: (usageRow?.file_bytes ?? 0) + sharedDataBytes, sharedDataBytes }
+      .first<{ active_artifacts: number; file_bytes: number }>()
+    return { activeArtifacts: usageRow?.active_artifacts ?? 0, fileBytes: usageRow?.file_bytes ?? 0 }
   }
 
   async #deleteObjectsUnder(prefix: string): Promise<void> {
