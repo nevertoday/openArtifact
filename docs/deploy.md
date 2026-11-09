@@ -100,7 +100,8 @@ Check that it works end to end:
 
 - the secret `CLOUDFLARE_API_TOKEN`: an API token for your account with Workers Scripts, Workers Routes, D1 and Workers Custom Domains edit permissions;
 - the variables `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID`, `APP_HOST`, `APP_ZONE`, `USERCONTENT_HOST` and, for sign-in mail, `MAIL_FROM`;
-- optionally the variable `ALLOWED_EMAIL_DOMAINS` (repository or environment), such as `*` to let anyone sign up. When it is set the deploy writes it into the app's configuration; left unset, the app keeps what it had. If you set it earlier as a Worker secret (step 3), run `npx wrangler secret delete ALLOWED_EMAIL_DOMAINS` in `apps/app` before the first deploy with the variable, since a variable and a secret cannot share a name.
+- optionally the variable `ALLOWED_EMAIL_DOMAINS` (repository or environment), such as `*` to let anyone sign up. When it is set the deploy writes it into the app's configuration; left unset, the app keeps what it had. If you set it earlier as a Worker secret (step 3), run `npx wrangler secret delete ALLOWED_EMAIL_DOMAINS` in `apps/app` before the first deploy with the variable, since a variable and a secret cannot share a name;
+- optionally the variable `ABUSE_REPORT_EMAIL`, the address that receives reports of abusive public pages (see [Abuse](#abuse)). Left unset, reports are only stored.
 
 The same two commands deploy from your own machine: `pnpm deploy:config` with those variables set writes the `wrangler.production.jsonc` files (kept out of git), and `pnpm deploy:production` applies the migrations and deploys. The Workers' secrets from step 3 are set once and kept across deployments.
 
@@ -108,6 +109,23 @@ The same two commands deploy from your own machine: `pnpm deploy:config` with th
 
 - **Who can sign up.** `ALLOWED_EMAIL_DOMAINS` decides who may create an account; nobody joins a workspace without an invite, so `*` opens sign-up without exposing any team's workspace. Admins can switch public links off for their workspace and take down any artifact in it.
 - **Upgrading from a version without personal workspaces.** New accounts no longer join the first workspace on their own. After upgrading, create a never-expiring invite link under 设置 › 成员 and share it with colleagues. Existing members keep their workspace and get a personal one on their next visit.
-- **Public links host whatever people publish.** As the operator you are responsible for what is served from your domains. Take down abuse from the artifact's page; removed artifacts are purged after 30 days by the daily job (`triggers.crons` in `apps/app/wrangler.jsonc`).
+- **Public links host whatever people publish.** As the operator you are responsible for what is served from your domains; see [Abuse](#abuse). Removed artifacts are purged after 30 days by the daily job (`triggers.crons` in `apps/app/wrangler.jsonc`).
+- **Limits.** Each workspace holds at most 1,000 active artifacts and 1 GiB of files (removed artifacts' files count until they are purged), and each person may publish at most 300 times in any 24 hours. They are set in `apps/app/src/api/publish-limits.ts`.
 - **Upgrades.** Pull, run `pnpm install`, apply the migrations (step 5), then deploy the three Workers again (step 6).
 - **Rolling back.** Do not roll the Workers back to a version from before migration `0017_personal_workspaces.sql` once anyone has left or deleted a workspace: the older code does not know `left_at` and `deleted_at`, so those people and workspaces would get their access back, and new accounts would join the first workspace again. Fix forward instead.
+
+## Abuse
+
+Anyone who opens a public link, signed in or not, can choose **Report** (举报) in the page's top bar and pick a reason: spam, phishing or malware, illegal content, or other. Reports are stored in the `abuse_reports` table, with the sender's network address kept only as a keyed hash. One sender may send 5 reports a minute (`REPORT_RATE_LIMITER`) and one page takes at most 20 reports a day, so the form cannot be used to flood you.
+
+When `ABUSE_REPORT_EMAIL` is set, each report is mailed there through the app's mail service (`MAILER=cloudflare` and `MAIL_FROM`, step 4), with the page's link and the command that takes it down. Without it, read the reports with `npx wrangler d1 execute open-artifact --remote --config wrangler.production.jsonc --command "SELECT * FROM abuse_reports ORDER BY created_at DESC LIMIT 20"` in `apps/app`.
+
+To take a page down, run from a checkout of the deployment, with wrangler signed in to its Cloudflare account and `apps/app/wrangler.production.jsonc` written by `pnpm deploy:config`:
+
+```sh
+pnpm takedown https://artifact.example.com/a/bank-login-k7f3q9x2m4ab --dry-run   # prints the SQL only
+pnpm takedown https://artifact.example.com/a/bank-login-k7f3q9x2m4ab            # or just the short id, k7f3q9x2m4ab
+```
+
+It runs `wrangler d1 execute open-artifact --remote` to remove the artifact as a takedown by the operator and records it in its workspace's admin log. The link stops working at once. Neither the author nor any workspace admin can restore it, and the daily job purges it after 30 days. wrangler prints the rows changed; 0 means no artifact has that short id. To undo a takedown within the 30 days, set `removed_at`, `removed_by` and `removed_as_admin` back to `NULL` for that `short_id` with `wrangler d1 execute`.
+

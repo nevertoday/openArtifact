@@ -80,8 +80,13 @@ pnpm run check   # 存储边界检查、类型检查、全部测试（Workers �
 | `GITHUB_CLIENT_ID` / `_SECRET`、`GOOGLE_CLIENT_ID` / `_SECRET` | app | 可选的登录方式；同一个平台的两个值都设置后，登录页才出现对应按钮。见[用 GitHub 或 Google 登录](#用-github-或-google-登录) |
 | `OIDC_DISCOVERY_URL`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`、`OIDC_DISPLAY_NAME` | app | 可选的公司单点登录 |
 | `DEFAULT_LOCALE` | app | 用户和浏览器都没指定语言时的界面语言：`zh-CN`（默认）或 `en` |
+| `ABUSE_REPORT_EMAIL` | app | 可选。公开页面被举报时发信到这个地址，信里有页面链接和 `pnpm takedown` 命令（见 [docs/deploy.zh-CN.md](docs/deploy.zh-CN.md#滥用)）。不设置时，举报只存进 D1，并在日志里记一条警告。从 GitHub 部署时，设置同名的仓库变量 |
 
-除了变量，还需要这些绑定：app 需要 `DB`（D1）、`FILES`（R2）、`UNLOCK_RATE_LIMITER`（公开链接密码的频率限制）、`SIGN_IN_EMAIL_RATE_LIMITER` 和 `SIGN_IN_ADDRESS_RATE_LIMITER`（每个收件地址、每个发起方请求登录验证码的频率限制），`MAILER=cloudflare` 时还需要 `EMAIL`（`send_email`，Cloudflare Email Service）；usercontent 需要指向 app 的 `ARTIFACT_FILES` 服务绑定；MCP 需要指向 app 的 `APP` 服务绑定。
+除了变量，还需要这些绑定：app 需要 `DB`（D1）、`FILES`（R2）、`UNLOCK_RATE_LIMITER`（公开链接密码的频率限制）、`SIGN_IN_EMAIL_RATE_LIMITER` 和 `SIGN_IN_ADDRESS_RATE_LIMITER`（每个收件地址、每个发起方请求登录验证码的频率限制）、`REPORT_RATE_LIMITER`（每个发起方举报的频率限制），`MAILER=cloudflare` 时还需要 `EMAIL`（`send_email`，Cloudflare Email Service）；usercontent 需要指向 app 的 `ARTIFACT_FILES` 服务绑定；MCP 需要指向 app 的 `APP` 服务绑定。
+
+### 上限
+
+每个工作区最多 1,000 个未删除的 artifact、1 GiB 文件，每个版本的文件都算；删除的 artifact 立即不占数量，它的文件要到 30 天后彻底清除时才不算。每个人 24 小时内最多发布 300 次（新 artifact 和新版本都算，所有工作区和 token 合计）。超过上限时，API 返回 `workspace_quota_reached`（403 或 413）或 `publish_limit_reached`（429），什么都不写入。数字定义在 `apps/app/src/api/publish-limits.ts`；设置 › 工作区设置 里能看到工作区的用量。
 
 ### 用 GitHub 或 Google 登录
 
