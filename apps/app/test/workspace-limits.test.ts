@@ -159,7 +159,7 @@ describe('publishes per person', () => {
     expect((await app.repositories.artifacts.findSummary(byAgent.body.artifactId ?? ''))?.version).toBe(3)
   })
 
-  it('gives the place back when a publish does not land, as on a version conflict', async () => {
+  it('gives the place back on a conflict found before any file is stored, as on a stale version', async () => {
     const publisher = await newPublisher('conflicted')
     const page = await publish({ cookie: publisher.cookie }, '<h1>one</h1>')
     await addPastPublishes(publisher.userId, 297, Date.now() - 60 * 60 * 1000)
@@ -172,6 +172,18 @@ describe('publishes per person', () => {
 
     expect(conflicts.map(conflict => conflict.status)).toEqual([409, 409, 409])
     expect(lastPlace.status).toBe(200)
+    expect(overTheCap.body.code).toBe('publish_limit_reached')
+  })
+
+  it('keeps the place of a publish that stored its files and then lost a race to another', async () => {
+    const publisher = await newPublisher('raced')
+    const page = await publish({ cookie: publisher.cookie }, '<h1>one</h1>')
+    await addPastPublishes(publisher.userId, 297, Date.now() - 60 * 60 * 1000)
+
+    const racing = await Promise.all(['a', 'b'].map(side => publishVersion({ cookie: publisher.cookie }, page.body.artifactId ?? '', 1, `<h1>${side}</h1>`)))
+    const overTheCap = await publishVersion({ cookie: publisher.cookie }, page.body.artifactId ?? '', 2, '<h1>after the race</h1>')
+
+    expect(racing.map(response => response.status).sort()).toEqual([200, 409])
     expect(overTheCap.body.code).toBe('publish_limit_reached')
   })
 

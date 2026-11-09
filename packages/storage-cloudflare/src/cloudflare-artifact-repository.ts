@@ -140,6 +140,8 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
   }
 
   async publishOnTopOf(artifactId: string, baseVersion: number, publication: Publication): Promise<PublishResult> {
+    const stale = await this.#rejectionFor(artifactId, baseVersion, false)
+    if (stale) return stale
     const nextVersion = baseVersion + 1
     const publishedAt = Date.now()
     const { batchResults, uploadId } = await this.#writeVersion(artifactId, publication.files, uploadId => [
@@ -152,7 +154,7 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     const claimedNextVersion = versionAdvance?.meta.changes === 1
     if (claimedNextVersion) return { status: 'published', version: nextVersion }
     await this.#discardUpload(artifactId, uploadId, publication.files)
-    return this.#rejectionFor(artifactId)
+    return (await this.#rejectionFor(artifactId, baseVersion, true)) ?? { status: 'conflict', currentVersion: baseVersion, uploaded: true }
   }
 
   async readCurrentVersion(artifactId: string): Promise<ArtifactVersionContent | null> {
@@ -365,10 +367,11 @@ export class CloudflareArtifactRepository implements ArtifactRepository {
     return [versionRow, ...fileRows]
   }
 
-  async #rejectionFor(artifactId: string): Promise<PublishResult> {
+  /** Why a publish on `baseVersion` cannot land now, or null while the artifact is still at it. */
+  async #rejectionFor(artifactId: string, baseVersion: number, uploaded: boolean): Promise<PublishResult | null> {
     const currentVersion = await this.#db.prepare('SELECT current_version FROM artifacts WHERE id = ?').bind(artifactId).first<number>('current_version')
     if (currentVersion === null) return { status: 'not_found' }
-    return { status: 'conflict', currentVersion }
+    return currentVersion === baseVersion ? null : { status: 'conflict', currentVersion, uploaded }
   }
 
   async #uploadFiles(artifactId: string, uploadId: string, files: ArtifactFile[]): Promise<void> {

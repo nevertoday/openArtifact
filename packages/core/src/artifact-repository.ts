@@ -107,7 +107,11 @@ export interface WorkspaceUsage {
 
 export type PublishResult =
   | { status: 'published'; version: number }
-  | { status: 'conflict'; currentVersion: number }
+  /**
+   * The artifact is no longer at the base version. `uploaded` says the publish stored its files before finding out,
+   * as when another publish won a race; a publish on a stale version finds out before it stores anything.
+   */
+  | { status: 'conflict'; currentVersion: number; uploaded: boolean }
   | { status: 'not_found' }
 
 /**
@@ -120,7 +124,10 @@ export interface ArtifactFileSource {
 
 export interface ArtifactRepository extends ArtifactFileSource {
   create(newArtifact: NewArtifact): Promise<CreatedArtifact>
-  /** Publishes only while the artifact is still at `baseVersion`; a concurrent publish turns this into a conflict. */
+  /**
+   * Publishes only while the artifact is still at `baseVersion`. A stale base version is refused before any file is
+   * stored; a concurrent publish that wins in the meantime turns this into a conflict after the upload.
+   */
   publishOnTopOf(artifactId: string, baseVersion: number, publication: Publication): Promise<PublishResult>
   readCurrentVersion(artifactId: string): Promise<ArtifactVersionContent | null>
   readVersion(artifactId: string, version: number): Promise<ArtifactVersionContent | null>

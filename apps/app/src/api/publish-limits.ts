@@ -54,10 +54,10 @@ export class PublishLimits {
   /**
    * Runs `publish` once the workspace has room and the publisher has a publish left today. A new version adds its
    * files; a new artifact also takes one of the workspace's artifacts. Either takes one of the publisher's daily
-   * publishes, only once the workspace has room, and gives it back when the publish does not land: when it throws, or
-   * when `landed` says its outcome is not a publish, such as a version conflict.
+   * publishes, only once the workspace has room, and gives it back when it throws, or when `counts` says its outcome
+   * cost nothing, such as a version conflict found before any file was stored.
    */
-  async publishWithin<Outcome>(publication: Publication, publish: () => Promise<Outcome>, landed: (outcome: Outcome) => boolean = () => true): Promise<Outcome> {
+  async publishWithin<Outcome>(publication: Publication, publish: () => Promise<Outcome>, counts: (outcome: Outcome) => boolean = () => true): Promise<Outcome> {
     await this.#ensureWorkspaceRoom(publication)
     const now = Date.now()
     const entryId = await this.#repositories.publishLog.record(publication.publisherId, now, { max: PUBLISHES_PER_PERSON_PER_DAY, since: now - DAY_MS })
@@ -69,7 +69,7 @@ export class PublishLimits {
     }
     try {
       const outcome = await publish()
-      if (!landed(outcome)) await this.#repositories.publishLog.release(entryId)
+      if (!counts(outcome)) await this.#repositories.publishLog.release(entryId)
       return outcome
     } catch (error) {
       await this.#repositories.publishLog.release(entryId)

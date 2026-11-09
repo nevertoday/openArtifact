@@ -129,7 +129,7 @@ export class ArtifactApi {
           excerpt: await PageExcerpt.of(files),
           files,
         }),
-      ArtifactApi.#landed,
+      ArtifactApi.#counts,
     )
     if (publishResult.status !== 'published') return this.#publishResponse(request, identity, openedArtifact.summary, publishResult)
     const renamedSummary = await this.#rename(identity, openedArtifact.summary, newName)
@@ -267,13 +267,15 @@ export class ArtifactApi {
           excerpt: await PageExcerpt.of(olderVersion.files),
           files: olderVersion.files,
         }),
-      ArtifactApi.#landed,
+      ArtifactApi.#counts,
     )
     return this.#publishResponse(request, identity, openedArtifact.summary, publishResult)
   }
 
-  static #landed(publishResult: PublishResult): boolean {
-    return publishResult.status === 'published'
+  // A conflict found after the files were stored was a real race and cost what a publish costs; one found before,
+  // on a stale base version, stored nothing, so retrying it to find the current version is free.
+  static #counts(publishResult: PublishResult): boolean {
+    return publishResult.status === 'published' || (publishResult.status === 'conflict' && publishResult.uploaded)
   }
 
   static #originJson(origin: VersionOrigin): { origin: VersionOrigin['kind']; restoredFrom: number | null } {
