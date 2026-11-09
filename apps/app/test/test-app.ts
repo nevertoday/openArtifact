@@ -103,6 +103,7 @@ export class TestApp {
       SIGN_IN_ADDRESS_RATE_LIMITER: options.productionSignInLimits ? env.SIGN_IN_ADDRESS_RATE_LIMITER : env.LOOSE_SIGN_IN_RATE_LIMITER,
       REPORT_RATE_LIMITER: env.REPORT_RATE_LIMITER,
       SHARED_DATA_WRITE_RATE_LIMITER: env.SHARED_DATA_WRITE_RATE_LIMITER,
+      SHARED_DATA_PERSON_RATE_LIMITER: env.SHARED_DATA_PERSON_RATE_LIMITER,
       ...(options.abuseReportEmail === undefined ? {} : { ABUSE_REPORT_EMAIL: options.abuseReportEmail }),
       ...(options.allowedEmailDomains === undefined ? {} : { ALLOWED_EMAIL_DOMAINS: options.allowedEmailDomains }),
       USERCONTENT_ORIGIN,

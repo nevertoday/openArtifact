@@ -129,7 +129,7 @@ describe('shared data in the workspace', () => {
 })
 
 describe('shared data from visitors who are not signed in', () => {
-  it('takes at most 60 changes a minute from one network, an IPv6 /64 counting as one, and does not limit people signed in', async () => {
+  it('takes at most 60 changes a minute from one network, an IPv6 /64 counting as one, and does not count people signed in against it', async () => {
     const author = await newAuthor('busy-page')
     const artifactId = await openPage(author.cookie, 'Busy page')
 
@@ -144,5 +144,24 @@ describe('shared data from visitors who are not signed in', () => {
     expect(deleteFromSameNetwork.status).toBe(429)
     expect(signedInFromSameNetwork.status).toBe(200)
     expect(otherNetwork.status).toBe(200)
+  })
+})
+
+describe('shared data from people signed in', () => {
+  it('takes at most 300 changes a minute from one person, wherever they write from, and counts each person apart', async () => {
+    const [busy, other] = [await newAuthor('busy-person'), await newAuthor('other-person')]
+    const artifactId = await openPage(busy.cookie, 'Busy tracker')
+
+    const statuses: number[] = []
+    for (let index = 0; index < 301; index++) statuses.push((await put(artifactId, `v${index % 5}`, { index }, { cookie: busy.cookie, senderAddress: `198.51.100.${index % 200}` })).status)
+    const deleteBySamePerson = await app.request(`/api/artifacts/${artifactId}/data/votes/v0`, { method: 'DELETE', cookie: busy.cookie })
+    const otherPerson = await put(artifactId, 'other', { ok: true }, { cookie: other.cookie })
+    const visitor = await put(artifactId, 'visitor', { ok: true }, { senderAddress: '198.51.100.7' })
+
+    expect(statuses.slice(0, 300).every(status => status === 200)).toBe(true)
+    expect(statuses[300]).toBe(429)
+    expect(deleteBySamePerson.status).toBe(429)
+    expect(otherPerson.status).toBe(200)
+    expect(visitor.status).toBe(200)
   })
 })

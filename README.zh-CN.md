@@ -82,7 +82,7 @@ pnpm run check   # 存储边界检查、类型检查、全部测试（Workers �
 | `DEFAULT_LOCALE` | app | 用户和浏览器都没指定语言时的界面语言：`zh-CN`（默认）或 `en` |
 | `ABUSE_REPORT_EMAIL` | app | 可选。公开页面被举报时发信到这个地址，信里有页面链接和 `pnpm takedown` 命令（见 [docs/deploy.zh-CN.md](docs/deploy.zh-CN.md#滥用)）。不设置时，举报只存进 D1，并在日志里记一条警告。从 GitHub 部署时，设置同名的仓库变量 |
 
-除了变量，还需要这些绑定：app 需要 `DB`（D1）、`FILES`（R2）、`UNLOCK_RATE_LIMITER`（公开链接密码的频率限制）、`SIGN_IN_EMAIL_RATE_LIMITER` 和 `SIGN_IN_ADDRESS_RATE_LIMITER`（每个收件地址、每个发起方请求登录验证码的频率限制）、`REPORT_RATE_LIMITER`（每个发起方举报的频率限制）、`SHARED_DATA_WRITE_RATE_LIMITER`（每个发起方未登录写共享数据的频率限制），`MAILER=cloudflare` 时还需要 `EMAIL`（`send_email`，Cloudflare Email Service）；usercontent 需要指向 app 的 `ARTIFACT_FILES` 服务绑定；MCP 需要指向 app 的 `APP` 服务绑定。
+除了变量，还需要这些绑定：app 需要 `DB`（D1）、`FILES`（R2）、`UNLOCK_RATE_LIMITER`（公开链接密码的频率限制）、`SIGN_IN_EMAIL_RATE_LIMITER` 和 `SIGN_IN_ADDRESS_RATE_LIMITER`（每个收件地址、每个发起方请求登录验证码的频率限制）、`REPORT_RATE_LIMITER`（每个发起方举报的频率限制）、`SHARED_DATA_WRITE_RATE_LIMITER`（每个发起方未登录写共享数据的频率限制）、`SHARED_DATA_PERSON_RATE_LIMITER`（每个登录用户写共享数据的频率限制），`MAILER=cloudflare` 时还需要 `EMAIL`（`send_email`，Cloudflare Email Service）；usercontent 需要指向 app 的 `ARTIFACT_FILES` 服务绑定；MCP 需要指向 app 的 `APP` 服务绑定。
 
 ### 上限
 

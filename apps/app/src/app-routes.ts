@@ -112,7 +112,7 @@ export class AppRoutes {
       artifactPages: this.#artifactPages,
       titleTranslator,
       abuseReporting: this.#abuseReporting,
-      sharedDataWriteLimiter: env.SHARED_DATA_WRITE_RATE_LIMITER,
+      sharedDataWriteLimiters: { visitorNetwork: env.SHARED_DATA_WRITE_RATE_LIMITER, person: env.SHARED_DATA_PERSON_RATE_LIMITER },
       localeSignals: { ...requestLocaleSignals(request.headers), fallback: fallbackLocaleOf(env) },
     })
   }

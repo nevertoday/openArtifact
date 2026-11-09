@@ -15,6 +15,7 @@ export default defineConfig({
           SIGN_IN_ADDRESS_RATE_LIMITER: { namespace_id: '1003', simple: { limit: 20, period: 60 } },
           REPORT_RATE_LIMITER: { namespace_id: '1004', simple: { limit: 5, period: 60 } },
           SHARED_DATA_WRITE_RATE_LIMITER: { namespace_id: '1005', simple: { limit: 60, period: 60 } },
+          SHARED_DATA_PERSON_RATE_LIMITER: { namespace_id: '1006', simple: { limit: 300, period: 60 } },
           LOOSE_SIGN_IN_RATE_LIMITER: { namespace_id: '1099', simple: { limit: 100000, period: 60 } },
         },
         bindings: { MIGRATIONS: await readD1Migrations('../../packages/storage-cloudflare/migrations') },

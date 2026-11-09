@@ -1,9 +1,16 @@
 import type { SharedDataBudget, SharedDocument } from '@open-artifact/core'
+import type { Identity } from '../auth/request-identity.ts'
 import { HttpError } from '../http-error.ts'
 import { SenderNetwork } from '../sender-network.ts'
 import type { ApiContext } from './api-context.ts'
 import { JsonBody } from './json-body.ts'
 import { SHARED_DATA_BUDGETS } from './publish-limits.ts'
+
+/** Who may change shared data how often: visitors who are not signed in per sender network, people signed in each on their own. */
+export interface SharedDataWriteLimiters {
+  visitorNetwork: RateLimit
+  person: RateLimit
+}
 
 const NAME_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 const MAX_DOCUMENT_BYTES = 64 * 1024
@@ -30,7 +37,7 @@ export class SharedDataApi {
 
   async putDocument(request: Request, artifactId: string, collection: string, documentId: string): Promise<Response> {
     const identity = await this.#context.identity()
-    if (identity === null) await this.#ensureVisitorAllowed(request)
+    await this.#ensureWriterAllowed(request, identity)
     await this.#context.gate.require(artifactId, identity, request, 'canWriteSharedData', 'change the data of this artifact')
     const requestBody = await JsonBody.of(request)
     const documentData = requestBody.raw('data')
@@ -54,18 +61,25 @@ export class SharedDataApi {
 
   async deleteDocument(request: Request, artifactId: string, collection: string, documentId: string): Promise<Response> {
     const identity = await this.#context.identity()
-    if (identity === null) await this.#ensureVisitorAllowed(request)
+    await this.#ensureWriterAllowed(request, identity)
     await this.#context.gate.require(artifactId, identity, request, 'canWriteSharedData', 'change the data of this artifact')
     const deleted = await this.#context.repositories.sharedData.deleteDocument(artifactId, SharedDataApi.#validName('collection', collection), SharedDataApi.#validName('document id', documentId))
     if (!deleted) throw HttpError.notFound(`document ${collection}/${documentId}`)
     return new Response(null, { status: 204 })
   }
 
-  // Visitors of a public link that lets anyone write are no one in particular, so their writes are limited per sender network.
-  async #ensureVisitorAllowed(request: Request): Promise<void> {
+  // Visitors of a public link that lets anyone write are no one in particular, so their writes are limited per sender
+  // network; anyone signed in is limited on their own, wherever they write from.
+  async #ensureWriterAllowed(request: Request, identity: Identity | null): Promise<void> {
+    const limiters = this.#context.sharedDataWriteLimiters
+    if (identity !== null) {
+      const { success } = await limiters.person.limit({ key: identity.userId })
+      if (!success) throw new HttpError(429, 'rate_limited', 'too many changes to shared data from you; wait a minute and try again')
+      return
+    }
     const senderNetwork = SenderNetwork.of(request)
     if (senderNetwork === null) return
-    const { success } = await this.#context.sharedDataWriteLimiter.limit({ key: senderNetwork })
+    const { success } = await limiters.visitorNetwork.limit({ key: senderNetwork })
     if (!success) throw new HttpError(429, 'rate_limited', 'too many changes to shared data from this network; wait a minute and try again')
   }
 

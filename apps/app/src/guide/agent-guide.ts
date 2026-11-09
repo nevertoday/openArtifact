@@ -113,7 +113,7 @@ const documents = await signups.list()             // [{ id, data, createdBy, up
 await signups.delete('lin')
 const viewer = await window.openArtifact.viewer()  // { userId, name } or null for an anonymous visitor
 \`\`\`
-Collection names and ids: letters, digits, \`-\`, \`_\`; at most 64 characters. A document is at most 64 KB of JSON. A page keeps at most ${SHARED_DATA_BUDGETS.artifactDocuments} documents and ${SHARED_DATA_BUDGETS.artifactBytes / 1024 ** 2} MB of shared data, and all the pages of a workspace ${SHARED_DATA_BUDGETS.workspaceBytes / 1024 ** 2} MB; past any of these, \`put\` and \`add\` fail with \`shared_data_full\` and save nothing, so design pages that replace or delete documents rather than adding one per event. Visitors who are not signed in may change shared data about once a second from one network.
+Collection names and ids: letters, digits, \`-\`, \`_\`; at most 64 characters. A document is at most 64 KB of JSON. A page keeps at most ${SHARED_DATA_BUDGETS.artifactDocuments} documents and ${SHARED_DATA_BUDGETS.artifactBytes / 1024 ** 2} MB of shared data, and all the pages of a workspace ${SHARED_DATA_BUDGETS.workspaceBytes / 1024 ** 2} MB; past any of these, \`put\` and \`add\` fail with \`shared_data_full\` and save nothing, so design pages that replace or delete documents rather than adding one per event. Visitors who are not signed in may change shared data about once a second from one network, and each person signed in 300 times a minute.
 
 ### HTTP API
 - \`POST ${api}/artifacts\` \`{ title, slug?, visibility?, publicLinkExpiresAt?, listed?, summary?, shareText?, note?, files: [{ path, content, encoding?: "utf8"|"base64", contentType? }] }\`
