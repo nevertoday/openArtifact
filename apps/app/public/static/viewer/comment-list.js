@@ -325,7 +325,7 @@ export class CommentList extends EventTarget {
       onClick: event => this.#copyToAgent(event.currentTarget, waiting, m.viewerClient.handoff.copiedAll(waiting.length)),
     }, icon('Copy', 14), element('span', { 'data-copy-label': '' }, m.viewerClient.handoff.copyAll))
     // The how-to stays one hover away on the link that leads to it, so the line reads as a count and an action.
-    const setUp = element('a', { className: 'xxd-btn', 'data-variant': 'ghost', 'data-size': 'xs', href: '/settings/agents', 'data-tooltip': m.viewerClient.handoff.hint }, m.viewerClient.handoff.setUp, icon('ArrowUpRight', 14))
+    const setUp = element('a', { className: 'xxd-btn', 'data-variant': 'ghost', 'data-size': 'xs', 'data-icon-only': '', href: '/settings/agents', 'aria-label': m.viewerClient.handoff.setUp, 'data-tooltip': m.viewerClient.handoff.hint }, icon('Settings', 16))
     return element('section', { className: 'agent-handoff', 'aria-label': m.viewerClient.handoff.region },
       icon('Bot', 16),
       element('p', { className: 'agent-handoff__title' }, this.#filter === 'agent' ? m.viewerClient.handoff.waitingAgent(waiting.length) : m.viewerClient.handoff.waitingOpen(waiting.length)),
