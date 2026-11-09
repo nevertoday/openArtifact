@@ -101,8 +101,12 @@ export interface ArtifactVersionContent {
 export interface WorkspaceUsage {
   /** Artifacts not removed. */
   activeArtifacts: number
-  /** Every stored version's files, removed artifacts included until they are purged. */
+  /**
+   * Every stored version's files and every artifact's shared data, removed artifacts included until they are
+   * purged; `sharedDataBytes` of it are shared data.
+   */
   storedBytes: number
+  sharedDataBytes: number
 }
 
 export type PublishResult =

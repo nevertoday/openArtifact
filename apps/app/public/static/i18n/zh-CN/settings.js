@@ -120,8 +120,10 @@ export default {
       artifactCount: ({ used, max }) => `${used.toLocaleString('zh-CN')} / ${max.toLocaleString('zh-CN')} 个`,
       /** @param {{ usedMb: number, maxGb: number }} size */
       storageSize: ({ usedMb, maxGb }) => `${usedMb.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} MB / ${maxGb} GB`,
+      /** @param {{ usedMb: number }} size */
+      sharedDataSize: ({ usedMb }) => `其中 ${usedMb.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} MB 是页面为访客保存的数据（共享数据）。`,
       /** @param {{ maxArtifacts: number, maxGb: number }} limits */
-      help: ({ maxArtifacts, maxGb }) => `每个工作区最多 ${maxArtifacts.toLocaleString('zh-CN')} 个 artifact、${maxGb} GB 文件，每个版本的文件都算。删除的 artifact 立即不占数量，但它的文件要到 30 天后彻底清除时才释放空间。`,
+      help: ({ maxArtifacts, maxGb }) => `每个工作区最多 ${maxArtifacts.toLocaleString('zh-CN')} 个 artifact、${maxGb} GB 文件和共享数据，每个版本的文件都算。删除的 artifact 立即不占数量，但它的文件和数据要到 30 天后彻底清除时才释放空间。`,
     },
     lifecycle: {
       title: '离开或删除',

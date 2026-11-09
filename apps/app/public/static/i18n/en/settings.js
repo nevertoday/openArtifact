@@ -110,7 +110,8 @@ export default /** @satisfies {import('../messages').Messages['settings']} */ ({
       storage: 'Storage',
       artifactCount: ({ used, max }) => `${used.toLocaleString('en')} of ${max.toLocaleString('en')}`,
       storageSize: ({ usedMb, maxGb }) => `${usedMb.toLocaleString('en', { maximumFractionDigits: 1 })} MB of ${maxGb} GB`,
-      help: ({ maxArtifacts, maxGb }) => `A workspace holds up to ${maxArtifacts.toLocaleString('en')} artifacts and ${maxGb} GB of files, every version's files included. A removed artifact stops counting toward the number at once, but its files keep their space until it's purged 30 days later.`,
+      sharedDataSize: ({ usedMb }) => `Of the storage, ${usedMb.toLocaleString('en', { maximumFractionDigits: 1 })} MB is data that pages keep for their visitors (shared data).`,
+      help: ({ maxArtifacts, maxGb }) => `A workspace holds up to ${maxArtifacts.toLocaleString('en')} artifacts and ${maxGb} GB of files and shared data, every version's files included. A removed artifact stops counting toward the number at once, but its files and data keep their space until it's purged 30 days later.`,
     },
     lifecycle: {
       title: 'Leave or delete',

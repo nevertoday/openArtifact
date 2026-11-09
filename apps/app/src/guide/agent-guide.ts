@@ -1,4 +1,4 @@
-import { PUBLISHES_PER_PERSON_PER_DAY, WORKSPACE_LIMITS } from '../api/publish-limits.ts'
+import { PUBLISHES_PER_PERSON_PER_DAY, SHARED_DATA_LIMITS, WORKSPACE_LIMITS } from '../api/publish-limits.ts'
 
 export type GuideFormat = 'agents-md' | 'claude-skill' | 'cursor-rule' | 'llms-txt'
 
@@ -69,7 +69,7 @@ export class AgentGuide {
 - Give the page a short \`<title>\`, support light and dark themes, work at phone width, and write in the language the person uses.
 
 ### Limits
-- A workspace holds at most ${WORKSPACE_LIMITS.activeArtifacts} active artifacts and ${WORKSPACE_LIMITS.storedBytes / 1024 ** 3} GiB of files, every version's files counted; a removed artifact's files count until it is purged 30 days later. Past either, publish and update answer \`workspace_quota_reached\` and save nothing. Tell your person, who can remove artifacts they no longer need; prefer a new version of an existing artifact to a new artifact.
+- A workspace holds at most ${WORKSPACE_LIMITS.activeArtifacts} active artifacts and ${WORKSPACE_LIMITS.storedBytes / 1024 ** 3} GiB of files and shared data, every version's files counted; a removed artifact's files and data count until it is purged 30 days later. Past either, publish and update answer \`workspace_quota_reached\` and save nothing. Tell your person, who can remove artifacts they no longer need; prefer a new version of an existing artifact to a new artifact.
 - One person may publish (a new artifact or a new version) at most ${PUBLISHES_PER_PERSON_PER_DAY} times in any 24 hours, across every workspace and token. Past that, publish and update answer 429 \`publish_limit_reached\`; do not retry in a loop.
 
 ### Update, never overwrite blindly
@@ -113,7 +113,7 @@ const documents = await signups.list()             // [{ id, data, createdBy, up
 await signups.delete('lin')
 const viewer = await window.openArtifact.viewer()  // { userId, name } or null for an anonymous visitor
 \`\`\`
-Collection names and ids: letters, digits, \`-\`, \`_\`; at most 64 characters. A document is at most 64 KB of JSON.
+Collection names and ids: letters, digits, \`-\`, \`_\`; at most 64 characters. A document is at most 64 KB of JSON. A page keeps at most ${SHARED_DATA_LIMITS.maxDocuments} documents and ${SHARED_DATA_LIMITS.maxBytes / 1024 ** 2} MB of shared data, counted in its workspace's storage; past either, \`put\` and \`add\` fail with \`shared_data_full\` and save nothing, so design pages that replace or delete documents rather than adding one per event. Visitors who are not signed in may change shared data about once a second from one network.
 
 ### HTTP API
 - \`POST ${api}/artifacts\` \`{ title, slug?, visibility?, publicLinkExpiresAt?, listed?, summary?, shareText?, note?, files: [{ path, content, encoding?: "utf8"|"base64", contentType? }] }\`

@@ -13,6 +13,7 @@ import {
 
 const artifactRepository = new CloudflareArtifactRepository(env.DB, env.FILES)
 const workspaceRepository = new CloudflareWorkspaceRepository(env.DB)
+const ROOMY = { maxDocuments: 2000, maxBytes: 5 * 1024 ** 2 }
 
 async function addUser(name: string): Promise<string> {
   const userId = `user-${name.toLowerCase()}`
@@ -259,9 +260,9 @@ describe('artifact access, comments and shared data', () => {
     const sharedDataRepository = new CloudflareSharedDataRepository(env.DB)
     const { artifactId } = await createArtifactIn(workspaceId, authorId)
 
-    await sharedDataRepository.putDocument(artifactId, 'signups', 'lin', { session: 'Morning' }, authorId)
-    const updatedDocument = await sharedDataRepository.putDocument(artifactId, 'signups', 'lin', { session: 'Afternoon' }, reviewerId)
-    await sharedDataRepository.putDocument(artifactId, 'votes', 'anonymous-1', { choice: 'A' }, null)
+    await sharedDataRepository.putDocument(artifactId, 'signups', 'lin', { session: 'Morning' }, authorId, ROOMY)
+    const updatedDocument = await sharedDataRepository.putDocument(artifactId, 'signups', 'lin', { session: 'Afternoon' }, reviewerId, ROOMY)
+    await sharedDataRepository.putDocument(artifactId, 'votes', 'anonymous-1', { choice: 'A' }, null, ROOMY)
 
     expect(updatedDocument).toMatchObject({ data: { session: 'Afternoon' }, createdBy: authorId, updatedBy: reviewerId })
     expect(await sharedDataRepository.listCollections(artifactId)).toEqual([
@@ -271,6 +272,29 @@ describe('artifact access, comments and shared data', () => {
     expect(await sharedDataRepository.deleteDocument(artifactId, 'votes', 'anonymous-1')).toBe(true)
     expect(await sharedDataRepository.deleteDocument(artifactId, 'votes', 'anonymous-1')).toBe(false)
     expect(await sharedDataRepository.listDocuments(artifactId, 'votes')).toEqual([])
+  })
+
+  it('keeps an artifact\'s shared data within its cap on documents and bytes, even under concurrent writes', async () => {
+    const sharedDataRepository = new CloudflareSharedDataRepository(env.DB)
+    const { artifactId } = await createArtifactIn(workspaceId, authorId)
+    const { artifactId: otherArtifactId } = await createArtifactIn(workspaceId, authorId)
+    const documentCap = { maxDocuments: 5, maxBytes: 1_000_000 }
+
+    const racing = await Promise.all(Array.from({ length: 12 }, (_, index) => sharedDataRepository.putDocument(artifactId, 'votes', `v${index}`, { choice: index }, null, documentCap)))
+    const savedId = racing.find(saved => saved !== null)?.documentId ?? ''
+    const replacedWhenFull = await sharedDataRepository.putDocument(artifactId, 'votes', savedId, { choice: 'changed' }, null, documentCap)
+    const otherArtifact = await sharedDataRepository.putDocument(otherArtifactId, 'votes', 'v0', { choice: 0 }, null, documentCap)
+    const byteCap = { maxDocuments: 100, maxBytes: 30 }
+    const fitting = await sharedDataRepository.putDocument(otherArtifactId, 'notes', 'n', { text: 'x'.repeat(4) }, null, byteCap)
+    const overBytes = await sharedDataRepository.putDocument(otherArtifactId, 'notes', 'm', { text: '汉' }, null, byteCap)
+    const shrinking = await sharedDataRepository.putDocument(otherArtifactId, 'notes', 'n', { text: '' }, null, byteCap)
+
+    expect(racing.filter(saved => saved !== null)).toHaveLength(5)
+    expect(replacedWhenFull?.data).toEqual({ choice: 'changed' })
+    expect(otherArtifact).not.toBeNull()
+    expect(fitting).not.toBeNull()
+    expect(overBytes).toBeNull()
+    expect(shrinking).not.toBeNull()
   })
 
   it('accepts a token only while it is neither revoked nor expired, and says which it is', async () => {

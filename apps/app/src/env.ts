@@ -8,6 +8,8 @@ export interface AppEnv {
   SIGN_IN_ADDRESS_RATE_LIMITER: RateLimit
   /** Abuse reports sent from one network address. */
   REPORT_RATE_LIMITER: RateLimit
+  /** Shared-data writes by visitors who are not signed in, from one network address. */
+  SHARED_DATA_WRITE_RATE_LIMITER: RateLimit
   USERCONTENT_ORIGIN: string
   /** Where the MCP Worker runs; the settings page shows agents this address. */
   MCP_ORIGIN: string

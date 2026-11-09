@@ -222,6 +222,7 @@ ${SettingsPage.#lifecycleSection(m, identity)}`
     <div class="xxd-row"><div class="xxd-row__text xxd-stack workspace-usage">
       ${meter('artifacts', words.artifacts, words.artifactCount({ used: usage.activeArtifacts, max: WORKSPACE_LIMITS.activeArtifacts }), usage.activeArtifacts, WORKSPACE_LIMITS.activeArtifacts)}
       ${meter('storage', words.storage, words.storageSize({ usedMb: SettingsPage.#shownMegabytes(usage.storedBytes), maxGb }), usage.storedBytes, WORKSPACE_LIMITS.storedBytes)}
+      <span class="xxd-row__desc" data-usage="shared-data">${words.sharedDataSize({ usedMb: SettingsPage.#shownMegabytes(usage.sharedDataBytes) })}</span>
       <span class="xxd-row__desc">${words.help({ maxArtifacts: WORKSPACE_LIMITS.activeArtifacts, maxGb })}</span>
     </div></div>
   </div>
