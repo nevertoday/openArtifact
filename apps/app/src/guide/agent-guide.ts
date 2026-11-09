@@ -1,4 +1,4 @@
-import { WORKSPACE_LIMITS } from '../api/publish-limits.ts'
+import { PUBLISHES_PER_PERSON_PER_DAY, WORKSPACE_LIMITS } from '../api/publish-limits.ts'
 
 export type GuideFormat = 'agents-md' | 'claude-skill' | 'cursor-rule' | 'llms-txt'
 
@@ -70,6 +70,7 @@ export class AgentGuide {
 
 ### Limits
 - A workspace holds at most ${WORKSPACE_LIMITS.activeArtifacts} active artifacts and ${WORKSPACE_LIMITS.storedBytes / 1024 ** 3} GiB of files, every version's files counted; a removed artifact's files count until it is purged 30 days later. Past either, publish and update answer \`workspace_quota_reached\` and save nothing. Tell your person, who can remove artifacts they no longer need; prefer a new version of an existing artifact to a new artifact.
+- One person may publish (a new artifact or a new version) at most ${PUBLISHES_PER_PERSON_PER_DAY} times in any 24 hours, across every workspace and token. Past that, publish and update answer 429 \`publish_limit_reached\`; do not retry in a loop.
 
 ### Update, never overwrite blindly
 1. \`read\` the artifact; note its \`version\`.

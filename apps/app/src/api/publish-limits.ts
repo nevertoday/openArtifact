@@ -1,4 +1,4 @@
-import type { ArtifactFile, ArtifactRepository, WorkspaceUsage } from '@open-artifact/core'
+import type { ArtifactFile, Repositories, WorkspaceUsage } from '@open-artifact/core'
 import { HttpError } from '../http-error.ts'
 
 /** How much one workspace may hold; the settings page shows the same numbers. */
@@ -7,23 +7,41 @@ export const WORKSPACE_LIMITS = {
   storedBytes: 1024 ** 3,
 } as const
 
+/** Publishes (new artifacts and new versions) one person may make in any 24 hours, across every workspace and token. */
+export const PUBLISHES_PER_PERSON_PER_DAY = 300
+
+const DAY_MS = 24 * 60 * 60 * 1000
 const FREE_SPACE_HINT = 'remove artifacts the workspace no longer needs on the web page (Remove, in an artifact\'s menu)'
 
-/** Refuses a publish or a restore before anything is written when the workspace would go over its limits. */
+/** Refuses a publish or a restore before anything is written when it would go over a limit. */
 export class PublishLimits {
-  readonly #artifacts: ArtifactRepository
+  readonly #repositories: Repositories
 
-  constructor(artifacts: ArtifactRepository) {
-    this.#artifacts = artifacts
+  constructor(repositories: Repositories) {
+    this.#repositories = repositories
   }
 
   static bytesOf(files: ArtifactFile[]): number {
     return files.reduce((total, file) => total + file.body.byteLength, 0)
   }
 
-  /** A new version adds its files; a new artifact also takes one of the workspace's artifacts. */
-  async ensureRoomToPublish(workspaceId: string, files: ArtifactFile[], publication: { newArtifact: boolean }): Promise<void> {
-    const usage = await this.#artifacts.usageOf(workspaceId)
+  /**
+   * A new version adds its files; a new artifact also takes one of the workspace's artifacts. Either takes one of
+   * the publisher's daily publishes, and only once the workspace has room, so a refused publish costs none.
+   */
+  async admitPublish(publisherId: string, workspaceId: string, files: ArtifactFile[], publication: { newArtifact: boolean }): Promise<void> {
+    await this.#ensureWorkspaceRoom(workspaceId, files, publication)
+    const now = Date.now()
+    const recorded = await this.#repositories.publishLog.record(publisherId, now, { max: PUBLISHES_PER_PERSON_PER_DAY, since: now - DAY_MS })
+    if (recorded) return
+    const message =
+      `you have published ${PUBLISHES_PER_PERSON_PER_DAY} times in the last 24 hours, the most one person may, counting every workspace and token; ` +
+      'nothing was published. Try again later; each publish counts for 24 hours'
+    throw new HttpError(429, 'publish_limit_reached', message)
+  }
+
+  async #ensureWorkspaceRoom(workspaceId: string, files: ArtifactFile[], publication: { newArtifact: boolean }): Promise<void> {
+    const usage = await this.#repositories.artifacts.usageOf(workspaceId)
     if (publication.newArtifact) PublishLimits.#ensureArtifactRoom(usage, 'published')
     const addedBytes = PublishLimits.bytesOf(files)
     if (usage.storedBytes + addedBytes <= WORKSPACE_LIMITS.storedBytes) return
@@ -36,7 +54,7 @@ export class PublishLimits {
 
   // Its files never stopped counting, so only the number of artifacts can go over.
   async ensureRoomToRestore(workspaceId: string): Promise<void> {
-    PublishLimits.#ensureArtifactRoom(await this.#artifacts.usageOf(workspaceId), 'restored')
+    PublishLimits.#ensureArtifactRoom(await this.#repositories.artifacts.usageOf(workspaceId), 'restored')
   }
 
   static #ensureArtifactRoom(usage: WorkspaceUsage, outcome: 'published' | 'restored'): void {

@@ -33,6 +33,7 @@ export default /** @satisfies {import('../messages').Messages['client']} */ ({
     share_text_too_long: 'With the link, this text is over the 280 X allows. Make it shorter.',
     workspace_changed: 'You switched workspace in another tab. Reload this page and try again.',
     mail_limit_reached: "You've reached today's limit on invite and share emails, so nothing was sent or saved. Try again tomorrow.",
+    publish_limit_reached: "You've reached the limit on publishes in 24 hours, so nothing was published. Try again later.",
     workspace_quota_reached: 'This workspace has reached its limit on artifacts or storage, so nothing was saved. Remove artifacts you no longer need and try again; see the usage in Workspace settings.',
     workspace_deleted: 'This workspace was deleted.',
     personal_workspace: "A personal workspace can't be left or deleted, and its owner always stays its admin.",

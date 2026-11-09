@@ -122,3 +122,50 @@ describe('storage per workspace', () => {
     expect(settings).toMatch(/data-usage="storage"[^>]*>/)
   })
 })
+
+describe('publishes per person', () => {
+  async function addPastPublishes(userId: string, count: number, publishedAt: number): Promise<void> {
+    await env.DB.prepare(
+      `WITH RECURSIVE past(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM past WHERE n < ?1)
+       INSERT INTO publish_log (publisher_id, published_at) SELECT ?2, ?3 FROM past`,
+    )
+      .bind(count, userId, publishedAt)
+      .run()
+  }
+
+  it('allows 300 publishes in 24 hours, by the web page and the person\'s tokens together, then refuses with nothing written', async () => {
+    const publisher = await newPublisher('prolific')
+    const bystander = await newPublisher('bystander')
+    const token = await app.createToken(publisher.cookie)
+    await addPastPublishes(publisher.userId, 50, Date.now() - 25 * 60 * 60 * 1000)
+    await addPastPublishes(publisher.userId, 297, Date.now() - 60 * 60 * 1000)
+
+    const byAgent = await publish({ token }, '<h1>298</h1>')
+    const versionOnTheWeb = await publishVersion({ cookie: publisher.cookie }, byAgent.body.artifactId ?? '', 1, '<h1>299</h1>')
+    const restoredVersion = await app.json<{ version: number }>(`/api/artifacts/${byAgent.body.artifactId}/versions/1/restore`, { method: 'POST', cookie: publisher.cookie, body: { baseVersion: 2 } })
+    const overByAgent = await publish({ token }, '<h1>301</h1>')
+    const overOnTheWeb = await publishVersion({ cookie: publisher.cookie }, byAgent.body.artifactId ?? '', 3, '<h1>301</h1>')
+    const restoreOver = await app.json<{ code: string }>(`/api/artifacts/${byAgent.body.artifactId}/versions/1/restore`, { method: 'POST', cookie: publisher.cookie, body: { baseVersion: 3 } })
+    const bystanderStillPublishes = await publish({ cookie: bystander.cookie }, '<h1>mine</h1>')
+
+    expect([byAgent.status, versionOnTheWeb.status, restoredVersion.status]).toEqual([201, 200, 200])
+    expect([overByAgent.status, overOnTheWeb.status, restoreOver.status, bystanderStillPublishes.status]).toEqual([429, 429, 429, 201])
+    expect(overByAgent.body.code).toBe('publish_limit_reached')
+    expect(overByAgent.body.error).toContain('published 300 times in the last 24 hours')
+    expect(overOnTheWeb.body.code).toBe('publish_limit_reached')
+    expect(restoreOver.body.code).toBe('publish_limit_reached')
+    expect(await artifactCount(publisher.workspaceId)).toBe(1)
+    expect((await app.repositories.artifacts.findSummary(byAgent.body.artifactId ?? ''))?.version).toBe(3)
+  })
+
+  it('does not take a publish from the day\'s allowance when the workspace is full', async () => {
+    const publisher = await newPublisher('full-workspace')
+    await addStoredArtifacts(publisher.workspaceId, publisher.userId, 1000)
+
+    const refused = await publish({ cookie: publisher.cookie }, '<h1>no room</h1>')
+    const counted = await env.DB.prepare('SELECT COUNT(*) AS count FROM publish_log WHERE publisher_id = ?').bind(publisher.userId).first<number>('count')
+
+    expect(refused.body.code).toBe('workspace_quota_reached')
+    expect(counted).toBe(0)
+  })
+})

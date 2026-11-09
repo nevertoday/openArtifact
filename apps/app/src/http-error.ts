@@ -29,6 +29,7 @@ export type ErrorCode =
   | 'rate_limited'
   | 'mail_limit_reached'
   | 'workspace_quota_reached'
+  | 'publish_limit_reached'
   | 'workspace_changed'
   | 'workspace_deleted'
   | 'personal_workspace'

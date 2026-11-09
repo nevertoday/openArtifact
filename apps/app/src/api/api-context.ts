@@ -63,7 +63,7 @@ export class ApiContext {
     this.personalPages = new PersonalPages(fields.repositories, fields.appOrigin)
     this.titleTranslator = fields.titleTranslator
     this.mailLimits = new MailLimits(fields.repositories.outboundMail)
-    this.publishLimits = new PublishLimits(fields.repositories.artifacts)
+    this.publishLimits = new PublishLimits(fields.repositories)
     this.#localeSignals = fields.localeSignals
   }
 
