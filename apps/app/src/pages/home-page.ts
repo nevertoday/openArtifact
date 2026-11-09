@@ -183,12 +183,12 @@ ${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(mod
   static #artifactsSection(shownArtifacts: OpenedArtifact[], model: HomeModel): SafeHtml {
     return html`${model.identity.hasChosenName ? '' : HomePage.#nameNudge(model.m, model.identity)}<header class="xxd-page-header home-header">
   <div class="xxd-page-header__row">
-    <h1 class="xxd-page-header__title">${HomePage.#heading(model.m, model.query)}</h1>
+    <h1 class="xxd-page-header__title">${HomePage.#heading(model.m, model.query)}${shownArtifacts.length > 0 && model.query.search.trim() === '' ? html`<span class="home-count">${String(shownArtifacts.length)}</span>` : ''}</h1>
     ${shownArtifacts.length > 0 ? html`<div class="xxd-page-header__actions"><a class="xxd-btn" data-variant="primary" href="/settings/agents">${model.m.home.letAgentPublish}</a></div>` : ''}
   </div>
   <p class="xxd-page-header__desc">${HomePage.#description(model.m, model.query)}</p>
 </header>
-${shownArtifacts.length > 0 || model.query.search.trim() !== '' ? HomePage.#resultLine(model.m, shownArtifacts.length, model.query) : ''}
+${model.query.search.trim() !== '' ? HomePage.#resultLine(model.m, shownArtifacts.length, model.query) : ''}
 ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#emptyState(HomePage.#emptyStateOf(model.m, model.query, model.identity))}`
   }
 

@@ -151,6 +151,7 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
   <h2 class="xxd-empty__title">${empty.ownerTitle}</h2>
   <p class="xxd-empty__text">${empty.owner}</p>
   <div class="xxd-empty__actions"><a class="xxd-btn" data-variant="primary" href="/?filter=mine">${empty.ownerAction}</a></div>
+  <div class="personal-ghosts" aria-hidden="true">${[0, 1, 2].map(() => html`<span class="personal-ghost"><i></i><i></i><b></b></span>`)}</div>
 </div>`
   }
 

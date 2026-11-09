@@ -55,7 +55,7 @@ describe('the server-rendered pages in English', () => {
     const mine = await englishPage('/?filter=shared', authorCookie)
     const searched = await englishPage('/?q=nothing-like-this', authorCookie)
 
-    expect(markup).toContain('>All</h1>')
+    expect(markup).toMatch(/>All(<span class="home-count">\d+<\/span>)?<\/h1>/)
     expect(markup).toContain('Waiting for my agent')
     expect(markup).toContain('published on the web')
     expect(markup).toContain(`href="${published.path}"`)

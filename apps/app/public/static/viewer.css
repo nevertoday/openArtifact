@@ -32,7 +32,8 @@
 .viewer-visibility[data-visibility="public_link"] .viewer-visibility__dot { background: var(--success, #15803d); }
 .viewer-visibility[data-visibility="private"] .viewer-visibility__dot, .viewer-visibility[data-visibility="specified"] .viewer-visibility__dot { background: var(--ink); }
 .viewer-share-button { gap: 7px; }
-.viewer-share-button .viewer-visibility__dot { background: color-mix(in srgb, var(--on-ink, #fff) 55%, transparent); }
+.viewer-share-button .viewer-visibility__dot { display: none; }
+.viewer-share-button:is([data-visibility="public_link"], [data-visibility="private"], [data-visibility="specified"]) .viewer-visibility__dot { display: inline-block; }
 .viewer-share-button[data-visibility="public_link"] .viewer-visibility__dot { background: #4ade80; }
 .viewer-share-button[data-visibility="private"] .viewer-visibility__dot, .viewer-share-button[data-visibility="specified"] .viewer-visibility__dot { background: transparent; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--on-ink, #fff) 80%, transparent); }
 button.viewer-visibility { cursor: pointer; }
