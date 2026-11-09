@@ -31,6 +31,7 @@ export type ErrorCode =
   | 'workspace_quota_reached'
   | 'publish_limit_reached'
   | 'shared_data_full'
+  | 'workspace_limit_reached'
   | 'workspace_changed'
   | 'workspace_deleted'
   | 'personal_workspace'

@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { WORKSPACES_PER_PERSON } from '../src/api/workspace-api.ts'
 import { purgePastRestoring } from '../src/purge.ts'
 import { TestApp } from './test-app.ts'
 
@@ -138,6 +139,25 @@ describe('creating a workspace', () => {
     expect(after.workspaces).toHaveLength(3)
     expect(tooLong).toMatchObject({ status: 400, body: { code: 'field_too_long' } })
     expect(byToken.status).toBe(403)
+  })
+
+  it(`lets one person create ${WORKSPACES_PER_PERSON} besides their personal one, counting a deleted one until it is purged`, async () => {
+    const founderCookie = await app.signInAlone('serial-founder@example.com')
+    const created = []
+    for (let index = 0; index < WORKSPACES_PER_PERSON; index++) created.push(await createWorkspace(founderCookie, `Team ${index}`))
+
+    const overTheCap = await app.json<{ code: string; error: string }>('/api/workspaces', { method: 'POST', cookie: founderCookie, body: { name: 'One more' } })
+    await app.request('/api/workspace', { method: 'DELETE', cookie: created[0]?.cookie ?? '' })
+    const afterDeleting = await app.json<{ code: string }>('/api/workspaces', { method: 'POST', cookie: founderCookie, body: { name: 'One more' } })
+    await purgePastRestoring(app.repositories, Date.now() + 31 * DAY)
+    const afterPurge = await app.request('/api/workspaces', { method: 'POST', cookie: founderCookie, body: { name: 'One more' } })
+
+    expect(overTheCap.status).toBe(403)
+    expect(overTheCap.body.code).toBe('workspace_limit_reached')
+    expect(overTheCap.body.error).toContain('nothing was created')
+    expect(afterDeleting.body.code).toBe('workspace_limit_reached')
+    expect(afterPurge.status).toBe(201)
+    expect((await me(founderCookie)).workspaces).toHaveLength(WORKSPACES_PER_PERSON + 1)
   })
 })
 

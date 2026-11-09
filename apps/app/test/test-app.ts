@@ -172,7 +172,9 @@ export class TestApp {
     const userId = me.body.user.userId
     if (this.#teamWorkspaceId === null) {
       const teamName = headers?.['Accept-Language']?.startsWith('en') ? 'My team' : '我的团队'
-      this.#teamWorkspaceId = (await this.repositories.workspaces.create(teamName, userId, Date.now())).workspace.workspaceId
+      const team = await this.repositories.workspaces.create(teamName, userId, Date.now(), { max: Number.MAX_SAFE_INTEGER })
+      if (team === null) throw new Error(`the team workspace for ${email} was not created`)
+      this.#teamWorkspaceId = team.workspace.workspaceId
     } else {
       const joinResult = await this.repositories.workspaces.join(this.#teamWorkspaceId, userId, Date.now(), { readmitsRemoved: false })
       if (joinResult.status === 'removed') return sessionCookie

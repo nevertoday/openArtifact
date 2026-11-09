@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers'
 import { beforeAll, describe, expect, it } from 'vitest'
+import type { Membership } from '@open-artifact/core'
 import {
   CloudflareAccessTokenRepository,
   CloudflareArtifactAccessRepository,
@@ -15,6 +16,12 @@ const artifactRepository = new CloudflareArtifactRepository(env.DB, env.FILES)
 const workspaceRepository = new CloudflareWorkspaceRepository(env.DB)
 const ROOMY = { maxDocuments: 2000, maxBytes: 5 * 1024 ** 2 }
 
+async function createWorkspace(name: string, creatorId: string, createdAt: number): Promise<Membership> {
+  const membership = await workspaceRepository.create(name, creatorId, createdAt, { max: Number.MAX_SAFE_INTEGER })
+  if (membership === null) throw new Error(`workspace ${name} was not created`)
+  return membership
+}
+
 async function addUser(name: string): Promise<string> {
   const userId = `user-${name.toLowerCase()}`
   const now = new Date().toISOString()
@@ -27,7 +34,7 @@ async function addUser(name: string): Promise<string> {
 // The team a test works in: the first person to join a name creates the workspace as its admin, later people join it.
 async function joinedTeam(userId: string, teamName = 'Design team') {
   const teamId = await env.DB.prepare('SELECT id FROM workspaces WHERE name = ? AND personal_of IS NULL AND deleted_at IS NULL ORDER BY created_at LIMIT 1').bind(teamName).first<string>('id')
-  if (teamId === null) return workspaceRepository.create(teamName, userId, Date.now())
+  if (teamId === null) return createWorkspace(teamName, userId, Date.now())
   const joinResult = await workspaceRepository.join(teamId, userId, Date.now(), { readmitsRemoved: false })
   if (joinResult.status === 'removed') throw new Error(`${userId} was not let into ${teamName}`)
   return joinResult.membership
@@ -56,7 +63,7 @@ describe('CloudflareWorkspaceRepository', () => {
     const founderId = await addUser('Lin')
     const colleagueId = await addUser('Zhou')
 
-    const founderMembership = await workspaceRepository.create('Founders', founderId, Date.now())
+    const founderMembership = await createWorkspace('Founders', founderId, Date.now())
     const colleagueJoin = await workspaceRepository.join(founderMembership.workspace.workspaceId, colleagueId, Date.now(), { readmitsRemoved: false })
     const members = await workspaceRepository.listMembers(founderMembership.workspace.workspaceId)
 
@@ -72,7 +79,7 @@ describe('CloudflareWorkspaceRepository', () => {
     const adminId = await addUser('Lin')
     const removedId = await addUser('Wang')
     const leaverId = await addUser('Sun')
-    const { workspace } = await workspaceRepository.create('Leavers', adminId, Date.now())
+    const { workspace } = await createWorkspace('Leavers', adminId, Date.now())
     await workspaceRepository.join(workspace.workspaceId, removedId, Date.now(), { readmitsRemoved: false })
     await workspaceRepository.join(workspace.workspaceId, leaverId, Date.now(), { readmitsRemoved: false })
 
@@ -92,7 +99,7 @@ describe('CloudflareWorkspaceRepository', () => {
 
   it('creates one personal workspace however many requests ask at once, and lists it first', async () => {
     const ownerId = await addUser('Gao')
-    await workspaceRepository.create('Earlier team', ownerId, Date.now() - 1000)
+    await createWorkspace('Earlier team', ownerId, Date.now() - 1000)
 
     const personalMemberships = await Promise.all(Array.from({ length: 6 }, () => workspaceRepository.ensurePersonal(ownerId, 'Gao 的工作区', Date.now())))
     const memberships = await workspaceRepository.membershipsOf(ownerId)
@@ -121,7 +128,7 @@ describe('CloudflareWorkspaceRepository', () => {
   it('hides a deleted workspace from everyone until an admin restores it within the window', async () => {
     const adminId = await addUser('Ma')
     const memberId = await addUser('Lu')
-    const { workspace } = await workspaceRepository.create('Short lived', adminId, Date.now())
+    const { workspace } = await createWorkspace('Short lived', adminId, Date.now())
     await workspaceRepository.join(workspace.workspaceId, memberId, Date.now(), { readmitsRemoved: false })
     const deletedAt = Date.now()
 
@@ -254,6 +261,19 @@ describe('artifact access, comments and shared data', () => {
       .run()
 
     expect((await commentRepository.find('old-pinned-comment'))?.anchor).toEqual({ x: 0.1, y: 0.2, version: null, selector: null, textQuote: null, quote: null })
+  })
+
+  it('lets one person create no more workspaces than the cap, even at once, not counting their personal one', async () => {
+    const creatorId = `creator-${crypto.randomUUID()}`
+    await workspaceRepository.ensurePersonal(creatorId, 'Mine', Date.now())
+
+    const racing = await Promise.all(Array.from({ length: 8 }, (_, index) => workspaceRepository.create(`Team ${index}`, creatorId, Date.now(), { max: 3 })))
+    const memberships = await workspaceRepository.membershipsOf(creatorId)
+    const someoneElse = await workspaceRepository.create('Theirs', `other-${crypto.randomUUID()}`, Date.now(), { max: 3 })
+
+    expect(racing.filter(created => created !== null)).toHaveLength(3)
+    expect(memberships).toHaveLength(4)
+    expect(someoneElse).not.toBeNull()
   })
 
   it('keeps shared documents per collection with who created and last changed them', async () => {

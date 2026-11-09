@@ -10,6 +10,8 @@ const MAX_NAME_LENGTH = 60
 const MAX_WORKSPACE_NAME_LENGTH = 40
 const YEAR_SECONDS = 365 * 24 * 60 * 60
 const AUDIT_PAGE_SIZE = 50
+/** Workspaces one person may create, besides their personal one; a deleted one counts until it is purged. */
+export const WORKSPACES_PER_PERSON = 10
 
 /** The signed-in person, their workspaces, and workspace settings. */
 export class WorkspaceApi {
@@ -46,11 +48,17 @@ export class WorkspaceApi {
     return Response.json({ workspaceId }, { headers: { 'Set-Cookie': WorkspaceApi.#workspaceCookie(request, workspaceId) } })
   }
 
-  /** Anyone may create a workspace; they become its admin and switch to it. */
+  /** Anyone may create a workspace, up to WORKSPACES_PER_PERSON; they become its admin and switch to it. */
   async create(request: Request): Promise<Response> {
     const identity = await this.#context.requireBrowserSession()
     const name = (await JsonBody.of(request)).text('name', MAX_WORKSPACE_NAME_LENGTH)
-    const membership = await this.#context.repositories.workspaces.create(name, identity.userId, Date.now())
+    const membership = await this.#context.repositories.workspaces.create(name, identity.userId, Date.now(), { max: WORKSPACES_PER_PERSON })
+    if (membership === null) {
+      const message =
+        `you have created ${WORKSPACES_PER_PERSON} workspaces, the most one person may besides their personal workspace; nothing was created. ` +
+        'A deleted workspace counts until it is purged 30 days after deletion. Use one of your workspaces, or ask its admin to invite you into an existing one'
+      throw new HttpError(403, 'workspace_limit_reached', message)
+    }
     return Response.json({ workspace: WorkspaceApi.#workspaceJson(membership) }, { status: 201, headers: { 'Set-Cookie': WorkspaceApi.#workspaceCookie(request, membership.workspace.workspaceId) } })
   }
 

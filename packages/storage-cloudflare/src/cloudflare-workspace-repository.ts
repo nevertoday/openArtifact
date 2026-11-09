@@ -72,12 +72,19 @@ export class CloudflareWorkspaceRepository implements WorkspaceRepository {
     return membershipRows.map(CloudflareWorkspaceRepository.#membershipOf)
   }
 
-  async create(name: string, creatorId: string, createdAt: number): Promise<Membership> {
+  // The count and the insert are one statement, and the membership follows only a workspace that was inserted.
+  async create(name: string, creatorId: string, createdAt: number, cap: { max: number }): Promise<Membership | null> {
     const workspaceId = crypto.randomUUID()
-    await this.#db.batch([
-      this.#db.prepare('INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?)').bind(workspaceId, name, createdAt),
-      this.#db.prepare(`INSERT INTO memberships (workspace_id, user_id, role, created_at) VALUES (?, ?, 'admin', ?)`).bind(workspaceId, creatorId, createdAt),
+    const [inserted] = await this.#db.batch([
+      this.#db
+        .prepare(
+          `INSERT INTO workspaces (id, name, created_by, created_at)
+           SELECT ?1, ?2, ?3, ?4 WHERE (SELECT COUNT(*) FROM workspaces WHERE created_by = ?3) < ?5`,
+        )
+        .bind(workspaceId, name, creatorId, createdAt, cap.max),
+      this.#db.prepare(`INSERT INTO memberships (workspace_id, user_id, role, created_at) SELECT id, ?2, 'admin', ?3 FROM workspaces WHERE id = ?1`).bind(workspaceId, creatorId, createdAt),
     ])
+    if ((inserted?.meta.changes ?? 0) === 0) return null
     return { workspace: { workspaceId, name, publicLinksEnabled: true, personalOf: null }, role: 'admin' }
   }
 
