@@ -44,7 +44,7 @@ export class LoginPage {
     <div class="xxd-auth login-card" data-next-path="${nextPath}">
       <h2 class="xxd-auth__name">${m.login.heading}</h2>
       ${invitation ? LoginPage.#invitationBanner(m, invitation) : html`<p class="xxd-auth__line" data-email-step-intro>${m.login.intro}</p>`}
-      ${nextPath !== '/' && !invitation ? html`<p class="xxd-auth__line">${m.login.returnsToPage}</p>` : ''}
+      ${nextPath !== '/' && !invitation ? html`<div class="xxd-banner login-gate" data-size="sm" role="status">${PageShell.icon('Lock')}<p class="xxd-banner__text">${m.login.returnsToPage}</p></div>` : ''}
       <div class="xxd-banner" data-tone="danger" id="login-error" role="alert" hidden>${PageShell.icon('TriangleAlert')}<p class="xxd-banner__text" data-error-text></p></div>
       <form id="email-step" data-xxd-validate>
         ${providers.length > 0 ? html`${providerButtons}<div class="xxd-auth__or">${m.login.orWithEmail}</div>` : ''}

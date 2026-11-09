@@ -117,7 +117,7 @@
   .app-frame:has(> .home-sidebar) { flex-direction: column; }
   .home-sidebar { width: auto; border-right: 0; border-bottom: 1px solid var(--line); }
   .home-sidebar .xxd-sidebar__body { position: static; display: grid; gap: var(--space-2); padding: var(--space-2) var(--space-6); }
-  .home-sidebar__filter-row { display: flex; gap: var(--space-1); overflow-x: auto; scrollbar-width: none; mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent); }
+  .home-sidebar__filter-row { display: flex; gap: var(--space-1); padding-block: 4px; padding-inline-end: 40px; overflow-x: auto; scrollbar-width: none; mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); }
   .home-sidebar__filter-row .xxd-sidebar__group { display: flex; flex: none; gap: var(--space-1); }
   .home-sidebar .xxd-sidebar__group + .xxd-sidebar__group { margin-top: 0; }
   .home-sidebar .xxd-sidebar__label, .home-sidebar .home-sidebar__sources { display: none; }
@@ -134,8 +134,8 @@
   .home-header .xxd-page-header__actions .xxd-btn { height: var(--control-h-sm); padding-inline: var(--control-pad-x-sm); }
   .home-sidebar .xxd-sidebar__item { min-height: 44px; }
   .home-sidebar .xxd-sidebar__body { padding-inline: var(--space-4); }
-  .home-source-picker { justify-self: stretch; }
-  .home-source-picker select { min-height: 44px; }
+  /* On a phone the chips are the filters; picking a source is what search does there. */
+  .home-source-picker { display: none; }
 }
 .xxd-empty__actions.xxd-cluster { justify-content: center; }
 .app-workspace-switcher { max-width: 240px; }
@@ -222,7 +222,9 @@
 .login-panel { position: relative; }
 @media (min-width: 641px) { .login-panel { align-content: center; padding-top: var(--space-8); } }
 .login-panel__locale { position: absolute; inset-block-start: var(--space-4); inset-inline-end: var(--space-4); }
-.login-card { max-width: 380px; padding-block: 0; }
+.login-card { max-width: 400px; padding-block: 0; }
+.login-card .xxd-auth__name { font-size: var(--text-xl, 22px); }
+.login-gate { justify-self: stretch; text-align: start; }
 .login-card .xxd-banner { justify-self: stretch; text-align: left; }
 .login-card__address { white-space: nowrap; }
 .login-card form[hidden] { display: none; }
@@ -249,6 +251,7 @@
 
 /* Until a person picks the name others see, a small dot on their avatar says there is something to set. */
 .app-account-button[data-needs-name] { position: relative; }
+@media (min-width: 641px) { .app-account-button[data-needs-name]::after { display: none; } }
 .app-account-button[data-needs-name]::after { content: ""; position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: #ea580c; box-shadow: 0 0 0 2px var(--paper); }
 @media (max-width: 640px) { .home-name-nudge { display: none; } }
 .home-count { margin-inline-start: var(--space-3); color: var(--muted-2); font-weight: var(--weight-regular); font-variant-numeric: tabular-nums; }

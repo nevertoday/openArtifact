@@ -239,8 +239,9 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   }
 
   static #versionPicker(model: ViewerModel): SafeHtml {
-    const onlyVersion = model.openedArtifact.summary.version === 1 ? new SafeHtml('data-only-version') : ''
-    return html`<button type="button" class="xxd-btn viewer-version" data-variant="ghost" data-size="sm" data-xxd-menu="version-menu" ${onlyVersion} aria-label="${model.m.viewer.version.picker(model.shownVersion)}" data-version-button><span data-version-label>v${model.shownVersion}</span>${PageShell.icon('ChevronDown', 14)}</button>
+    // A first version has no history to open, so its label opens nothing until v2 arrives (versions.js adds the menu then).
+    const menu = model.openedArtifact.summary.version === 1 ? new SafeHtml('data-only-version') : new SafeHtml('data-xxd-menu="version-menu"')
+    return html`<button type="button" class="xxd-btn viewer-version" data-variant="ghost" data-size="sm" ${menu} aria-label="${model.m.viewer.version.picker(model.shownVersion)}" data-version-button><span data-version-label>v${model.shownVersion}</span>${PageShell.icon('ChevronDown', 14)}</button>
 <div class="xxd-menu viewer-version-menu" id="version-menu" role="menu" popover aria-label="${model.m.viewer.version.menu}" data-version-menu></div>`
   }
 

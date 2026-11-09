@@ -4,7 +4,7 @@
 
 .personal-brand { margin: -40px 0 40px; font-size: var(--text-sm); }
 .personal-brand .app-brand { color: var(--ink); }
-.personal-owner-bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-1) var(--space-4); padding: 10px var(--space-4); background: var(--wash); border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--text-sm); }
+.personal-owner-bar { display: flex; flex-wrap: wrap; justify-content: flex-start; padding-inline: max(16px, calc(50% - 560px)) !important; align-items: center; gap: var(--space-1) var(--space-4); padding: 10px var(--space-4); background: var(--wash); border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--text-sm); }
 
 .personal-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-1) 14px; padding-bottom: var(--space-5); border-bottom: 1px solid var(--line); }
 .personal-head__avatar { grid-row: span 2; display: grid; place-items: center; width: 48px; height: 48px; font-size: 19px; }
@@ -13,7 +13,7 @@
 .personal-head__bio { grid-column: 2; min-width: 0; font-size: 14px; line-height: 1.55; color: var(--muted); }
 .personal-head__bio-text { margin: 0; }
 .personal-head__bio-edit { max-width: 100%; margin: 0 calc(-1 * var(--space-1-5)); padding: 2px var(--space-1-5); border: 0; background: transparent; color: inherit; font: inherit; text-align: start; cursor: text; transition: background-color var(--motion-quick) ease; }
-.personal-head__bio-edit[data-empty="true"] { max-width: none; overflow: visible; white-space: nowrap; margin: 2px 0 0; padding: 2px 10px; border: 1px dashed var(--line-strong); border-radius: 999px; color: var(--muted); font-size: var(--text-xs); }
+.personal-head__bio-edit[data-empty="true"] { max-width: none; overflow: visible; white-space: nowrap; color: var(--action-text, var(--muted)); font-size: var(--text-sm); }
 @media (hover: hover) { .personal-head__bio-edit:hover { background: var(--wash); } }
 .personal-head__bio-edit:focus-visible { outline: 2px solid var(--action); outline-offset: 1px; }
 .personal-head__bio-input { width: 100%; }
@@ -74,8 +74,8 @@
 
 .personal-empty { margin-top: var(--space-8); }
 /* What the page will hold, drawn faintly under the owner's empty state. */
-.personal-ghosts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); width: min(720px, 100%); margin-top: var(--space-8); opacity: .7; mask-image: linear-gradient(to bottom, #000 40%, transparent); }
-.personal-ghost { display: flex; flex-direction: column; gap: 8px; aspect-ratio: 4 / 3; padding: 16px; border: 1px dashed var(--line-strong); border-radius: var(--r-md); }
+.personal-ghosts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); width: min(720px, 100%); margin-top: var(--space-8); opacity: .8; }
+.personal-ghost { display: flex; flex-direction: column; gap: 8px; aspect-ratio: 4 / 3; padding: 16px; border-radius: var(--r-md); background: linear-gradient(var(--wash), transparent); }
 .personal-ghost i { height: 10px; width: 60%; border-radius: 5px; background: var(--wash-strong); }
 .personal-ghost i + i { height: 6px; width: 85%; }
 .personal-ghost b { flex: 1; border-radius: 6px; background: var(--wash); }
