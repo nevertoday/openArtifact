@@ -3,7 +3,7 @@ import { cloudflareRepositories } from '@open-artifact/storage-cloudflare'
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import { AppRoutes } from './app-routes.ts'
 import { purgePastRestoring } from './purge.ts'
-import { mailUnmailedReportDigest, operatorMailbox } from './api/abuse-report-api.ts'
+import { mailUnmailedReportDigest } from './api/abuse-report-api.ts'
 import { TitleTranslators } from './api/title-translator.ts'
 import { Mailers } from './auth/mailer.ts'
 import type { CardRenderer } from './share/card-renderer.ts'
@@ -46,7 +46,7 @@ export default {
   async scheduled(_controller: ScheduledController, env: AppEnv): Promise<void> {
     const repositories = cloudflareRepositories(env.DB, env.FILES)
     const now = Date.now()
-    const jobs = await Promise.allSettled([purgePastRestoring(repositories, now), mailUnmailedReportDigest(repositories, Mailers.fromEnv(env), operatorMailbox(env), now)])
+    const jobs = await Promise.allSettled([purgePastRestoring(repositories, now), mailUnmailedReportDigest(repositories, env, now)])
     const failed = jobs.find(job => job.status === 'rejected')
     if (failed) throw failed.reason
   },

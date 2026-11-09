@@ -94,7 +94,7 @@ export class TestApp {
    * Tests sign the same people in many times a minute, so sign-in codes are limited loosely unless
    * `productionSignInLimits` asks for the limits the app is deployed with.
    */
-  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean; abuseReportEmail?: string } = { allowedEmailDomains: 'example.com' }) {
+  constructor(options: { allowedEmailDomains?: string; productionSignInLimits?: boolean; abuseReportEmail?: string; noMailService?: boolean } = { allowedEmailDomains: 'example.com' }) {
     const appEnv: AppEnv = {
       DB: env.DB,
       FILES: env.FILES,
@@ -105,6 +105,8 @@ export class TestApp {
       SHARED_DATA_WRITE_RATE_LIMITER: env.SHARED_DATA_WRITE_RATE_LIMITER,
       SHARED_DATA_PERSON_RATE_LIMITER: env.SHARED_DATA_PERSON_RATE_LIMITER,
       ...(options.abuseReportEmail === undefined ? {} : { ABUSE_REPORT_EMAIL: options.abuseReportEmail }),
+      // The routes are given the recording mailer; MAILER only says a mail service is set up, as the deployment's would.
+      ...(options.noMailService ? {} : { MAILER: 'console' }),
       ...(options.allowedEmailDomains === undefined ? {} : { ALLOWED_EMAIL_DOMAINS: options.allowedEmailDomains }),
       USERCONTENT_ORIGIN,
       MCP_ORIGIN: 'http://mcp.test',

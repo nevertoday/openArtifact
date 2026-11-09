@@ -1,5 +1,5 @@
 import { ABUSE_REASONS, ArtifactPath, type AbuseReason, type ArtifactSummary, type Repositories, type SigningKey } from '@open-artifact/core'
-import type { Mailer } from '../auth/mailer.ts'
+import { Mailers, type Mailer, type MailerEnv } from '../auth/mailer.ts'
 import type { AppEnv } from '../env.ts'
 import { HttpError } from '../http-error.ts'
 import { SenderNetwork } from '../sender-network.ts'
@@ -24,8 +24,14 @@ const REASON_WORDS: Record<AbuseReason, string> = {
   other: 'other',
 }
 
-/** Where the deployment mails abuse reports; null when ABUSE_REPORT_EMAIL is not set. */
-export function operatorMailbox(env: Pick<AppEnv, 'ABUSE_REPORT_EMAIL'>): string | null {
+export type ReportMailEnv = MailerEnv & Pick<AppEnv, 'ABUSE_REPORT_EMAIL'>
+
+/**
+ * Where the deployment mails abuse reports; null, so reports are only stored, when ABUSE_REPORT_EMAIL is not set or
+ * no mail service is (MAILER).
+ */
+export function operatorMailbox(env: ReportMailEnv): string | null {
+  if (env.MAILER === undefined) return null
   return env.ABUSE_REPORT_EMAIL?.trim() || null
 }
 
@@ -94,7 +100,7 @@ export class AbuseReportApi {
   async #tellOperator(summary: ArtifactSummary, report: { reportId: string; reason: AbuseReason; details: string | null; reporterEmail: string | null; signedIn: boolean }): Promise<void> {
     const { mailbox } = this.#context.abuseReporting
     if (mailbox === null) {
-      console.warn(`Abuse report ${report.reportId} on ${summary.shortId} was stored but not mailed: ABUSE_REPORT_EMAIL is not set`)
+      console.warn(`Abuse report ${report.reportId} on ${summary.shortId} was stored but not mailed: ABUSE_REPORT_EMAIL or MAILER is not set`)
       return
     }
     const now = Date.now()
@@ -129,11 +135,19 @@ export class AbuseReportApi {
   }
 }
 
-/** For the daily cron: one mail telling the operator how many reports of the last day were stored without mail, when any were. */
-export async function mailUnmailedReportDigest(repositories: Repositories, mailer: Mailer, mailbox: string | null, now: number): Promise<void> {
-  if (mailbox === null) return
+/**
+ * For the daily cron: one mail telling the operator how many reports of the last day were stored without mail, when
+ * any were. The mailer is made here, so a mail service set up wrong fails this job alone, not the purge beside it.
+ */
+export async function mailUnmailedReportDigest(repositories: Repositories, env: ReportMailEnv, now: number, mailerFor: (env: ReportMailEnv) => Mailer = Mailers.fromEnv): Promise<void> {
+  const mailbox = operatorMailbox(env)
+  if (mailbox === null) {
+    if (env.ABUSE_REPORT_EMAIL?.trim()) console.warn('The daily digest of abuse reports stored without mail was skipped: ABUSE_REPORT_EMAIL is set but MAILER is not')
+    return
+  }
   const unmailed = await repositories.abuseReports.countUnmailedSince(now - DAY_MS)
   if (unmailed === 0) return
+  const mailer = mailerFor(env)
   const text = [
     `${unmailed} abuse ${unmailed === 1 ? 'report was' : 'reports were'} stored without mail in the last day, past the ${REPORT_MAILS_PER_DAY} reports a day that are mailed one by one; see abuse_reports.`,
     '',

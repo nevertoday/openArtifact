@@ -119,7 +119,7 @@ cd ../mcp && npx wrangler deploy
 
 任何人通过公开链接打开页面，不论是否登录，都能点顶栏的 **举报**（Report），选择原因：垃圾内容或广告、钓鱼或恶意软件、违法内容、其他。举报存在 `abuse_reports` 表里，发起方的网络地址只以带密钥的哈希保存。同一个发起方每分钟最多举报 5 次（`REPORT_RATE_LIMITER`），同一个页面每天最多收 20 条举报。
 
-设置了 `ABUSE_REPORT_EMAIL` 时，每条举报都通过 app 的邮件服务（`MAILER=cloudflare` 和 `MAIL_FROM`，第 4 步）发到这个地址。信的开头是下架这个页面的命令，然后是页面链接，举报人写的内容逐行加上 `> ` 引用，所以举报内容冒充不了命令。所有页面合计，24 小时内最多逐条发 50 封，所以没人能靠举报很多页面给你刷邮件。超出的举报照样保存，`mailed_at` 留空，每日任务会给你发一封汇总，告诉你有几条。没设置 `ABUSE_REPORT_EMAIL` 时，在 `apps/app` 里用 `npx wrangler d1 execute open-artifact --remote --config wrangler.production.jsonc --command "SELECT * FROM abuse_reports ORDER BY created_at DESC LIMIT 20"` 查看举报。
+设置了 `ABUSE_REPORT_EMAIL` 时，每条举报都通过 app 的邮件服务（`MAILER=cloudflare` 和 `MAIL_FROM`，第 4 步）发到这个地址。信的开头是下架这个页面的命令，然后是页面链接，举报人写的内容逐行加上 `> ` 引用，所以举报内容冒充不了命令。所有页面合计，24 小时内最多逐条发 50 封，所以没人能靠举报很多页面给你刷邮件。超出的举报照样保存，`mailed_at` 留空，每日任务会给你发一封汇总，告诉你有几条。没设置 `MAILER` 时，举报和没设置 `ABUSE_REPORT_EMAIL` 时一样只保存，每日任务会在日志里记下跳过了汇总。`MAILER` 配错只会让汇总失败，旁边的清除照样执行。不发信时，在 `apps/app` 里用 `npx wrangler d1 execute open-artifact --remote --config wrangler.production.jsonc --command "SELECT * FROM abuse_reports ORDER BY created_at DESC LIMIT 20"` 查看举报。
 
 要下架一个页面，在这个部署的代码目录里运行（wrangler 已登录对应的 Cloudflare 账户，`apps/app/wrangler.production.jsonc` 已由 `pnpm deploy:config` 生成）：
 

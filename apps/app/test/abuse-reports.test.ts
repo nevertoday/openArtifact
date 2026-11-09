@@ -1,9 +1,14 @@
+import { createScheduledController } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { mailUnmailedReportDigest, REPORT_MAILS_PER_DAY } from '../src/api/abuse-report-api.ts'
+import { MailerConfigError } from '../src/auth/mailer.ts'
+import type { AppEnv } from '../src/env.ts'
+import worker from '../src/index.ts'
 import { TestApp } from './test-app.ts'
 
 const OPERATOR = 'abuse@operator.example'
+const OPERATOR_MAIL = { ABUSE_REPORT_EMAIL: OPERATOR, MAILER: 'console' }
 const app = new TestApp({ allowedEmailDomains: 'example.com', abuseReportEmail: OPERATOR })
 let authorCookie = ''
 
@@ -181,7 +186,30 @@ describe('reporting a public page', () => {
     expect(sent.status).toBe(201)
     expect(await storedReports(page.artifactId)).toHaveLength(1)
     expect(unsetApp.mailer.sent.length).toBe(mailsBefore)
-    expect(String(warned.mock.calls[0]?.[0])).toContain('ABUSE_REPORT_EMAIL is not set')
+    expect(String(warned.mock.calls[0]?.[0])).toContain('ABUSE_REPORT_EMAIL or MAILER is not set')
+  })
+
+  it('only stores reports, claiming no mail, and skips the digest when the operator address is set but no mail service is', async () => {
+    const mailless = new TestApp({ allowedEmailDomains: 'example.com', abuseReportEmail: OPERATOR, noMailService: true })
+    const cookie = await mailless.signIn('mailless-author@example.com')
+    const page = await mailless.publish({ cookie }, 'No mail service', '<h1>x</h1>', 'public_link')
+    const warned = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const sent = await report(mailless, page.artifactId, { reason: 'spam' })
+    const mailedAt = await env.DB.prepare('SELECT mailed_at FROM abuse_reports WHERE artifact_id = ?').bind(page.artifactId).first<number | null>('mailed_at')
+    const failingMailer = vi.fn(() => {
+      throw new Error('no mailer should be made')
+    })
+    await mailUnmailedReportDigest(mailless.repositories, { ABUSE_REPORT_EMAIL: OPERATOR }, Date.now(), failingMailer)
+
+    expect(sent.status).toBe(201)
+    expect(mailedAt).toBeNull()
+    expect(mailless.mailer.sent.filter(email => email.to === OPERATOR)).toEqual([])
+    expect(failingMailer).not.toHaveBeenCalled()
+    expect(warned.mock.calls.map(call => String(call[0]))).toEqual([
+      expect.stringContaining('ABUSE_REPORT_EMAIL or MAILER is not set'),
+      expect.stringContaining('digest of abuse reports stored without mail was skipped'),
+    ])
   })
 })
 
@@ -223,10 +251,10 @@ describe('mail to the operator across every page', () => {
       statuses.push((await report(app, page?.artifactId ?? '', { reason: 'spam' }, { senderAddress: `198.18.${Math.floor(index / 4)}.${index % 4}` })).status)
     }
     const mailedOneByOne = app.mailer.sent.filter(email => email.to === OPERATOR).length - mailsBefore
-    await mailUnmailedReportDigest(app.repositories, app.mailer, OPERATOR, Date.now())
+    await mailUnmailedReportDigest(app.repositories, OPERATOR_MAIL, Date.now(), () => app.mailer)
     const digest = app.mailer.lastTo(OPERATOR)
     const mailsAfterDigest = app.mailer.sent.length
-    await mailUnmailedReportDigest(app.repositories, app.mailer, OPERATOR, Date.now() + 2 * 24 * 60 * 60 * 1000)
+    await mailUnmailedReportDigest(app.repositories, OPERATOR_MAIL, Date.now() + 2 * 24 * 60 * 60 * 1000, () => app.mailer)
 
     expect(statuses.every(status => status === 201)).toBe(true)
     expect(mailedOneByOne).toBe(placesLeft)
@@ -234,5 +262,15 @@ describe('mail to the operator across every page', () => {
     expect(digest?.subject).toBe(`${storedUnmailedBefore + 3} abuse reports stored without mail in the last day`)
     expect(digest?.text).toContain('see abuse_reports')
     expect(app.mailer.sent.length).toBe(mailsAfterDigest)
+  })
+
+  it('still purges in the daily job when the mail service is set up wrong, and fails the digest alone', async () => {
+    const expired = await app.publish({ cookie: authorCookie }, 'Expired before a bad mail setup')
+    await env.DB.prepare('UPDATE artifacts SET removed_at = ? WHERE id = ?').bind(Date.now() - 31 * 24 * 60 * 60 * 1000, expired.artifactId).run()
+
+    const dailyJob = worker.scheduled(createScheduledController(), { ...env, ABUSE_REPORT_EMAIL: OPERATOR, MAILER: 'sendgrid' } as unknown as AppEnv)
+
+    await expect(dailyJob).rejects.toThrow(MailerConfigError)
+    expect(await app.repositories.artifacts.findSummary(expired.artifactId)).toBeNull()
   })
 })
