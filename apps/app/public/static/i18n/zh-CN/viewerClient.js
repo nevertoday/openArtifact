@@ -106,7 +106,7 @@ export default {
     /** @param {number} count */
     copiedAll: count => `已复制 ${count} 条评论，粘贴给你的 agent`,
     hint: '粘贴给任何 agent 都能照着改。已接入的 agent，直接说「处理 Open Artifact 上的评论」。',
-    setUp: '去 Agent 接入',
+    setUp: '接入 agent',
     copyOne: '复制给 agent',
     /** @param {number} number */
     copiedOne: number => `已复制评论 ${number}，粘贴给你的 agent`,

@@ -294,6 +294,7 @@ function showAccountName(name) {
     accountInitial.setAttribute('style', avatarStyle(name))
   }
   document.querySelector('[data-account-button]')?.setAttribute('aria-label', m.shell.accountMenu(name))
+  document.querySelector('[data-account-button]')?.removeAttribute('data-needs-name')
 }
 
 function wireThemeChoice() {

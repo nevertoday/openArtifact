@@ -155,7 +155,6 @@ export class ShareDialog extends EventTarget {
     })
     dialog.querySelector('[data-copy-link]').dataset.copy = location.origin + location.pathname
     this.showTitle(config.title)
-    dialog.querySelector('[data-share-url]').textContent = location.host + location.pathname
   }
 
   /** A request for access links here with #share=<the member's id>; the link is used once, then cleared. */

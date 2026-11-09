@@ -6,6 +6,7 @@ export default /** @satisfies {import('../messages').Messages['login']} */ ({
     headlineSecond: 'seen and talked over here.',
     pitch: 'Pages published by Claude Code, Codex and Cursor all live here. Open one to read it, comment right on the page, then let the agent make the changes.',
     storage: 'Free to use. Your own workspace is ready the first time you sign in, and you can invite others to it.',
+    shot: { title: 'Q3 growth review', share: 'Share', comment: 'Make retention a line chart', forAgent: 'For agent', published: 'Claude Code published v2' },
   },
   heading: 'Sign in or sign up',
   intro: 'Enter your email and we\'ll send you a 6-digit code. A new address signs up on the spot. No password needed.',

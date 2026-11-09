@@ -386,15 +386,19 @@ describe('settings', () => {
 
   it('nudges a person who has not set a name, until they do', async () => {
     const newcomerCookie = await app.signIn('newcomer@example.com')
+    const emptyHome = await pageText('/', newcomerCookie)
+    await app.publish({ cookie: newcomerCookie }, 'First page')
 
     const before = await pageText('/', newcomerCookie)
     await app.request('/api/me', { method: 'PATCH', cookie: newcomerCookie, body: { name: '新同事' } })
     const after = await pageText('/', newcomerCookie)
     const profile = await pageText('/settings/profile', newcomerCookie)
 
+    expect(emptyHome).toContain('data-needs-name')
     expect(before).toContain('设置你的名字')
     expect(before).toContain('看到的是「newcomer」')
     expect(after).not.toContain('设置你的名字')
+    expect(after).not.toContain('data-needs-name')
     expect(profile).toContain('value="新同事"')
     expect(profile).toContain('邮箱用来登录，不能修改。')
   })

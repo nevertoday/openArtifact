@@ -1,11 +1,6 @@
 /* Only what the UI kit has no component for: the app frame, artifact covers, settings, login. The viewer has viewer.css. Kit tokens only,
    except the page-title size below, which the kit's scale has no step for. */
 
-/* The scrollbar's room is kept whether or not a page scrolls, so headers never jump between pages or under a dialog. */
-html { scrollbar-gutter: stable; }
-/* The reserved strip takes the colour of what runs beside it: the login form's panel. */
-:root:has(.login-panel) { background: var(--paper-raised); }
-
 /* Type scale of the app's own pages. The kit sets 13px everywhere, which suits menus and toolbars; the pages people
    read get one step more, and the page title a clear jump above the section headings, so what matters is seen first. */
 :root { --app-title-size: 32px; --app-title-leading: 40px; }
@@ -195,15 +190,33 @@ html { scrollbar-gutter: stable; }
 .login-story .xxd-badge { gap: var(--space-1); }
 .login-story { position: relative; overflow: hidden; isolation: isolate; }
 :root[data-theme="dark"] .login-story { background: #0e0d0b; }
-.login-story > :not(.login-wall) { position: relative; }
-/* A tilted wall of pages fading into the dark, so the first screen shows what the product holds. */
-.login-wall { position: absolute; inset: -12% -30% 30% -14%; z-index: -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; transform: rotate(-9deg); opacity: .5; mask-image: linear-gradient(to bottom, rgb(0 0 0 / .35) 4%, #000 22%, rgb(0 0 0 / .5) 42%, transparent 62%); pointer-events: none; }
-.login-wall__page { display: flex; flex-direction: column; gap: 8px; aspect-ratio: 4 / 3; padding: 16px; border-radius: 12px; background: var(--tone); box-shadow: 0 24px 48px rgb(0 0 0 / .4); }
-.login-wall__page i { height: 9px; width: 58%; border-radius: 5px; background: rgb(17 17 17 / .7); }
-.login-wall__page i + i { height: 6px; width: 82%; background: rgb(17 17 17 / .2); }
-.login-wall__page b { flex: 1; border-radius: 7px; background: rgb(255 255 255 / .75); box-shadow: 0 1px 2px rgb(0 0 0 / .06); }
-.login-wall__page:nth-child(4n + 2) { translate: 0 28px; }
-.login-wall__page:nth-child(4n + 4) { translate: 0 -18px; }
+
+/* The product shot: a viewer window with a pinned comment and the agent's new version, tilted a little in the dark. */
+.login-shot { position: relative; width: min(500px, 100%); margin: 0 0 var(--space-8); perspective: 1400px; }
+.login-shot__window { border-radius: 14px; overflow: hidden; background: #f6f1ea; box-shadow: 0 40px 80px rgb(0 0 0 / .5), 0 0 0 1px rgb(255 255 255 / .06); transform: rotateY(-8deg) rotateX(4deg); transform-origin: left center; }
+.login-shot__bar { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; background: #fff; border-bottom: 1px solid #ebe8e4; color: #141413; font-size: 12px; }
+.login-shot__bar b { font-weight: 600; }
+.login-shot__dots { display: flex; gap: 5px; }
+.login-shot__dots i { width: 8px; height: 8px; border-radius: 50%; background: #e2ded8; }
+.login-shot__share { margin-inline-start: auto; padding: 3px 10px; border-radius: 999px; background: #141413; color: #fff; font-size: 11px; font-weight: 600; }
+.login-shot__page { position: relative; display: grid; gap: 9px; padding: 24px 28px 28px; }
+.login-shot__h { width: 46%; height: 14px; border-radius: 4px; background: #2a2825; }
+.login-shot__line { width: 78%; height: 7px; border-radius: 4px; background: #d9d3ca; }
+.login-shot__line[data-short] { width: 58%; }
+.login-shot__chart { display: flex; align-items: flex-end; gap: 10px; height: 92px; margin-top: 8px; padding: 12px 14px 0; border-radius: 10px; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / .06); }
+.login-shot__chart i { flex: 1; height: calc(var(--h) * 100%); border-radius: 4px 4px 0 0; background: linear-gradient(#c2410c, #ea580c); opacity: .85; }
+.login-shot__pin { position: absolute; top: 18px; left: 52%; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #ea580c; color: #fff; font-size: 12px; font-weight: 700; box-shadow: 0 0 0 3px rgb(234 88 12 / .25); }
+.login-shot__comment { position: absolute; top: 34px; right: -12px; display: flex; gap: 10px; width: 230px; padding: 12px; border-radius: 12px; background: #fff; color: #141413; font-size: 12.5px; line-height: 1.45; box-shadow: 0 20px 40px rgb(0 0 0 / .35); }
+.login-shot__comment p { margin: 0 0 6px; }
+.login-shot__avatar { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: oklch(90% .06 200); color: oklch(38% .1 200); font-size: 11px; font-weight: 700; }
+.login-shot__for-agent { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #fdeee6; color: #c2410c; font-size: 11px; font-weight: 600; }
+.login-shot__toast { position: absolute; bottom: -18px; left: 28px; display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 8px; border-radius: 999px; background: #1f1e1b; color: #f3f0ea; font-size: 12px; box-shadow: 0 16px 32px rgb(0 0 0 / .4), 0 0 0 1px rgb(255 255 255 / .08); }
+.login-shot__check { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #16a34a; color: #fff; font-size: 11px; font-weight: 700; }
+@media (prefers-reduced-motion: no-preference) {
+  .login-shot__comment { animation: login-rise .6s .3s both cubic-bezier(.16, 1, .3, 1); }
+  .login-shot__toast { animation: login-rise .6s .7s both cubic-bezier(.16, 1, .3, 1); }
+}
+@keyframes login-rise { from { opacity: 0; transform: translateY(10px); } }
 /* The card hangs from a fixed top, so a banner appearing above the form never makes it jump. */
 .login-panel { flex: 1 1 420px; min-width: 0; display: grid; justify-items: center; align-content: start; padding: clamp(var(--space-8), 22vh, 240px) var(--space-4) var(--space-6); background: var(--paper-raised); }
 .login-panel { position: relative; }
@@ -228,12 +241,16 @@ html { scrollbar-gutter: stable; }
 @media (max-width: 640px) {
   .login-page { flex-direction: column; flex-wrap: nowrap; }
   .login-story { flex: none; gap: var(--space-4); padding: var(--space-5) var(--space-4); }
-  .login-story__pitch > p, .login-story__pitch > .xxd-cluster, .login-story > footer, .login-wall { display: none; }
+  .login-story__pitch > p, .login-story__pitch > .xxd-cluster, .login-story > footer, .login-shot { display: none; }
   .login-panel { padding-top: var(--space-4); }
   /* In the flow above the card, so it never shares a row with the heading. */
   .login-panel__locale { position: static; justify-self: end; margin-bottom: var(--space-4); }
 }
 
+/* Until a person picks the name others see, a small dot on their avatar says there is something to set. */
+.app-account-button[data-needs-name] { position: relative; }
+.app-account-button[data-needs-name]::after { content: ""; position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: #ea580c; box-shadow: 0 0 0 2px var(--paper); }
+@media (max-width: 640px) { .home-name-nudge { display: none; } }
 .home-count { margin-inline-start: var(--space-3); color: var(--muted-2); font-weight: var(--weight-regular); font-variant-numeric: tabular-nums; }
 .home-header + .artifact-grid { margin-top: var(--space-2); }
 .home-first-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); width: min(720px, 100%); margin: var(--space-2) 0 0; padding: 0; list-style: none; counter-reset: first-step; text-align: start; }

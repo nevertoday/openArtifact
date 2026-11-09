@@ -182,7 +182,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     const homeLink = workspaceName
       ? html`<a class="xxd-btn viewer-bar__home" data-variant="ghost" data-size="sm" href="/" aria-label="${model.m.viewer.bar.home}">${PageShell.icon('House')}<span class="viewer-bar__workspace">${workspaceName}</span></a><span class="viewer-bar__crumb" aria-hidden="true">/</span>`
       : html`<a class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" href="/" aria-label="${model.m.viewer.bar.home}" data-tooltip="${model.m.viewer.bar.home}" data-tooltip-placement="bottom-start">${PageShell.icon('House')}</a>`
-    const brandMark = html`<a class="xxd-btn viewer-bar__brand" data-variant="ghost" data-icon-only data-size="sm" href="/" aria-label="Open Artifact" data-tooltip="Open Artifact" data-tooltip-placement="bottom-start">${PageShell.brandMark(20)}</a>`
+    const brandMark = html`<a class="xxd-btn viewer-bar__brand" data-variant="ghost" data-size="sm" href="/">${PageShell.brandMark(20)}<span class="viewer-bar__label">Open Artifact</span></a><span class="viewer-bar__crumb" aria-hidden="true">/</span>`
     return html`<header class="xxd-topbar viewer-bar">
   ${isVisitor ? brandMark : homeLink}
   <div class="viewer-bar__title">
@@ -195,7 +195,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     ${permissions.canReadComments ? html`<span class="viewer-comment-group">${ViewerPage.#commentCountButton(model.m)}${permissions.canComment ? ViewerPage.#commentModeButton(model) : ''}</span>` : ''}
     ${permissions.canComment && !permissions.canReadComments ? ViewerPage.#commentModeButton(model) : ''}
     ${permissions.canManageSharing ? ViewerPage.#shareButton(model) : ''}
-    ${ViewerPage.#canReport(model) ? html`<button type="button" class="xxd-btn viewer-report" data-variant="ghost" data-size="sm" data-icon-only aria-haspopup="dialog" aria-label="${model.m.viewer.report.open}" data-tooltip="${model.m.viewer.report.open}" data-open-report>${PageShell.icon('Flag', 14)}</button>` : ''}
+    ${ViewerPage.#canReport(model) ? html`<button type="button" class="xxd-btn viewer-report" data-variant="ghost" data-size="sm" aria-haspopup="dialog" data-open-report>${PageShell.icon('Flag', 14)}<span class="viewer-bar__label">${model.m.viewer.report.open}</span></button>` : ''}
     ${isVisitor ? '' : ViewerPage.#moreMenu(model)}
     ${model.identity ? PageShell.accountControls(model.m, model.identity) : ViewerPage.#signInLink(model)}
   </div>
@@ -270,7 +270,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
 
   static #signInLink(model: ViewerModel): SafeHtml {
     const loginPath = `/login?next=${encodeURIComponent(ViewerPage.#pathOf(model, 'viewer'))}`
-    return html`<a class="xxd-link viewer-sign-in" href="${loginPath}">${model.m.viewer.bar.signInToComment}</a>`
+    return html`<a class="xxd-btn viewer-sign-in" data-size="sm" href="${loginPath}">${model.m.viewer.bar.signInToComment}</a>`
   }
 
   static #removalTakesDown(model: ViewerModel): boolean {
@@ -395,7 +395,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     </div>
     <div class="xxd-dialog__body share-dialog__body" data-share-body><p class="viewer-drawer__status"><span class="xxd-spinner" aria-hidden="true"></span>${m.viewer.share.loading}</p></div>
     <div class="xxd-dialog__actions">
-      <span class="xxd-text share-dialog__url" data-variant="caption" data-share-url></span>
+      <span class="share-dialog__spacer"></span>
       <button type="button" class="xxd-btn" data-variant="ghost" data-share-to-x>${PageShell.xLogo(14)}${m.viewer.share.toX}</button>
       <button type="button" class="xxd-btn" data-copy-link data-copy-done="${m.viewer.share.linkCopied}">${PageShell.icon('Copy', 14)}${m.viewer.share.copyLink}</button>
       <button type="submit" class="xxd-btn" data-variant="primary" data-save-sharing disabled>${m.viewer.share.save}</button>

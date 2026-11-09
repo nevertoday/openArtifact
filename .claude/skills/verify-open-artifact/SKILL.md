@@ -52,7 +52,7 @@ This is read-only. For each Worker it checks that the pid is alive, `/health` re
 | --- | --- |
 | Act as the signed-in user over HTTP | `node $V api <METHOD> <path> --as session [--body '<json>'|@file]` (Origin header added, so CSRF checks pass, and `X-Open-Artifact-Workspace` naming the current workspace, as the pages send it; `--workspace <id>` names another, `--workspace none` names none, to see the 409 `workspace_changed`) |
 | Act as an agent over HTTP | `node $V api <METHOD> <path>` (default `--as token`) |
-| Publish a page | `node $V publish --file page.html --title "T" [--visibility workspace\|private\|specified\|public_link]` (prints `path`, the canonical `/a/{slug}-{shortId}`) |
+| Publish a page | `node $V publish --file page.html --title "T" [--client "Claude Code"] [--visibility workspace\|private\|specified\|public_link]` (prints `path`, the canonical `/a/{slug}-{shortId}`) |
 | Act as an agent over MCP | `node $V mcp tools/list`, `node $V mcp <tool> --args '<json>'` |
 | A second person | `node $V sign-in --email member@example.com` (switches the stored session to them; sign in founder again to switch back) |
 | Drive the UI | `node $V browse <path> [--as session\|anon] <steps>` |

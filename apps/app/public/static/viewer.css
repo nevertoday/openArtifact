@@ -32,6 +32,9 @@
 .viewer-visibility[data-visibility="public_link"] .viewer-visibility__dot { background: var(--success, #15803d); }
 .viewer-visibility[data-visibility="private"] .viewer-visibility__dot, .viewer-visibility[data-visibility="specified"] .viewer-visibility__dot { background: var(--ink); }
 .viewer-share-button { gap: 7px; }
+.share-dialog__spacer { flex: 1; }
+.viewer-report { color: var(--muted); }
+.viewer-bar__brand { font-weight: var(--weight-strong); }
 .viewer-share-button .viewer-visibility__dot { display: none; }
 .viewer-share-button:is([data-visibility="public_link"], [data-visibility="private"], [data-visibility="specified"]) .viewer-visibility__dot { display: inline-block; }
 .viewer-share-button[data-visibility="public_link"] .viewer-visibility__dot { background: #4ade80; }
@@ -46,7 +49,7 @@ button.viewer-visibility { cursor: pointer; }
 /* No open comments shows the icon alone; the button's label still says the count to a screen reader. */
 .viewer-count:empty, .viewer-count[data-zero] { display: none; }
 .viewer-comment-mode[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
-.viewer-sign-in { padding-inline: var(--space-2); white-space: nowrap; }
+.viewer-sign-in { white-space: nowrap; }
 .viewer-more-menu__visibility { display: none; }
 .viewer-more-menu__note { display: flex; align-items: flex-start; gap: var(--space-1-5); max-width: 320px; color: var(--muted); font-weight: var(--weight-regular); white-space: normal; }
 
@@ -169,7 +172,6 @@ button.viewer-visibility { cursor: pointer; }
 .comment-pin:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
 .comment-thread__quote { margin: 4px 0 6px; }
 .comment-thread__lost { display: inline-block; margin-inline-end: var(--space-1-5); padding: 0 7px; border-radius: 999px; background: color-mix(in srgb, var(--warning-text) 12%, transparent); color: var(--warning-text); font-weight: var(--weight-medium); line-height: 18px; }
-.comment-thread__quote:has(> .comment-thread__lost:only-child) { padding-inline-start: 0; border-inline-start: 0; }
 .comment-thread__body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .comment-thread[data-state="resolved"] :is(.comment-thread__body, .comment-thread__quote) { color: var(--muted); }
 .comment-replies { display: grid; gap: 10px; margin: 10px 0 0; padding: 0 0 0 var(--space-3); border-inline-start: 1px solid var(--line); list-style: none; }
@@ -230,7 +232,6 @@ button.viewer-visibility { cursor: pointer; }
 .share-grant-form__email { flex: 1 1 200px; }
 .share-person { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; }
 .share-person .xxd-list__main { flex: 1 1 8em; min-width: 0; }
-.share-dialog__url { flex: 1 1 200px; min-width: 0; align-self: center; overflow-wrap: anywhere; }
 
 /* Full view: the artifact alone, filling the tab. */
 .viewer-full { display: flex; flex-direction: column; height: 100dvh; }
