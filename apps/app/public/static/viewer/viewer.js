@@ -56,7 +56,7 @@ const threads = permissions.canReadComments ? new CommentThreads(config.artifact
 const handoff = permissions.canEdit
   ? new AgentHandoff(m.viewerClient.agentPrompt, { artifactId: config.artifactId, title: config.title, version: config.currentVersion, url: `${location.origin}${config.path}`, guideUrl: `${location.origin}/llms.txt` })
   : null
-const list = threads ? new CommentList({ element: drawerElement.querySelector('[data-drawer-view="comments"]'), threads, drawer, stage, canComment: permissions.canComment, byTouch: writesByTouch, handoff }) : null
+const list = threads ? new CommentList({ element: drawerElement.querySelector('[data-drawer-view="comments"]'), artifactId: config.artifactId, threads, drawer, stage, canComment: permissions.canComment, byTouch: writesByTouch, handoff }) : null
 const pins = threads ? new CommentPins({ frame, threads, list, isShowingLatest: () => versions?.isShowingLatest ?? true }) : null
 
 if (threads) {

@@ -232,7 +232,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
       <button type="button" class="xxd-btn" data-size="xs" data-variant="danger" data-purge-artifact="${summary.artifactId}" data-title="${summary.title}">${PageShell.icon('Trash2', 14)}${m.home.removedTable.purge}</button></td>
   </tr>`
     }
-    return html`${header}<div class="xxd-table-wrap"><table class="xxd-table">
+    return html`${header}<div class="xxd-table-wrap"><table class="xxd-table stack-table">
   <thead><tr><th>${m.home.removedTable.title}</th><th>${m.home.removedTable.removed}</th><th>${m.home.removedTable.kept}</th><th class="xxd-table__actions"><span class="xxd-sr-only">${m.home.removedTable.actions}</span></th></tr></thead>
   <tbody>${removedArtifacts.map(row)}</tbody>
 </table></div>`

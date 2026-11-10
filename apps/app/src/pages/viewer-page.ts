@@ -108,7 +108,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     const body = html`<div class="viewer-full">
 <header class="viewer-full__bar">
   <a class="xxd-btn" data-variant="ghost" data-size="sm" href="${ViewerPage.#pathOf(model, 'viewer')}">${PageShell.icon('ArrowLeft')}${model.m.viewer.full.back}</a>
-  <span class="viewer-full__title" tabindex="0" data-tooltip="${summary.title}" data-tooltip-placement="bottom-start">${summary.title}</span>
+  <span class="viewer-full__title" title="${summary.title}">${summary.title}</span>
   <span class="xxd-text xxd-mono" data-variant="caption">v${model.shownVersion}</span>
 </header>
 <div class="viewer-full__frame"><iframe id="artifact-frame" src="${model.artifactUrl}" title="${summary.title}" sandbox="${ARTIFACT_SANDBOX}" referrerpolicy="no-referrer"></iframe></div>
@@ -186,7 +186,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     return html`<header class="xxd-topbar viewer-bar">
   ${isVisitor ? brandMark : homeLink}
   <div class="viewer-bar__title">
-    <span class="viewer-bar__name" tabindex="0" data-tooltip="${summary.title}" data-tooltip-placement="bottom-start" data-artifact-title>${summary.title}</span>
+    <span class="viewer-bar__name" data-artifact-title>${summary.title}</span>
     ${permissions.canSeeVersions ? ViewerPage.#versionPicker(model) : ''}
     ${isVisitor && model.authorName ? html`<span class="viewer-bar__author">${model.m.viewer.bar.byAuthor(model.authorName)}</span>` : ''}
   </div>
@@ -252,7 +252,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     const visibility = summary.sharing.visibility
     const content = html`<span class="viewer-visibility__dot" aria-hidden="true"></span><span data-visibility-label>${label}</span>`
     if (permissions.canManageSharing) return html`<button type="button" class="viewer-visibility" data-visibility="${visibility}" data-tooltip="${model.m.viewer.visibility.tooltipManage}" data-open-share>${content}</button>`
-    return html`<span class="viewer-visibility" data-visibility="${visibility}" tabindex="0" data-tooltip="${model.m.viewer.visibility.tooltip}">${content}</span>`
+    return html`<span class="viewer-visibility" data-visibility="${visibility}" title="${model.m.viewer.visibility.tooltip}">${content}</span>`
   }
 
   // How far the page reaches rides on the share button as a dot, with the words on hover and in the ⋯ menu.

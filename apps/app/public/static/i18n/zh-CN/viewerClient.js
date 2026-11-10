@@ -275,7 +275,7 @@ export default {
     listed: '列在我的主页',
     personalPage: '看我的主页',
     listedHint: '陌生人能在你的主页上看到它，搜索引擎也能找到。',
-    notListable: '设了访问密码的文档不能列出。',
+    notListable: '设了访问密码的页面不能列出。',
     neverExpires: '永不过期',
     /** @param {number} days */
     expiresIn: days => `${days} 天后过期`,

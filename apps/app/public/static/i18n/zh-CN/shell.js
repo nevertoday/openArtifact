@@ -23,7 +23,7 @@ export default {
   },
   deletedWorkspacesDialog: {
     title: '最近删除的工作区',
-    description: '删除后 30 天内，管理员可以恢复工作区和其中的 artifact；之后它们会被彻底删除。',
+    description: '删除后 30 天内，管理员可以恢复工作区和其中的 页面；之后它们会被彻底删除。',
     restore: '恢复',
   },
   cancel: '取消',

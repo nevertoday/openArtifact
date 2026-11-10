@@ -9,7 +9,7 @@
 .viewer-bar { position: relative; z-index: var(--z-dock); flex: none; height: 48px; gap: var(--space-1); padding-inline: var(--space-2); background: var(--paper); }
 .viewer-bar__home { flex: 0 1 auto; min-width: 0; max-width: 220px; color: var(--muted); }
 .viewer-bar__workspace { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.viewer-bar__crumb { flex: none; color: var(--muted-2); }
+.viewer-bar__crumb { flex: none; color: var(--muted); }
 /* With one version there is no history to open: the label stays as a quiet fact, without its menu. */
 .viewer-version[data-only-version] { pointer-events: none; color: var(--muted); }
 .viewer-version[data-only-version] > :not([data-version-label]) { display: none; }
@@ -326,3 +326,4 @@ button.viewer-visibility { cursor: pointer; }
 }
 
 .viewer-report { white-space: nowrap; }
+.comment-reply-prompt__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

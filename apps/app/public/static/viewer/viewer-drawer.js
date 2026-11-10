@@ -16,6 +16,8 @@ export class ViewerDrawer {
   #toggleButton
   #view = 'comments'
   #returnFocusTo = null
+  /** The sheet put an entry in the history when it opened, so the phone's back button closes it. */
+  #holdsHistoryEntry = false
 
   constructor(viewer, element, toggleButton) {
     this.#viewer = viewer
@@ -23,6 +25,13 @@ export class ViewerDrawer {
     this.#toggleButton = toggleButton
     element.querySelector('[data-close-drawer]').addEventListener('click', () => this.close())
     this.#wireSheetHandle(element.querySelector('[data-drawer-handle]'))
+    window.addEventListener('popstate', () => {
+      if (!this.#holdsHistoryEntry) return
+      this.#holdsHistoryEntry = false
+      this.close()
+    })
+    // Reloaded while the sheet was open: its entry is still on top with nothing to close, so step off it.
+    if (history.state?.viewerSheet) history.back()
   }
 
   get isOpen() {
@@ -49,6 +58,10 @@ export class ViewerDrawer {
       this.#returnFocusTo = document.activeElement
       this.#element.hidden = false
       this.#viewer.dataset.sheetHeight = 'half'
+      if (this.isSheet) {
+        history.pushState({ viewerSheet: true }, '')
+        this.#holdsHistoryEntry = true
+      }
     }
     if (focusTitle) this.#element.querySelector('[data-drawer-title]').focus({ preventScroll: true })
     this.#showToggleState()
@@ -65,6 +78,10 @@ export class ViewerDrawer {
     this.#element.hidden = true
     if (focusWasInside) (this.#toggleButton ?? this.#returnFocusTo)?.focus()
     this.#showToggleState()
+    if (this.#holdsHistoryEntry) {
+      this.#holdsHistoryEntry = false
+      history.back()
+    }
   }
 
   #showToggleState() {

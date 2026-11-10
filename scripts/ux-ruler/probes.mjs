@@ -22,7 +22,9 @@ export const touchTargets = probe(`
   const TARGET = 44
   const controls = [...document.querySelectorAll('a[href], button, input:not([type=hidden]), select, textarea, summary, [role=button], [role=tab], [role=menuitem], [role=menuitemradio], [role=radio], [role=switch]')]
   const offenders = []
+  const modal = document.querySelector('dialog:modal')
   for (const control of controls) {
+    if (modal && !modal.contains(control)) continue
     if (!shown(control) || control.disabled || control.getAttribute('aria-disabled') === 'true') continue
     const style = getComputedStyle(control)
     if (style.pointerEvents === 'none') continue

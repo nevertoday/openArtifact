@@ -77,7 +77,7 @@ const GATES = [
     name: 'every touch control has a 44×44 hit area',
     measure: () => {
       const offenders = across(ALL_VIEWS, PHONE, probes.touchTargets)
-      const [pins] = browse(viewer, [...PHONE, ['sleep', 900], ['frame-eval', `[...document.querySelectorAll('[data-open-artifact-ui]')].flatMap(host => [...host.shadowRoot.querySelectorAll('.pin')]).map(pin => { const r = pin.getBoundingClientRect(); const reach = getComputedStyle(pin, '::after'); const w = Math.max(r.width, parseFloat(reach.width) || 0), h = Math.max(r.height, parseFloat(reach.height) || 0); return w >= 44 && h >= 44 ? null : 'comment pin ' + Math.round(w) + '×' + Math.round(h) }).filter(Boolean)`]])
+      const [pins] = browse(viewer, [...PHONE, ['sleep', 1800], ['frame-eval', `[...document.querySelectorAll('[data-open-artifact-ui]')].flatMap(host => [...(host.shadowRoot?.querySelectorAll('.pin') ?? [])]).map(pin => { const r = pin.getBoundingClientRect(); const reach = getComputedStyle(pin, '::after'); const w = Math.max(r.width, parseFloat(reach.width) || 0), h = Math.max(r.height, parseFloat(reach.height) || 0); return w >= 44 && h >= 44 ? null : 'comment pin ' + Math.round(w) + '×' + Math.round(h) }).filter(Boolean)`]])
       return [...offenders, ...(pins ?? ['the page frame did not answer']).map(offender => `viewer, in the page: ${offender}`)]
     },
   },

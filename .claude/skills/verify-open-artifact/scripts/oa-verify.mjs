@@ -395,6 +395,7 @@ async function browse(run, target, steps, flags) {
     for (let i = 0; i < 100; i++) { if ((await evaluate('document.readyState')) === 'complete') break; await sleep(100) }
     results.push({ step: 'navigate', url, finalUrl: await evaluate('location.href'), title: await evaluate('document.title') })
     const sel = s => JSON.stringify(s)
+    let touchScreen = false
     for (const step of steps) {
       if (step.name === 'wait') {
         let found = false
@@ -417,7 +418,8 @@ async function browse(run, target, steps, flags) {
       } else if (step.name === 'viewport') {
         const [width, height] = step.value.split('x').map(Number)
         await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 700 })
-        await send('Emulation.setTouchEmulationEnabled', { enabled: width < 700, maxTouchPoints: 5 })
+        touchScreen = width < 700
+        await send('Emulation.setTouchEmulationEnabled', { enabled: touchScreen, maxTouchPoints: 5 })
         results.push({ step: 'viewport', width, height })
       } else if (step.name === 'scheme') {
         await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: step.value }] })
@@ -444,8 +446,10 @@ async function browse(run, target, steps, flags) {
         if (!frameTarget) throw new Error(`--frame-eval: no iframe target from ${run.origins.usercontent}`)
         const frameWs = new WebSocket(frameTarget.webSocketDebuggerUrl)
         await new Promise((ok, no) => { frameWs.onopen = ok; frameWs.onerror = no })
+        // The frame is its own DevTools target, so the phone's touch screen has to be emulated there too.
         const value = await new Promise(ok => {
           frameWs.onmessage = event => { const m = JSON.parse(event.data); if (m.id === 1) ok(m.result?.result?.value ?? null) }
+          frameWs.send(JSON.stringify({ id: 0, method: 'Emulation.setTouchEmulationEnabled', params: { enabled: touchScreen, maxTouchPoints: 5 } }))
           frameWs.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: step.value, returnByValue: true, awaitPromise: true } }))
         })
         frameWs.close()
