@@ -273,7 +273,7 @@ ${deletedWorkspaces.length > 0 ? PageShell.#deletedWorkspacesDialog(m, deletedWo
     const choice = (locale: Locale) => {
       const current = locale === m.meta.lang
       return role === 'menu'
-        ? html`<button type="submit" class="xxd-menu__item" role="menuitemradio" aria-checked="${String(current)}" name="locale" value="${locale}" lang="${locale}">${PageShell.icon(current ? 'Check' : 'Globe', 14)}${messagesFor(locale).meta.name}</button>`
+        ? html`<button type="submit" class="xxd-menu__item" role="menuitemradio" aria-checked="${String(current)}" name="locale" value="${locale}" lang="${locale}">${PageShell.icon('Globe', 14)}${messagesFor(locale).meta.name}</button>`
         : html`<button type="submit" class="xxd-btn" data-variant="ghost" data-size="xs" name="locale" value="${locale}" lang="${locale}" aria-pressed="${String(current)}">${messagesFor(locale).meta.name}</button>`
     }
     return html`<form method="post" action="/locale" class="${role === 'bar' ? 'xxd-btn-group app-locale-switch' : 'app-locale-switch'}" aria-label="${m.shell.language}">${LOCALES.map(choice)}</form>`

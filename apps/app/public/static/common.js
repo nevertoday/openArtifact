@@ -321,6 +321,8 @@ function wireNotificationBell() {
   if (bell && panel) new NotificationBell(bell, panel).refresh()
 }
 
+// On a phone the side navigation is a strip that scrolls sideways; the current page starts in view.
+document.querySelector('.app-sidebar [aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'center' })
 renderServerTimes()
 wireSignOut()
 wireWorkspaceMenu()

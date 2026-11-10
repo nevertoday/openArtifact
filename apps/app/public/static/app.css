@@ -65,7 +65,7 @@
   .app-workspace-switcher { max-width: 52vw; }
   .app-frame { flex-direction: column; }
   .app-sidebar { width: auto; border-right: 0; border-bottom: 1px solid var(--line); }
-  .app-sidebar .xxd-sidebar__body { position: static; display: flex; overflow-x: auto; scrollbar-width: none; mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); padding-inline-end: 40px; }
+  .app-sidebar .xxd-sidebar__body { position: static; display: flex; overflow-x: auto; scrollbar-width: none; mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent); padding-inline-end: 64px; }
   .app-sidebar .xxd-sidebar__group { display: flex; flex: none; }
   .app-sidebar .xxd-sidebar__group + .xxd-sidebar__group { margin-top: 0; }
   .app-sidebar .xxd-sidebar__label { display: none; }
@@ -79,10 +79,9 @@
 }
 
 /* Home: artifact cards. The cover is a monochrome sketch of a page until the live preview loads over it. */
-.artifact-grid { --grid-min: 240px; }
-/* Every card in a row is as tall as the tallest in that row; a long title stops at two lines and shows in full on hover. */
-.artifact-card .xxd-card__body { grid-template-rows: auto auto 1fr; }
-.artifact-card__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--text-md); line-height: var(--leading-md); }
+.artifact-grid { --grid-min: 280px; }
+/* Every card is the same height: a long title stops at one line and shows in full on hover. */
+.artifact-card__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-md); line-height: var(--leading-md); }
 .artifact-card .xxd-card__meta { font-size: var(--text-sm); }
 .artifact-cover { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--inset-md); --ratio: 4 / 3; }
 .artifact-cover__title { width: 55%; height: 10px; background: var(--line-strong); }
@@ -99,14 +98,16 @@
 /* 12px taller than the cover, so lifting it 4px on hover never shows the cover's ground beneath it. */
 .artifact-cover__preview { position: absolute; inset: 0 auto auto 0; width: 300%; height: calc(300% + 12px); border: 0; transform: scale(calc(1 / 3)); transform-origin: 0 0; pointer-events: none; }
 .xxd-card__media.artifact-cover { border-bottom: 1px solid var(--line); }
-/* One line that never cuts a word short: what does not fit wraps below the line and is clipped whole, so a narrow
-   card gives up the version, then the time, and keeps who published it and with which agent. */
-.artifact-meta { display: flex; flex-wrap: wrap; align-items: center; height: 20px; margin: 0; overflow: hidden; white-space: nowrap; line-height: 20px; }
-.artifact-meta > * { flex: none; }
-.artifact-meta > :is(time, .xxd-mono)::before { content: "·"; padding-inline: var(--space-1-5); color: var(--muted); }
-.artifact-meta > .xxd-avatar { --avatar-size: 20px; margin-inline-end: var(--space-2); font-size: 10px; }
-.artifact-meta__who { flex: 0 1 auto; min-width: 0; max-width: calc(100% - 28px); overflow: hidden; text-overflow: ellipsis; }
-.artifact-meta__agent { display: inline-flex; align-items: center; gap: 5px; margin-inline-start: var(--space-2); }
+/* Every card carries the same facts in the same places: the title with its version and time at the end of the line,
+   then who published it and with which agent. Only a name too long for the card is ever cut short. */
+.artifact-card__head { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+.artifact-card__head > .artifact-card__title { flex: 1 1 auto; min-width: 0; margin: 0; }
+.artifact-card__when { flex: none; color: var(--muted); font-size: var(--text-xs); white-space: nowrap; }
+.artifact-card__when > .xxd-mono + time::before { content: "·"; padding-inline: var(--space-1-5); }
+.artifact-meta { display: flex; align-items: center; margin: 0; white-space: nowrap; }
+.artifact-meta > .xxd-avatar { flex: none; --avatar-size: 20px; margin-inline-end: var(--space-2); font-size: 10px; }
+.artifact-meta__who { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.artifact-meta__agent { flex: none; display: inline-flex; align-items: center; gap: 5px; margin-inline-start: var(--space-2); }
 .artifact-cover__sketch { display: contents; }
 /* An agent's mark: a small square in the colour of its name (avatar.js), where a person has a round initial. */
 .agent-mark { flex: none; display: inline-block; width: 8px; height: 8px; border-radius: 2.5px; background: oklch(62% 0.15 var(--avatar-hue, 260)); }
@@ -277,7 +278,7 @@
 .home-toolbar__tag > [data-xxd-icon] { color: var(--muted); }
 .home-more { display: flex; justify-content: center; margin: var(--space-6) 0 0; }
 .home-more:has(+ .artifact-grid) { justify-content: flex-start; margin: 0 0 var(--space-4); }
-@media (max-width: 640px) { .home-toolbar__select { flex: 1 1 0; min-width: 0; } .home-toolbar__select > select { width: 100%; max-width: none; } .home-toolbar__spacer { display: none; } }
+@media (max-width: 640px) { .home-toolbar__select { flex: 1 1 0; min-width: 0; } .home-toolbar__select > select { width: 100%; max-width: none; } .home-toolbar__spacer { display: none; } .home-toolbar__tag { order: 1; } .home-header .xxd-page-header__actions { display: none; } }
 .home-first-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); width: min(720px, 100%); margin: var(--space-2) 0 0; padding: 0; list-style: none; counter-reset: first-step; text-align: start; }
 .home-first-steps li { counter-increment: first-step; display: grid; gap: var(--space-2); padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--paper); color: var(--ink); font-size: var(--text-sm); line-height: 1.55; }
 .home-first-steps li::before { content: counter(first-step); display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: var(--paper); font-size: var(--text-xs); font-weight: var(--weight-strong); }
@@ -348,7 +349,8 @@ td .xxd-btn[data-variant="danger-outline"][data-size="xs"]:not(:hover, :focus-vi
 @media (max-width: 640px) {
   .stack-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .stack-table, .stack-table tbody { display: block; }
-  .stack-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
+  .stack-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line); }
+  .stack-table tr:last-child { border-bottom: 0; }
   .stack-table td { display: block; min-width: 0; padding: 0; border: 0; white-space: normal; overflow-wrap: anywhere; }
   .stack-table td:first-child { flex-basis: 100%; font-weight: var(--weight-medium); }
   .stack-table td.xxd-table__actions { flex-basis: 100%; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: var(--space-2); margin-top: var(--space-2); }

@@ -226,7 +226,7 @@ ${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(mod
     const hasCards = page.total > 0
     return html`${model.identity.hasChosenName || !hasCards ? '' : HomePage.#nameNudge(m, model.identity)}<header class="xxd-page-header home-header">
   <div class="xxd-page-header__row">
-    <h1 class="xxd-page-header__title">${query.filter === 'all' ? m.home.headingAll : m.home.filters[query.filter]}${hasCards && query.search.trim() === '' ? html`<span class="home-count">${String(page.total)}</span>` : ''}</h1>
+    <h1 class="xxd-page-header__title">${query.search.trim() !== '' ? m.home.headingSearch : query.filter === 'all' ? m.home.headingAll : m.home.filters[query.filter]}${hasCards && query.search.trim() === '' ? html`<span class="home-count">${String(page.total)}</span>` : ''}</h1>
     ${hasCards ? html`<div class="xxd-page-header__actions"><a class="xxd-btn" data-variant="primary" href="/settings/agents">${m.home.letAgentPublish}</a></div>` : ''}
   </div>
   <p class="xxd-page-header__desc">${m.home.filterDescriptions[query.filter]}</p>
@@ -362,7 +362,8 @@ ${hasCards ? HomePage.#grid(model) : HomePage.#emptyState(HomePage.#emptyStateOf
     const publishedBy = ArtifactLabels.publishedBy(m, authorName, summary.publishedVia)
     // Visible to the workspace is the default, which the 全部 description states, so only a different reach gets a badge.
     const visibility = summary.sharing.visibility
-    const sharingBadge = visibility === 'workspace' ? '' : html`<span class="artifact-chip" data-visibility="${visibility}">${PageShell.icon(SHARING_ICONS[visibility], 14)}${ArtifactLabels.sharingBadge(m, summary.sharing, model.now)}</span>`
+    // The chip names the reach alone; a public link's expiry and password are a hover away, off the cover.
+    const sharingBadge = visibility === 'workspace' ? '' : html`<span class="artifact-chip" data-visibility="${visibility}" title="${ArtifactLabels.sharingBadge(m, summary.sharing, model.now)}">${PageShell.icon(SHARING_ICONS[visibility], 14)}${ArtifactLabels.visibility(m, visibility)}</span>`
     const commentsText = m.home.unresolvedComments({ count: unresolvedCount, forAgent: forAgentCount })
     const commentBadge = unresolvedCount > 0 ? html`<span class="artifact-chip artifact-chip--comments" title="${commentsText}"><span class="artifact-chip__dot"></span>${PageShell.icon('MessageSquare', 14)}<span aria-hidden="true">${String(unresolvedCount)}</span><span class="xxd-sr-only">${commentsText}</span></span>` : ''
     const otherWorkspace = model.workspaceNames.get(summary.workspaceId)
@@ -377,8 +378,11 @@ ${hasCards ? HomePage.#grid(model) : HomePage.#emptyState(HomePage.#emptyStateOf
     ${commentBadge}
   </div>
   <div class="xxd-card__body">
-    <p class="xxd-card__title artifact-card__title" title="${summary.title}">${summary.title}</p>
-    <p class="xxd-card__meta artifact-meta" title="${publishedBy} · ${ArtifactLabels.updatedAgo(m, summary.updatedAt, model.now)}${summary.version > 1 ? ` · v${summary.version}` : ''}">${PageShell.avatar(authorName, { size: 'sm' })}<span class="artifact-meta__who">${authorName}</span>${summary.publishedVia ? html`<span class="artifact-meta__agent">${PageShell.agentMark(summary.publishedVia)}${summary.publishedVia}</span>` : ''}${PageShell.relativeTime(m, summary.updatedAt, model.now)}${summary.version > 1 ? html`<span class="xxd-mono">v${summary.version}</span>` : ''}</p>
+    <div class="artifact-card__head">
+      <p class="xxd-card__title artifact-card__title" title="${summary.title}">${summary.title}</p>
+      <span class="artifact-card__when">${summary.version > 1 ? html`<span class="xxd-mono">v${summary.version}</span>` : ''}${PageShell.relativeTime(m, summary.updatedAt, model.now)}</span>
+    </div>
+    <p class="xxd-card__meta artifact-meta" title="${publishedBy}">${PageShell.avatar(authorName, { size: 'sm' })}<span class="artifact-meta__who">${authorName}</span>${summary.publishedVia ? html`<span class="artifact-meta__agent">${PageShell.agentMark(summary.publishedVia)}${summary.publishedVia}</span>` : ''}</p>
   </div>
 </a>`
   }

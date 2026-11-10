@@ -202,7 +202,7 @@ export class PageRoutes {
     const identity = await this.#context.identity()
     const reference = ArtifactPath.parse(segment)
     const openedArtifact = reference ? await this.#context.gate.openReferenced(reference, identity, request) : null
-    if (!openedArtifact) return MessagePages.notFound(await this.#context.messages(), identity ? null : PageRoutes.#pathOf(request))
+    if (!openedArtifact) return MessagePages.notFound(await this.#context.messages(), identity ? null : PageRoutes.#pathOf(request), identity)
     if (!openedArtifact.permissions.canView) return this.#refusal(request, segment, openedArtifact, identity)
     // The redirect spells out the artifact's words, so it comes only after the same check that shows its title.
     if (segment !== ArtifactPath.segmentOf(openedArtifact.summary)) return PageRoutes.#movedTo(`${ArtifactPath.of(openedArtifact.summary, page)}${new URL(request.url).search}`)
@@ -347,8 +347,8 @@ export class PageRoutes {
     if (permissions.needsPublicLinkPassword) return MessagePages.publicLinkPassword(await this.#context.messages(), ArtifactPath.atSegment(segment, 'unlock'), PageRoutes.#passwordPromptOf(request))
     if (!identity) return this.#redirectToLogin(request)
     // Whoever can bring a removed page back is told it was removed, not that it never existed.
-    if (summary.removal !== null && permissions.canRestore) return MessagePages.removed(await this.#context.messages(), summary.artifactId, summary.title, summary.removal.purgeAt, Date.now())
-    if (!ArtifactGate.mayAskForAccess(openedArtifact, identity)) return MessagePages.notFound(await this.#context.messages(), null)
+    if (summary.removal !== null && permissions.canRestore) return MessagePages.removed(await this.#context.messages(), identity, summary.artifactId, summary.title, summary.removal.purgeAt, Date.now())
+    if (!ArtifactGate.mayAskForAccess(openedArtifact, identity)) return MessagePages.notFound(await this.#context.messages(), null, identity)
     const authorNames = await this.#context.people.namesOf([summary.authorId])
     return MessagePages.noAccess(await this.#context.messages(), summary.artifactId, authorNames.get(summary.authorId) ?? '')
   }

@@ -223,7 +223,7 @@ describe('home page', () => {
     }
 
     expect(cardOf('Team roadmap')).not.toContain('工作区内可见')
-    expect(cardOf('Private notes')).toMatch(/<span class="artifact-chip" data-visibility="private">.*私有<\/span>/)
+    expect(cardOf('Private notes')).toMatch(/<span class="artifact-chip" data-visibility="private"[^>]*>.*私有<\/span>/)
     expect(cardOf('Team roadmap')).not.toContain('>v1</span>')
     expect(cardOf('Revised brief')).toContain('<span class="xxd-mono">v2</span>')
     expect(newcomerHome).toMatch(/href="\/\?filter=mine"[^>]*>.*?我发布的<\/span><span class="xxd-badge"\s+title="0 个页面"><\/span>/)

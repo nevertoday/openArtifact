@@ -24,6 +24,7 @@ export default {
     text: name => `现在团队成员在评论和通知里看到的是「${name}」。设一个大家认得出的名字。`,
     action: '去设置',
   },
+  headingSearch: '搜索结果',
   headingAll: '全部',
   /** @param {number} count */
   resultCount: count => `${count} 个`,
@@ -40,9 +41,9 @@ export default {
   toolbar: {
     label: '筛选和排序',
     source: '来源',
-    allSources: '全部来源',
+    allSources: '来源',
     visibility: '可见范围',
-    allVisibilities: '全部可见范围',
+    allVisibilities: '可见范围',
     sort: '排序',
     sorts: { updated: '最近更新', title: '按标题', comments: '待处理评论最多' },
     /** @param {{ label: string, count: number }} p */
