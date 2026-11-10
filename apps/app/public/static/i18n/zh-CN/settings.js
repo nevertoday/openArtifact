@@ -2,10 +2,11 @@
 export default {
   sections: { profile: '个人资料', agents: 'Agent 接入', members: '成员', workspace: '工作区设置' },
   topBarContext: '/ 设置',
-  sidebar: { label: '设置分类', personal: '个人' },
+  sidebar: { label: '设置分类', personal: '个人', back: '返回工作区' },
   save: '保存',
   actions: '操作',
   agents: {
+    upcoming: '接下来的步骤',
     description: 'Claude Code、Codex、Cursor、Gemini CLI 等 agent 以你的身份发布和修改 artifact。agent 能做什么，由 token 的权限决定。',
     naming: {
       title: '1 · 给这个 agent 起个名字',
@@ -80,7 +81,7 @@ export default {
   },
   members: {
     /** @param {{ count: number, isAdmin: boolean }} p */
-    summary: ({ count, isAdmin }) => `${count} 人。${isAdmin ? '' : '要请同事加入，请管理员邀请。'}`,
+    summary: ({ count, isAdmin }) => (isAdmin ? `${count} 位成员` : `${count} 位成员。要请同事加入，请管理员邀请。`),
     you: '（你）',
     allMembers: '全部成员',
     columns: { name: '名字', email: '邮箱', role: '角色' },

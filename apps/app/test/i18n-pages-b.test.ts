@@ -27,7 +27,7 @@ async function englishPage(path: string, cookie: string): Promise<string> {
 // Allowed: the switch names 中文 in Chinese, agent-facing guide text glosses labels as `Label (标签)`, the audit log
 // quotes the workspace's stored name, a personal workspace keeps the name it was given in Chinese at sign-up, and
 // ArtifactLabels' wording is migrated by another area.
-const ALLOWED = ['我的团队', '[a-z]+的工作区']
+const ALLOWED = ['我的团队', '[a-z]+ 的工作区']
 const chineseLines = (markup: string) =>
   markup
     .replace(/lang="zh-CN">(<i [^>]*><\/i>)?中文/g, '')
@@ -65,7 +65,7 @@ describe('server-rendered pages in English', () => {
     const profile = await englishPage('/settings/profile', adminCookie)
 
     expect(profile).toContain('<legend class="xxd-label">Appearance</legend>')
-    expect(profile).toMatch(/value="system" checked><span>System<\/span>/)
+    expect(profile).toMatch(/value="system" checked>.*?<\/span><span>System<\/span>/)
     expect(profile).toContain("You sign in with your email, so it can&#39;t be changed.")
     expect(chineseLines(profile)).toEqual([])
   })

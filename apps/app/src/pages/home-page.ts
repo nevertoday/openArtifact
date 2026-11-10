@@ -1,5 +1,5 @@
 import type { Messages } from '../i18n/messages.ts'
-import { ArtifactPath, type CommentThread, type DeletedWorkspace } from '@open-artifact/core'
+import { ArtifactPath, type ArtifactVisibility, type CommentThread, type DeletedWorkspace } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
 import type { Identity } from '../auth/request-identity.ts'
 import { ArtifactLabels } from './artifact-labels.ts'
@@ -164,7 +164,11 @@ interface EmptyState {
   title: string
   text: string
   actions: { label: string; href: string; primary: boolean }[]
+  /** How a new workspace gets going, shown as numbered cards under the text. */
+  steps?: readonly string[]
 }
+
+const SHARING_ICONS = { private: 'Lock', specified: 'UserRound', public_link: 'Globe' } as const satisfies Record<Exclude<ArtifactVisibility, 'workspace'>, IconName>
 
 export class HomePage {
   static render(model: HomeModel): Response {
@@ -177,22 +181,19 @@ ${PageShell.jsonData('home-config', { justRemoved: HomePage.#justRemovedJson(mod
   }
 
   static #artifactsSection(shownArtifacts: OpenedArtifact[], model: HomeModel): SafeHtml {
-    return html`${model.identity.hasChosenName ? '' : HomePage.#nameNudge(model.m, model.identity)}<header class="xxd-page-header home-header">
+    return html`${model.identity.hasChosenName || shownArtifacts.length === 0 ? '' : HomePage.#nameNudge(model.m, model.identity)}<header class="xxd-page-header home-header">
   <div class="xxd-page-header__row">
-    <h1 class="xxd-page-header__title">${HomePage.#heading(model.m, model.query)}</h1>
-    <div class="xxd-page-header__actions"><a class="xxd-btn" data-variant="primary" href="/settings/agents">${model.m.home.letAgentPublish}</a></div>
+    <h1 class="xxd-page-header__title">${HomePage.#heading(model.m, model.query)}${shownArtifacts.length > 0 && model.query.search.trim() === '' ? html`<span class="home-count">${String(shownArtifacts.length)}</span>` : ''}</h1>
+    ${shownArtifacts.length > 0 ? html`<div class="xxd-page-header__actions"><a class="xxd-btn" data-variant="primary" href="/settings/agents">${model.m.home.letAgentPublish}</a></div>` : ''}
   </div>
   <p class="xxd-page-header__desc">${HomePage.#description(model.m, model.query)}</p>
 </header>
-${HomePage.#resultLine(model.m, shownArtifacts.length, model.query)}
+${model.query.search.trim() !== '' ? HomePage.#resultLine(model.m, shownArtifacts.length, model.query) : ''}
 ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#emptyState(HomePage.#emptyStateOf(model.m, model.query, model.identity))}`
   }
 
   static #nameNudge(m: Messages, identity: Identity): SafeHtml {
-    return html`<div class="xxd-banner home-name-nudge" role="status">${PageShell.icon('UserRound')}<div>
-  <p class="xxd-banner__title">${m.home.nameNudge.title}</p>
-  <p class="xxd-banner__text">${m.home.nameNudge.text(identity.name)}</p>
-</div><div class="xxd-banner__actions"><a class="xxd-btn" data-size="sm" href="/settings/profile">${m.home.nameNudge.action}</a></div></div>`
+    return html`<a class="home-name-nudge" href="/settings/profile">${PageShell.avatar(identity.name, { size: 'sm' })}<b>${m.home.nameNudge.title}</b><span>${m.home.nameNudge.text(identity.name)}</span>${PageShell.icon('ArrowRight', 14)}</a>`
   }
 
   // The heading names what the list shows, so it never runs the workspace name into a sentence.
@@ -283,7 +284,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">${m.home.sidebar.filter}</div>${ARTIFACT_FILTERS.map(filterLink)}</div>
     <div class="xxd-sidebar__group"><div class="xxd-sidebar__label">${m.home.sidebar.waiting}</div>${WAITING_FILTERS.map(filterLink)}</div>
   </div>
-  ${agentCounts.length > 0 ? html`<div class="xxd-sidebar__group home-sidebar__sources"><div class="xxd-sidebar__label">${m.home.sidebar.sources}</div>${agentCounts.map(agentLink)}</div>` : ''}
+  ${agentCounts.length > 1 ? html`<div class="xxd-sidebar__group home-sidebar__sources"><div class="xxd-sidebar__label">${m.home.sidebar.sources}</div>${agentCounts.map(agentLink)}</div>` : ''}
   ${agentCounts.length > 1 || model.query.agent !== null ? HomePage.#sourcePicker(model, agentCounts) : ''}
 </div></nav>`
   }
@@ -312,20 +313,24 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     const forAgentCount = model.listing.forAgentCount(summary.artifactId)
     const publishedBy = ArtifactLabels.publishedBy(model.m, model.authorNames.get(summary.authorId) ?? '', summary.publishedVia)
     // Visible to the workspace is the default, which the 全部 description states, so only a different reach gets a badge.
-    const sharingBadge = summary.sharing.visibility === 'workspace' ? '' : html`<span class="xxd-badge">${ArtifactLabels.sharingBadge(model.m, summary.sharing, model.now)}</span>`
-    const commentBadge = unresolvedCount > 0 ? html`<span class="xxd-badge" data-appearance="dot" data-tone="warning">${model.m.home.unresolvedComments({ count: unresolvedCount, forAgent: forAgentCount })}</span>` : ''
+    const visibility = summary.sharing.visibility
+    const sharingBadge = visibility === 'workspace' ? '' : html`<span class="artifact-chip" data-visibility="${visibility}">${PageShell.icon(SHARING_ICONS[visibility], 14)}${ArtifactLabels.sharingBadge(model.m, summary.sharing, model.now)}</span>`
+    const commentsText = model.m.home.unresolvedComments({ count: unresolvedCount, forAgent: forAgentCount })
+    const commentBadge = unresolvedCount > 0 ? html`<span class="artifact-chip artifact-chip--comments" title="${commentsText}"><span class="artifact-chip__dot"></span>${PageShell.icon('MessageSquare', 14)}${String(unresolvedCount)}<span class="xxd-sr-only">${commentsText}</span></span>` : ''
     const otherWorkspace = model.workspaceNames.get(summary.workspaceId)
-    const workspaceBadge = otherWorkspace === undefined ? '' : html`<span class="xxd-badge" data-tone="action" title="${model.m.home.fromWorkspace(otherWorkspace)}">${PageShell.icon('Users', 14)}${otherWorkspace}</span>`
+    const workspaceBadge = otherWorkspace === undefined ? '' : html`<span class="artifact-chip" title="${model.m.home.fromWorkspace(otherWorkspace)}">${PageShell.icon('Users', 14)}${otherWorkspace}</span>`
+    const authorName = model.authorNames.get(summary.authorId) ?? ''
     return html`<a class="xxd-card artifact-card" href="${ArtifactPath.of(summary)}">
   <div class="xxd-card__media artifact-cover" aria-hidden="true">
     <span class="artifact-cover__title"></span><span class="artifact-cover__line"></span><span class="artifact-cover__line"></span>
     <span class="artifact-cover__blocks"><span></span><span></span><span></span></span>
     ${HomePage.#livePreview(model.previewUrls.get(summary.artifactId))}
+    ${workspaceBadge || sharingBadge ? html`<span class="artifact-cover__chips">${workspaceBadge}${sharingBadge}</span>` : ''}
+    ${commentBadge}
   </div>
   <div class="xxd-card__body">
     <p class="xxd-card__title artifact-card__title" title="${summary.title}">${summary.title}</p>
-    <p class="xxd-card__meta artifact-meta" title="${publishedBy} · ${ArtifactLabels.updatedAgo(model.m, summary.updatedAt, model.now)}${summary.version > 1 ? ` · v${summary.version}` : ''}"><span>${publishedBy}</span>${PageShell.relativeTime(model.m, summary.updatedAt, model.now)}${summary.version > 1 ? html`<span class="xxd-mono">v${summary.version}</span>` : ''}</p>
-    ${workspaceBadge || sharingBadge || commentBadge ? html`<div class="xxd-cluster artifact-card__badges">${workspaceBadge}${sharingBadge}${commentBadge}</div>` : ''}
+    <p class="xxd-card__meta artifact-meta" title="${publishedBy} · ${ArtifactLabels.updatedAgo(model.m, summary.updatedAt, model.now)}${summary.version > 1 ? ` · v${summary.version}` : ''}">${PageShell.avatar(authorName, { size: 'sm' })}<span>${authorName}</span>${summary.publishedVia ? html`<span>${summary.publishedVia}</span>` : ''}${PageShell.relativeTime(model.m, summary.updatedAt, model.now)}${summary.version > 1 ? html`<span class="xxd-mono">v${summary.version}</span>` : ''}</p>
   </div>
 </a>`
   }
@@ -349,7 +354,7 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
     const inviteMembers = identity.membership.role === 'admin' ? [{ label: empty.inviteMembers, href: '/settings/members', primary: false }] : []
     switch (query.filter) {
       case 'all':
-        return { icon: 'Inbox', ...empty.filters.all, actions: [connectAgent, ...inviteMembers] }
+        return { icon: 'Inbox', ...empty.filters.all, actions: [connectAgent, ...inviteMembers], steps: empty.firstSteps }
       case 'mine':
         return { icon: 'UserRound', ...empty.filters.mine, actions: [connectAgent] }
       case 'shared':
@@ -364,11 +369,12 @@ ${shownArtifacts.length > 0 ? HomePage.#grid(shownArtifacts, model) : HomePage.#
   }
 
   static #emptyState(emptyState: EmptyState): SafeHtml {
-    const { icon, title, text, actions } = emptyState
+    const { icon, title, text, actions, steps } = emptyState
     return html`<section class="xxd-empty">
   ${PageShell.icon(icon, 24)}
   <h2 class="xxd-empty__title">${title}</h2>
   ${text ? html`<p class="xxd-empty__text">${text}</p>` : ''}
+  ${steps ? html`<ol class="home-first-steps">${steps.map(step => html`<li>${step}</li>`)}</ol>` : ''}
   ${actions.length > 0 ? html`<div class="xxd-empty__actions xxd-cluster">${actions.map(action => html`<a class="xxd-btn" ${action.primary ? html`data-variant="primary"` : ''} href="${action.href}">${action.label}</a>`)}</div>` : ''}
 </section>`
   }

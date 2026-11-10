@@ -131,7 +131,7 @@ export default {
   settings: {
     tokens: {
       scopes: { publish: '仅发布', full: '完全权限' },
-      states: { revoked: '已撤销', expired: '已过期', active: '有效' },
+      states: { revoked: '已撤销', expired: '已过期', expiringSoon: '快要过期', active: '有效' },
       columns: { name: '名字', scope: '权限', lastUsed: '最近使用', expires: '到期', state: '状态' },
       neverUsed: '还没用过',
       neverExpires: '永不过期',

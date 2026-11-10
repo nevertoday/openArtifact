@@ -14,8 +14,8 @@ describe('signing in', () => {
     const zhou = await app.json<{ user: { userId: string }; workspace: { workspaceId: string; name: string; role: string; personalOf: string } }>('/api/me', { cookie: zhouCookie })
 
     expect(lin.body.user).toEqual(expect.objectContaining({ name: 'lin', email: 'lin@example.com' }))
-    expect(lin.body.workspace).toMatchObject({ name: 'lin的工作区', role: 'admin', personalOf: lin.body.user.userId })
-    expect(zhou.body.workspace).toMatchObject({ name: 'zhou的工作区', role: 'admin', personalOf: zhou.body.user.userId })
+    expect(lin.body.workspace).toMatchObject({ name: 'lin 的工作区', role: 'admin', personalOf: lin.body.user.userId })
+    expect(zhou.body.workspace).toMatchObject({ name: 'zhou 的工作区', role: 'admin', personalOf: zhou.body.user.userId })
     expect(zhou.body.workspace.workspaceId).not.toBe(lin.body.workspace.workspaceId)
   })
 

@@ -106,7 +106,7 @@ export default {
     /** @param {number} count */
     copiedAll: count => `已复制 ${count} 条评论，粘贴给你的 agent`,
     hint: '粘贴给任何 agent 都能照着改。已接入的 agent，直接说「处理 Open Artifact 上的评论」。',
-    setUp: '去 Agent 接入',
+    setUp: '接入 agent',
     copyOne: '复制给 agent',
     /** @param {number} number */
     copiedOne: number => `已复制评论 ${number}，粘贴给你的 agent`,
@@ -254,6 +254,7 @@ export default {
     add: '添加',
     nobodyYetSpecified: '还没有添加任何人，现在只有你能看到。',
     nobodyYet: '还没有单独添加任何人。',
+    givePersonMore: '给某个人更多权限',
     peopleTitle: '添加的人',
     peopleHintSpecified: '保存后，新添加的人会收到邮件。可查看：使用页面；可评论：再加评论；可编辑：还能发布新版本。',
     peopleHint: '给某个人比其他人更多的权限，比如可编辑：还能发布新版本。保存后，新添加的人会收到邮件。',

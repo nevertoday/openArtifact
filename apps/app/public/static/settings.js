@@ -1,3 +1,4 @@
+import { avatarStyle } from './avatar.js'
 import { api, confirmArtifactRemoval, element, initialOf, m, readJsonData, removalText, removeArtifact, restoreArtifact, dateText, timeElement, userMessageOf } from './common.js'
 
 const settingsConfig = readJsonData('settings-config')
@@ -9,10 +10,13 @@ function secondaryText(text) {
 
 const POLL_INTERVAL_MS = 5000
 const JUST_CREATED_HIGHLIGHT_MS = 2500
+// A token that stops within a week is flagged while there is still time to make another.
+const EXPIRING_SOON_MS = 7 * 24 * 60 * 60 * 1000
 
 function tokenStateOf(accessToken) {
   if (accessToken.revokedAt) return { label: tokenText.states.revoked, tone: undefined, isActive: false }
   if (accessToken.expiresAt && accessToken.expiresAt <= Date.now()) return { label: tokenText.states.expired, tone: 'warning', isActive: false }
+  if (accessToken.expiresAt && accessToken.expiresAt - Date.now() <= EXPIRING_SOON_MS) return { label: tokenText.states.expiringSoon, tone: 'warning', isActive: true }
   return { label: tokenText.states.active, tone: 'success', isActive: true }
 }
 
@@ -133,6 +137,7 @@ class AgentConnection {
   #pollTimer = null
   #setupStep = document.getElementById('connect-setup')
   #checkStep = document.getElementById('connect-check')
+  #upcomingSteps = document.querySelector('[data-connect-upcoming]')
   #status = document.getElementById('connect-status')
 
   constructor() {
@@ -145,6 +150,7 @@ class AgentConnection {
     this.#setupStep.querySelector('[data-token-name]').textContent = createdToken.name
     this.#setupStep.hidden = false
     this.#checkStep.hidden = false
+    this.#upcomingSteps.hidden = true
     this.#showStatus(AgentConnection.#waiting(m.client.settings.connection.waiting))
     this.#stopWatching()
     this.#pollTimer = setInterval(() => this.#checkWhileVisible(), POLL_INTERVAL_MS)
@@ -159,6 +165,7 @@ class AgentConnection {
     this.#fillToken('')
     this.#setupStep.hidden = true
     this.#checkStep.hidden = true
+    this.#upcomingSteps.hidden = false
   }
 
   #fillToken(tokenValue) {
@@ -281,8 +288,12 @@ function wireProfileForm() {
 
 function showAccountName(name) {
   for (const accountName of document.querySelectorAll('[data-account-name]')) accountName.textContent = name
-  for (const accountInitial of document.querySelectorAll('[data-account-initial]')) accountInitial.textContent = initialOf(name)
+  for (const accountInitial of document.querySelectorAll('[data-account-initial]')) {
+    accountInitial.textContent = initialOf(name)
+    accountInitial.setAttribute('style', avatarStyle(name))
+  }
   document.querySelector('[data-account-button]')?.setAttribute('aria-label', m.shell.accountMenu(name))
+  document.querySelector('[data-account-button]')?.removeAttribute('data-needs-name')
 }
 
 function wireThemeChoice() {
@@ -296,7 +307,11 @@ function wireThemeChoice() {
 
 function wireWorkspaceNameForm() {
   const workspaceNameForm = document.getElementById('workspace-name-form')
-  workspaceNameForm?.addEventListener('submit', async event => {
+  if (!workspaceNameForm) return
+  const nameInput = document.getElementById('workspace-name')
+  const savedName = nameInput.value.trim()
+  nameInput.addEventListener('input', () => { workspaceNameForm.querySelector('[type="submit"]').disabled = nameInput.value.trim() === savedName })
+  workspaceNameForm.addEventListener('submit', async event => {
     event.preventDefault()
     const saveButton = event.submitter
     saveButton.disabled = true

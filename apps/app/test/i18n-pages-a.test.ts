@@ -8,7 +8,7 @@ const english = { 'Accept-Language': 'en' }
 const anyChinese = /[一-鿿]/
 // The language switch names Chinese in Chinese, and the team and the personal workspaces are stored with Chinese
 // names; none of it is page wording.
-const withoutOwnNames = (markup: string) => markup.replaceAll('>中文<', '><').replaceAll('我的团队', '').replaceAll(/[a-z]+的工作区/g, '')
+const withoutOwnNames = (markup: string) => markup.replaceAll('>中文<', '><').replaceAll('我的团队', '').replaceAll(/[a-z]+ 的工作区/g, '')
 let authorCookie = ''
 let readerCookie = ''
 
@@ -31,8 +31,8 @@ describe('the server-rendered pages in English', () => {
     const { markup } = await englishPage('/login?next=/settings')
 
     expect(markup).toContain('<title>Sign in · Open Artifact</title>')
-    expect(markup).toContain('Any agent publishes,<br>your whole team uses it.')
-    expect(markup).toContain('After you sign in, the page you were on opens.')
+    expect(markup).toContain('The pages your agents make,<br>seen and talked over here.')
+    expect(markup).toContain('The page you opened needs you to sign in. It opens as soon as you do.')
     expect(markup).toContain('data-error-not-admitted="This email can&#39;t sign up yet. Ask an admin to invite you."')
     expect(markup).toContain('Send code')
     expect(markup).not.toMatch(anyChinese)
@@ -55,7 +55,7 @@ describe('the server-rendered pages in English', () => {
     const mine = await englishPage('/?filter=shared', authorCookie)
     const searched = await englishPage('/?q=nothing-like-this', authorCookie)
 
-    expect(markup).toContain('All artifacts')
+    expect(markup).toMatch(/>All(<span class="home-count">\d+<\/span>)?<\/h1>/)
     expect(markup).toContain('Waiting for my agent')
     expect(markup).toContain('published on the web')
     expect(markup).toContain(`href="${published.path}"`)
@@ -121,9 +121,11 @@ describe('the server-rendered pages in English', () => {
 })
 
 describe('the home page’s source filter', () => {
-  it('keeps the same address in every language, the web page included', async () => {
+  it('keeps the same address in every language, the web page included, once there is more than one source', async () => {
     const author = await app.signIn('source-filter@example.com')
     await app.request('/api/artifacts', { method: 'POST', cookie: author, body: { title: 'Made on the web page', files: [{ path: 'index.html', content: '<p>web</p>' }] } })
+    const agentToken = await app.createToken(author)
+    await app.request('/api/artifacts', { method: 'POST', token: agentToken, headers: { 'X-Open-Artifact-Client': 'Codex' }, body: { title: 'Made by an agent', files: [{ path: 'index.html', content: '<p>agent</p>' }] } })
 
     const chinese = await app.request('/', { cookie: author })
     const english = await app.request('/', { cookie: author, headers: { 'Accept-Language': 'en' } })

@@ -187,6 +187,7 @@ export default /** @satisfies {import('../messages').Messages['viewerClient']} *
     add: 'Add',
     nobodyYetSpecified: "You haven't added anyone yet, so only you can see it.",
     nobodyYet: "You haven't added anyone individually yet.",
+    givePersonMore: 'Give one person more access',
     peopleTitle: 'People added',
     peopleHintSpecified: 'People you add get an email once you save. Can view: use the page. Can comment: also comment. Can edit: also publish new versions.',
     peopleHint: 'Give someone more access than everyone else, like Can edit to also publish new versions. People you add get an email once you save.',

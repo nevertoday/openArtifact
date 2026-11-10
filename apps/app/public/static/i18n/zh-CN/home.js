@@ -9,7 +9,7 @@ export default {
     waiting_for_my_agent: '等我的 agent 处理',
   },
   filterDescriptions: {
-    all: '团队成员和他们的 agent 发布的 artifact，默认工作区内可见。',
+    all: '这个工作区里的人和他们的 agent 发布的 artifact。',
     mine: '你发布的，和你的 agent 代你发布的。',
     shared: '作者把你加进分享名单的 artifact，不论它在哪个工作区。',
     removed: '删除后所有人都看不到。30 天内可以恢复，之后彻底删除；也可以现在就永久删除，立即释放存储空间。',
@@ -24,7 +24,7 @@ export default {
     text: name => `现在团队成员在评论和通知里看到的是「${name}」。设一个大家认得出的名字。`,
     action: '去设置',
   },
-  headingAll: '全部 artifact',
+  headingAll: '全部',
   /** @param {string} agent */
   headingByAgent: agent => `${agent} 发布的`,
   /** @param {string} agent */
@@ -57,6 +57,7 @@ export default {
   /** @param {{ count: number, forAgent: number }} p */
   unresolvedComments: ({ count, forAgent }) => `${count} 条未解决评论${forAgent > 0 ? ` · 其中 ${forAgent} 条给 agent` : ''}`,
   empty: {
+    firstSteps: ['在「Agent 接入」里给你的 agent 一个 token', '让 agent 把设计文档、报告或看板发布到这里', '在页面上直接评论，选「给 agent」让它去改'],
     /** @param {string} search */
     searchTitle: search => `没有找到「${search}」`,
     searchText: '搜索会查标题、作者的名字和发布它的 agent。',

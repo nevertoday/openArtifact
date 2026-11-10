@@ -56,7 +56,7 @@ const threads = permissions.canReadComments ? new CommentThreads(config.artifact
 const handoff = permissions.canEdit
   ? new AgentHandoff(m.viewerClient.agentPrompt, { artifactId: config.artifactId, title: config.title, version: config.currentVersion, url: `${location.origin}${config.path}`, guideUrl: `${location.origin}/llms.txt` })
   : null
-const list = threads ? new CommentList({ element: drawerElement.querySelector('[data-drawer-view="comments"]'), threads, drawer, stage, canComment: permissions.canComment, byTouch: writesByTouch(), handoff }) : null
+const list = threads ? new CommentList({ element: drawerElement.querySelector('[data-drawer-view="comments"]'), threads, drawer, stage, canComment: permissions.canComment, byTouch: writesByTouch, handoff }) : null
 const pins = threads ? new CommentPins({ frame, threads, list, isShowingLatest: () => versions?.isShowingLatest ?? true }) : null
 
 if (threads) {
@@ -75,7 +75,7 @@ if (threads) {
 
 const commentMode = permissions.canComment ? new CommentMode({ button: viewer.querySelector('[data-comment-mode]'), hint: stage.querySelector('[data-mode-hint]'), frame }) : null
 const composer = permissions.canComment ? new Composer({ form: stage.querySelector('[data-composer]'), stage, frame, threads, shownVersion: () => frame.version }) : null
-const coach = permissions.canComment ? new CoachMark(viewer.querySelector('[data-coach]'), viewer.querySelector('[data-comment-mode]')) : null
+const coach = permissions.canComment ? new CoachMark(viewer.querySelector('[data-coach]')) : null
 
 if (commentMode) {
   composer.addEventListener('open', () => {
@@ -94,7 +94,7 @@ if (commentMode) {
     Xxd.toast(m.viewerClient.comments.sent(thread.number), { tone: 'success', within: stage, action: { label: m.viewerClient.actions.view, onClick: () => list.select(thread.id, { reveal: false, focus: true }) } })
   })
   versions?.addEventListener('shown', () => composer.close())
-  setTimeout(() => coach.showOnce(), COACH_DELAY_MS)
+  setTimeout(() => coach.showOnce(() => drawer?.isOpen ?? false), COACH_DELAY_MS)
 }
 
 const shareDialogElement = document.getElementById('share-dialog')
@@ -111,8 +111,8 @@ topBar.addEventListener('renamed', event => {
 
 if (shareDialog) {
   for (const shareOpener of document.querySelectorAll('[data-open-share]')) shareOpener.addEventListener('click', () => shareDialog.open())
-  shareDialog.addEventListener('saved', event => topBar.showVisibility(event.detail.label))
-  shareXPanel.addEventListener('saved', event => topBar.showVisibility(event.detail.label))
+  shareDialog.addEventListener('saved', event => topBar.showVisibility(event.detail))
+  shareXPanel.addEventListener('saved', event => topBar.showVisibility(event.detail))
   for (const shareXOpener of document.querySelectorAll('[data-open-share-x]')) shareXOpener.addEventListener('click', () => shareXPanel.open())
   shareDialogElement.querySelector('[data-share-to-x]').addEventListener('click', async () => {
     if (await shareDialog.close()) shareXPanel.open()

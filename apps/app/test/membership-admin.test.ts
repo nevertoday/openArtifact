@@ -214,7 +214,7 @@ describe('renaming the workspace', () => {
     const homeMarkup = await (await app.request('/', { cookie: adminCookie })).text()
     const agentsMarkup = await (await app.request('/settings/agents', { cookie: adminCookie })).text()
 
-    expect(homeMarkup).toContain('全部 artifact')
+    expect(homeMarkup).toMatch(/>全部(<span class="home-count">\d+<\/span>)?<\/h1>/)
     expect(homeMarkup).not.toContain('增长组的 artifact')
     expect(agentsMarkup).not.toContain('在 增长组 里')
   })

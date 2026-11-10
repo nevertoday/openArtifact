@@ -49,9 +49,9 @@ describe('login page', () => {
     const fromSharedLink = await pageText('/login?next=/a/some-artifact')
     const plain = await pageText('/login')
 
-    expect(fromSharedLink).toContain('登录后会打开你刚才的页面。')
-    expect(plain).not.toContain('登录后会打开你刚才的页面。')
-    expect(plain).toContain('输入邮箱，我们发一个 6 位验证码，不用密码。')
+    expect(fromSharedLink).toContain('你要打开的页面需要登录后才能看。登录后会直接打开它。')
+    expect(plain).not.toContain('你要打开的页面需要登录后才能看。登录后会直接打开它。')
+    expect(plain).toContain('输入邮箱，我们发一个 6 位验证码。新邮箱会自动注册。')
   })
 
   it.each(['//evil.example/steal', '/\t/evil.example', '/\\evil.example', 'https://evil.example/'])('never redirects off the site after sign-in (next=%s)', async nextPath => {
@@ -211,10 +211,13 @@ describe('home page', () => {
 
     const authorHome = await pageText('/', authorCookie)
     const newcomerHome = await pageText('/', newcomerCookie)
-    const cardOf = (title: string) => authorHome.slice(authorHome.indexOf(`title="${title}"`), authorHome.indexOf('</a>', authorHome.indexOf(`title="${title}"`)))
+    const cardOf = (title: string) => {
+      const titleAt = authorHome.indexOf(`title="${title}"`)
+      return authorHome.slice(authorHome.lastIndexOf('<a class="xxd-card artifact-card"', titleAt), authorHome.indexOf('</a>', titleAt))
+    }
 
     expect(cardOf('Team roadmap')).not.toContain('工作区内可见')
-    expect(cardOf('Private notes')).toContain('<span class="xxd-badge">私有</span>')
+    expect(cardOf('Private notes')).toMatch(/<span class="artifact-chip" data-visibility="private">.*私有<\/span>/)
     expect(cardOf('Team roadmap')).not.toContain('>v1</span>')
     expect(cardOf('Revised brief')).toContain('<span class="xxd-mono">v2</span>')
     expect(newcomerHome).toMatch(/href="\/\?filter=mine"[^>]*>.*?我发布的<\/span><span class="xxd-badge"\s+title="0 个 artifact"><\/span>/)
@@ -383,35 +386,38 @@ describe('settings', () => {
 
   it('nudges a person who has not set a name, until they do', async () => {
     const newcomerCookie = await app.signIn('newcomer@example.com')
+    const emptyHome = await pageText('/', newcomerCookie)
+    await app.publish({ cookie: newcomerCookie }, 'First page')
 
     const before = await pageText('/', newcomerCookie)
     await app.request('/api/me', { method: 'PATCH', cookie: newcomerCookie, body: { name: '新同事' } })
     const after = await pageText('/', newcomerCookie)
     const profile = await pageText('/settings/profile', newcomerCookie)
 
+    expect(emptyHome).toContain('data-needs-name')
     expect(before).toContain('设置你的名字')
     expect(before).toContain('看到的是「newcomer」')
     expect(after).not.toContain('设置你的名字')
+    expect(after).not.toContain('data-needs-name')
     expect(profile).toContain('value="新同事"')
     expect(profile).toContain('邮箱用来登录，不能修改。')
   })
 
-  it('shows a person icon on the account button until the person chooses a name, then their initial', async () => {
-    const accountAvatar = (markup: string) => markup.match(/<span class="xxd-avatar" data-account-initial>(.*?)<\/span>/)?.[1]
+  it('shows the initial of the name others see on the account button, and follows a new name', async () => {
+    const accountAvatar = (markup: string) => markup.match(/<span class="xxd-avatar"[^>]*data-account-initial[^>]*>(.*?)<\/span>/)?.[1]
     const unnamedCookie = await app.signIn('xavier.unnamed@example.com')
 
     const before = accountAvatar(await pageText('/', unnamedCookie))
     await app.request('/api/me', { method: 'PATCH', cookie: unnamedCookie, body: { name: '徐同学' } })
     const after = accountAvatar(await pageText('/', unnamedCookie))
 
-    expect(before).toContain('data-xxd-icon="UserRound"')
-    expect(before).not.toContain('X')
+    expect(before).toBe('X')
     expect(after).toBe('徐')
   })
 
   it('offers the three colour schemes on the profile page, following the system until the browser says otherwise', async () => {
     const profile = await pageText('/settings/profile', authorCookie)
-    const themeChoices = [...profile.matchAll(/<input type="radio" class="xxd-radio" name="theme" id="theme-\w+" value="(\w+)" ?(checked)?><span>([^<]+)<\/span>/g)].map(match => ({ value: match[1], checked: Boolean(match[2]), label: match[3] }))
+    const themeChoices = [...profile.matchAll(/<input type="radio" class="xxd-radio" name="theme" id="theme-\w+" value="(\w+)" ?(checked)?>.*?<\/span><span>([^<]+)<\/span>/g)].map(match => ({ value: match[1], checked: Boolean(match[2]), label: match[3] }))
 
     expect(profile).toContain('<legend class="xxd-label">外观</legend>')
     expect(themeChoices).toEqual([

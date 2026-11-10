@@ -1,10 +1,23 @@
 /* The viewer: the artifact first, a slim bar above it, comments written on the page itself and a drawer beside it.
    Kit tokens only. Motion moves opacity and transform alone, and stops when the reader asks for less motion. */
 
+/* The viewer never scrolls the window, so a dialog must not reserve a scrollbar's width and shift the bar. */
+:root:has(.viewer) { scrollbar-gutter: auto !important; }
 .viewer { position: relative; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; background: var(--paper); }
 
 /* Bar: one line, the title cut with an ellipsis before anything wraps. */
 .viewer-bar { position: relative; z-index: var(--z-dock); flex: none; height: 48px; gap: var(--space-1); padding-inline: var(--space-2); background: var(--paper); }
+.viewer-bar__home { flex: 0 1 auto; min-width: 0; max-width: 220px; color: var(--muted); }
+.viewer-bar__workspace { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-bar__crumb { flex: none; color: var(--muted-2); }
+/* With one version there is no history to open: the label stays as a quiet fact, without its menu. */
+.viewer-version[data-only-version] { pointer-events: none; color: var(--muted); }
+.viewer-version[data-only-version] > :not([data-version-label]) { display: none; }
+/* Reading comments and writing one are one control: the count, then a plus, inside one outline. */
+.viewer-comment-group { display: inline-flex; align-items: center; height: var(--control-h-sm); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.viewer-comment-group > .xxd-btn { height: 100%; border: 0; border-radius: 0; }
+.viewer-comment-group > .viewer-comment-mode { border-inline-start: 1px solid var(--line); }
+.viewer-bar__author { flex: none; color: var(--muted); font-size: var(--text-xs); white-space: nowrap; }
 .viewer-bar__title { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; }
 .viewer-bar__name { min-width: 0; overflow: hidden; padding: 2px var(--space-1-5); color: var(--ink); font: var(--weight-medium) var(--text-sm) / var(--leading-sm) var(--font-body); white-space: nowrap; text-overflow: ellipsis; }
 .viewer-bar__name:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
@@ -13,18 +26,30 @@
 .viewer-version[data-old] { color: var(--warning-text); }
 .viewer-bar__end { flex: none; display: flex; align-items: center; gap: var(--space-1); margin-inline-start: auto; }
 /* Who can see the page is a quiet fact beside 分享, not a second button competing with it. */
-.viewer-visibility { flex: none; height: var(--control-h-sm); padding-inline: var(--space-1-5); border: 0; background: transparent; color: var(--muted); font: inherit; font-size: var(--text-xs); }
+.viewer-visibility { flex: none; display: inline-flex; align-items: center; gap: 6px; height: var(--control-h-sm); padding-inline: 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font: inherit; font-size: var(--text-xs); font-weight: var(--weight-medium); white-space: nowrap; }
+/* The dot says how far the page reaches at a glance: grey inside the workspace, green on the open web, ink for fewer people. */
+.viewer-visibility__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted-2); }
+.viewer-visibility[data-visibility="public_link"] .viewer-visibility__dot { background: var(--success, #15803d); }
+.viewer-visibility[data-visibility="private"] .viewer-visibility__dot, .viewer-visibility[data-visibility="specified"] .viewer-visibility__dot { background: var(--ink); }
+.viewer-share-button { gap: 7px; }
+.share-dialog__spacer { flex: 1; }
+.viewer-report { color: var(--muted); }
+.viewer-bar__brand { font-weight: var(--weight-strong); }
+.viewer-share-button .viewer-visibility__dot { display: none; }
+.viewer-share-button:is([data-visibility="public_link"], [data-visibility="private"], [data-visibility="specified"]) .viewer-visibility__dot { display: inline-block; }
+.viewer-share-button[data-visibility="public_link"] .viewer-visibility__dot { background: #4ade80; }
+.viewer-share-button[data-visibility="private"] .viewer-visibility__dot, .viewer-share-button[data-visibility="specified"] .viewer-visibility__dot { background: transparent; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--on-ink, #fff) 80%, transparent); }
 button.viewer-visibility { cursor: pointer; }
-@media (hover: hover) { button.viewer-visibility:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; } }
+@media (hover: hover) { button.viewer-visibility:hover { border-color: var(--line-strong); background: var(--wash); } }
 /* The page's own actions, then a hairline, then the person's: notifications and account. */
 .viewer-bar__end > .app-bell { margin-inline-start: var(--space-1); }
 .viewer-bar__end > .app-bell::before { content: ""; position: absolute; inset-inline-start: calc(-1 * var(--space-1) - 1px); top: 8px; bottom: 8px; width: 1px; background: var(--line); pointer-events: none; }
 .viewer-count-button { gap: var(--space-1-5); }
-.viewer-count { min-width: 18px; height: 18px; padding: 0 5px; background: var(--ink); color: var(--paper); font: var(--weight-medium) 11px / 18px var(--font-body); text-align: center; font-variant-numeric: tabular-nums; }
+.viewer-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--ink); color: var(--paper); font: var(--weight-medium) 11px / 18px var(--font-body); text-align: center; font-variant-numeric: tabular-nums; }
 /* No open comments shows the icon alone; the button's label still says the count to a screen reader. */
 .viewer-count:empty, .viewer-count[data-zero] { display: none; }
 .viewer-comment-mode[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
-.viewer-sign-in { padding-inline: var(--space-2); white-space: nowrap; }
+.viewer-sign-in { white-space: nowrap; }
 .viewer-more-menu__visibility { display: none; }
 .viewer-more-menu__note { display: flex; align-items: flex-start; gap: var(--space-1-5); max-width: 320px; color: var(--muted); font-weight: var(--weight-regular); white-space: normal; }
 
@@ -87,10 +112,10 @@ button.viewer-visibility { cursor: pointer; }
 .viewer-shortcut { display: inline-flex; gap: 2px; color: var(--muted); }
 @media (pointer: coarse) { .viewer-shortcut { display: none; } }
 
-/* A one-time hint hanging under the comment-mode button. */
+/* A one-time hint resting at the bottom of the page. */
 .viewer-coach { position: absolute; z-index: 8; display: flex; align-items: center; gap: var(--space-3); padding: 10px var(--space-2) 10px 14px; background: var(--ink); color: var(--paper); font-size: var(--text-sm); line-height: 20px; white-space: nowrap; box-shadow: var(--shadow-popover); animation: viewer-rise-in var(--motion-medium) var(--ease-out-expo); }
 .viewer-coach[hidden] { display: none; }
-.viewer-coach::before { content: ""; position: absolute; top: -6px; right: var(--arrow-right, 24px); width: 12px; height: 12px; background: var(--ink); transform: rotate(45deg); }
+.viewer-coach { max-width: calc(100% - 24px); border-radius: 999px; }
 
 /* Drawer: beside the page on a wide screen, over it on a tablet, a sheet from the bottom on a phone. */
 .viewer-drawer { position: relative; flex: none; display: flex; flex-direction: column; width: 380px; min-height: 0; border-inline-start: 1px solid var(--line); background: var(--paper); }
@@ -139,12 +164,12 @@ button.viewer-visibility { cursor: pointer; }
 .comment-thread__folded-body { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .comment-thread[data-folded] { padding-block: 10px; }
 .comment-thread__author { color: var(--ink); font-size: var(--text-sm); font-weight: var(--weight-medium); }
-.comment-pin { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--space-1); border: 0; background: var(--ink); color: var(--paper); font: var(--weight-strong) 11px / 1 var(--font-body); font-variant-numeric: tabular-nums; cursor: pointer; }
+.comment-pin { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--space-1); border: 0; border-radius: 999px; background: var(--ink); color: var(--paper); font: var(--weight-strong) 11px / 1 var(--font-body); font-variant-numeric: tabular-nums; cursor: pointer; }
 .comment-pin[data-state="agent"] { background: var(--warning-solid); color: var(--warning-on-solid); }
 .comment-pin[data-state="resolved"] { background: var(--success-solid); color: var(--success-on-solid); }
 .comment-pin:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
 .comment-thread__quote { margin: 4px 0 6px; }
-.comment-thread__lost { margin-inline-end: var(--space-1-5); color: var(--warning-text); }
+.comment-thread__lost { display: inline-block; margin-inline-end: var(--space-1-5); padding: 0 7px; border-radius: 999px; background: color-mix(in srgb, var(--warning-text) 12%, transparent); color: var(--warning-text); font-weight: var(--weight-medium); line-height: 18px; }
 .comment-thread__body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .comment-thread[data-state="resolved"] :is(.comment-thread__body, .comment-thread__quote) { color: var(--muted); }
 .comment-replies { display: grid; gap: 10px; margin: 10px 0 0; padding: 0 0 0 var(--space-3); border-inline-start: 1px solid var(--line); list-style: none; }
@@ -183,12 +208,28 @@ button.viewer-visibility { cursor: pointer; }
 .share-dialog__heading { flex: 1; min-width: 0; }
 .share-dialog__body { display: grid; gap: var(--gap-block); padding-top: var(--space-4); color: var(--ink); }
 .share-dialog__body > * + * { margin-top: 0; }
+.share-reaches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: var(--space-2); margin: 0; padding: 0; border: 0; }
+.share-reaches > legend { margin-bottom: var(--space-2); padding: 0; }
+.share-reach { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px var(--space-3); align-items: start; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--paper); cursor: pointer; transition: border-color var(--motion-quick) ease, background-color var(--motion-quick) ease; }
+.share-reach > input { position: absolute; opacity: 0; pointer-events: none; }
+.share-reach > [data-xxd-icon] { margin-top: 1px; color: var(--muted); }
+.share-reach__text { display: grid; gap: 2px; min-width: 0; }
+.share-reach__text b { font-weight: var(--weight-medium); }
+.share-reach__text small { color: var(--muted); font-size: var(--text-xs); line-height: 1.5; }
+.share-reach:has(input:checked) { border-color: var(--ink); background: var(--wash); box-shadow: inset 0 0 0 1px var(--ink); }
+.share-reach:has(input:checked) > [data-xxd-icon] { color: var(--ink); }
+.share-reach:has(input:focus-visible) { outline: 2px solid var(--action); outline-offset: 2px; }
+.share-reach:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+@media (hover: hover) { .share-reach:not(:has(input:checked, input:disabled)):hover { border-color: var(--line-strong); } }
+@media (max-width: 480px) { .share-reaches { grid-template-columns: minmax(0, 1fr); } }
+/* The member list is a suggestion list, not a menu, so the browser's drop-down arrow goes. */
+#grant-email::-webkit-calendar-picker-indicator { display: none !important; }
+.share-people-reveal { justify-self: start; color: var(--muted); }
 .share-section__title { margin: 0; color: var(--ink); font: var(--weight-medium) var(--text-sm) / var(--leading-sm) var(--font-body); }
 .share-grant-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--gap-items); }
 .share-grant-form__email { flex: 1 1 200px; }
 .share-person { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; }
 .share-person .xxd-list__main { flex: 1 1 8em; min-width: 0; }
-.share-dialog__url { flex: 1 1 200px; min-width: 0; align-self: center; overflow-wrap: anywhere; }
 
 /* Full view: the artifact alone, filling the tab. */
 .viewer-full { display: flex; flex-direction: column; height: 100dvh; }
@@ -204,13 +245,15 @@ button.viewer-visibility { cursor: pointer; }
 /* A phone: labels give way to icons, the visibility moves into the ⋯ menu, the drawer becomes a sheet. */
 @media (max-width: 640px) {
   .viewer-bar { gap: 0; padding-inline: var(--space-1); }
-  .viewer-bar__label, .viewer-bar__end > .viewer-visibility { display: none; }
+  .viewer-bar__label, .viewer-bar__end > .viewer-visibility, .viewer-bar__workspace, .viewer-bar__crumb { display: none; }
+  .viewer-bar { height: 52px; }
+  .viewer-bar .viewer-share-button, .viewer-comment-group { height: 34px; min-height: 34px; border-radius: 999px; }
   .viewer-comment-mode { padding-inline: var(--space-2); }
   .viewer-more-menu__visibility { display: block; }
   .viewer-bar__end { gap: 0; }
-  /* Every pixel of a phone's bar goes to the title, so the hairline before the account controls is dropped. */
-  .viewer-bar__end > .app-bell { margin-inline-start: 0; }
-  .viewer-bar__end > .app-bell::before { display: none; }
+  /* Every pixel of a phone's bar goes to the title: the bell and account menu stay on the home page, and a long
+     press on the page writes a comment, so their buttons leave the bar. */
+  .viewer-bar__end > .app-bell, .viewer-bar__end > .app-account-button, .viewer-comment-mode { display: none; }
   .viewer-version { padding-inline: var(--space-1); }
   .viewer-notice { padding-inline: var(--space-2); }
   .viewer-drawer { position: absolute; right: 0; bottom: 0; left: 0; z-index: 7; width: auto; height: 55%; padding-bottom: env(safe-area-inset-bottom, 0px); border-inline-start: 0; border-top: 1px solid var(--line); box-shadow: var(--shadow-sheet); animation: viewer-sheet-in var(--motion-sheet) var(--ease-out-expo); }
@@ -237,7 +280,7 @@ button.viewer-visibility { cursor: pointer; }
 
 /* Under an artifact listed on its author's personal page: who wrote it, and where to read on. */
 .viewer-byline { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 10px max(var(--space-4), calc(50% - 560px)); border-top: 1px solid var(--line); background: var(--paper); font-size: var(--text-sm); }
-.viewer-byline__avatar { display: grid; place-items: center; width: 30px; height: 30px; background: var(--ink); color: var(--paper); font-weight: 700; text-decoration: none; }
+.viewer-byline__avatar { display: grid; place-items: center; width: 30px; height: 30px; text-decoration: none; }
 .viewer-byline__who { display: grid; margin: 0; min-width: 0; }
 .viewer-byline__who a { color: var(--ink); font-weight: var(--weight-strong); text-decoration: none; }
 .viewer-byline__who span { color: var(--muted); font-size: var(--text-xs); }

@@ -5,6 +5,8 @@ import { PageShell } from './page-shell.ts'
 
 const AGENTS_ON_STAGE = ['Claude Code', 'Codex', 'Cursor', 'Gemini CLI']
 const SIGN_IN_CODE_DIGITS = 6
+/** Bar heights of the little chart in the product shot, as fractions of its height. */
+const SHOT_BARS = [0.42, 0.58, 0.5, 0.74, 0.66, 0.92]
 
 // Brand marks as their owners publish them; the icon set has neither.
 const PROVIDER_MARKS: Record<string, SafeHtml> = {
@@ -30,6 +32,7 @@ export class LoginPage {
   <section class="login-story" data-theme="dark">
     ${PageShell.brandLink()}
     <div class="login-story__pitch">
+      ${LoginPage.#productShot(m)}
       <h1 class="xxd-text" data-variant="display">${m.login.story.headlineFirst}<br>${m.login.story.headlineSecond}</h1>
       <p class="xxd-text" data-variant="secondary">${m.login.story.pitch}</p>
       <div class="xxd-cluster">${AGENTS_ON_STAGE.map(agent => html`<span class="xxd-badge">${PageShell.icon('Bot', 14)}${agent}</span>`)}</div>
@@ -41,7 +44,7 @@ export class LoginPage {
     <div class="xxd-auth login-card" data-next-path="${nextPath}">
       <h2 class="xxd-auth__name">${m.login.heading}</h2>
       ${invitation ? LoginPage.#invitationBanner(m, invitation) : html`<p class="xxd-auth__line" data-email-step-intro>${m.login.intro}</p>`}
-      ${nextPath !== '/' && !invitation ? html`<p class="xxd-auth__line">${m.login.returnsToPage}</p>` : ''}
+      ${nextPath !== '/' && !invitation ? html`<div class="xxd-banner login-gate" data-size="sm" role="status">${PageShell.icon('Lock')}<p class="xxd-banner__text">${m.login.returnsToPage}</p></div>` : ''}
       <div class="xxd-banner" data-tone="danger" id="login-error" role="alert" hidden>${PageShell.icon('TriangleAlert')}<p class="xxd-banner__text" data-error-text></p></div>
       <form id="email-step" data-xxd-validate>
         ${providers.length > 0 ? html`${providerButtons}<div class="xxd-auth__or">${m.login.orWithEmail}</div>` : ''}
@@ -63,6 +66,23 @@ export class LoginPage {
   </main>
 </div>`
     return PageShell.render({ m, title: m.login.pageTitle, body, scripts: ['login.js'] })
+  }
+
+  // What the product is, shown rather than told: a page an agent published, a comment pinned on it for the agent.
+  static #productShot(m: Messages): SafeHtml {
+    const { shot } = m.login.story
+    return html`<div class="login-shot" aria-hidden="true">
+  <div class="login-shot__window">
+    <div class="login-shot__bar"><span class="login-shot__dots"><i></i><i></i><i></i></span><b>${shot.title}</b><span class="login-shot__share">${shot.share}</span></div>
+    <div class="login-shot__page">
+      <span class="login-shot__h"></span><span class="login-shot__line"></span><span class="login-shot__line" data-short></span>
+      <span class="login-shot__chart">${SHOT_BARS.map(height => html`<i style="--h: ${String(height)}"></i>`)}</span>
+      <span class="login-shot__pin">1</span>
+    </div>
+  </div>
+  <div class="login-shot__comment"><span class="login-shot__avatar">L</span><div><p>${shot.comment}</p><span class="login-shot__for-agent">${shot.forAgent}</span></div></div>
+  <div class="login-shot__toast"><span class="login-shot__check">✓</span>${shot.published}</div>
+</div>`
   }
 
   static #invitationBanner(m: Messages, invitation: LoginInvitation): SafeHtml {

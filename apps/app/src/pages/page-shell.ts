@@ -1,6 +1,7 @@
 import { LOCALES, WorkspaceDeletion, type DeletedWorkspace, type Locale, type Membership, type Workspace } from '@open-artifact/core'
 import type { Identity } from '../auth/request-identity.ts'
 import { messagesFor, type Messages } from '../i18n/messages.ts'
+import { avatarStyle } from '../../public/static/avatar.js'
 import { fullTimeText, relativeTimeText } from '../../public/static/time-text.js'
 import { ArtifactLabels } from './artifact-labels.ts'
 import { html, SafeHtml } from './html.ts'
@@ -27,7 +28,6 @@ export type IconName =
   | 'House'
   | 'Inbox'
   | 'LayoutGrid'
-  | 'LayoutTemplate'
   | 'Link'
   | 'Lock'
   | 'LockKeyhole'
@@ -101,7 +101,7 @@ export class PageShell {
 ${options.description ? html`<meta name="description" content="${options.description}"><meta property="og:description" content="${options.description}">` : ''}
 ${PageShell.#publicCardMeta(options)}
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-<script src="/static/vendor/xxd/boot.js" data-key="open-artifact" data-default-theme="system"></script>
+<script src="/static/vendor/xxd/boot.js" data-key="open-artifact" data-default-theme="system" data-default-corners="rounded" data-default-finish="material"></script>
 <link rel="stylesheet" href="/static/vendor/xxd/xxd.css">
 <script src="/static/vendor/xxd/icons.js"></script>
 <script src="/static/vendor/xxd/xxd.js"></script>
@@ -180,7 +180,12 @@ ${options.description ? html`<meta name="twitter:description" content="${options
   }
 
   static brandLink(): SafeHtml {
-    return html`<a class="app-brand" href="/">${PageShell.icon('LayoutTemplate', 20)}<span>Open Artifact</span></a>`
+    return html`<a class="app-brand" href="/">${PageShell.brandMark()}<span>Open Artifact</span></a>`
+  }
+
+  /** The product's mark: a page with its corner turned, and the orange dot of a comment waiting on it. */
+  static brandMark(size = 22): SafeHtml {
+    return html`<svg class="app-brand__mark" width="${String(size)}" height="${String(size)}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="1" y="1" width="22" height="22" rx="6.5" fill="currentColor"/><path d="M7.5 6h6l3.5 3.5V18h-9.5z" fill="var(--bg, #fff)"/><path d="M13.5 6v3.5H17" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="18.6" cy="5.4" r="3" fill="#ea580c" stroke="var(--bg, #fff)" stroke-width="1.6"/></svg>`
   }
 
   /** The page's top bar; `middle` sits between the brand and the account menu. */
@@ -274,6 +279,11 @@ ${deletedWorkspaces.length > 0 ? PageShell.#deletedWorkspacesDialog(m, deletedWo
     return html`<form method="post" action="/locale" class="${role === 'bar' ? 'xxd-btn-group app-locale-switch' : 'app-locale-switch'}" aria-label="${m.shell.language}">${LOCALES.map(choice)}</form>`
   }
 
+  /** A person's initial on their own tint; `accountInitial` marks the one the profile page renames live. */
+  static avatar(name: string, options: { size?: 'sm' | 'lg'; accountInitial?: boolean } = {}): SafeHtml {
+    return html`<span class="xxd-avatar" data-avatar style="${avatarStyle(name)}" ${options.size ? new SafeHtml(`data-size="${options.size}"`) : ''} ${options.accountInitial ? new SafeHtml('data-account-initial') : ''} aria-hidden="true">${PageShell.initialOf(name)}</span>`
+  }
+
   static initialOf(name: string): string {
     return Array.from(name.trim())[0]?.toUpperCase() ?? '?'
   }
@@ -296,7 +306,7 @@ ${deletedWorkspaces.length > 0 ? PageShell.#deletedWorkspacesDialog(m, deletedWo
   static #accountMenu(m: Messages, identity: Identity): SafeHtml {
     const menuLink = (section: (typeof SETTINGS_SECTIONS)[number]) =>
       html`<a class="xxd-menu__item" role="menuitem" href="/settings/${section}">${PageShell.icon(SETTINGS_SECTION_ICONS[section], 14)}${m.settings.sections[section]}</a>`
-    return html`<button type="button" class="xxd-btn app-account-button" data-variant="ghost" data-size="sm" data-icon-only data-xxd-menu="account-menu" aria-label="${m.shell.accountMenu(identity.name)}" data-account-button data-current-workspace="${identity.membership.workspace.workspaceId}"><span class="xxd-avatar" data-account-initial>${identity.hasChosenName ? PageShell.initialOf(identity.name) : PageShell.icon('UserRound', 16)}</span></button>
+    return html`<button type="button" class="xxd-btn app-account-button" data-variant="ghost" data-size="sm" data-icon-only data-xxd-menu="account-menu" aria-label="${m.shell.accountMenu(identity.name)}" data-account-button data-current-workspace="${identity.membership.workspace.workspaceId}" ${identity.hasChosenName ? '' : new SafeHtml('data-needs-name')}>${PageShell.avatar(identity.name, { accountInitial: true })}</button>
 <div class="xxd-menu" id="account-menu" role="menu" popover>
   <div class="xxd-menu__label xxd-text-pair app-account-head"><span class="xxd-text" data-account-name>${identity.name}</span><span class="xxd-text" data-variant="caption">${identity.email}</span></div>
   <div class="xxd-menu__sep" role="separator"></div>

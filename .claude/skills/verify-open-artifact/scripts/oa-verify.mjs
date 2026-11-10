@@ -312,6 +312,7 @@ async function api(run, method, path, flags) {
   // --workspace <id> names another workspace, --workspace none names none; left out, the current one is named.
   const namedWorkspace = as === 'session' ? (flags.workspace === undefined ? await pageWorkspaceId(run) : flags.workspace === 'none' ? null : flags.workspace) : null
   if (namedWorkspace) headers['X-Open-Artifact-Workspace'] = namedWorkspace
+  if (flags.client) headers['X-Open-Artifact-Client'] = flags.client
   let body
   if (flags.body !== undefined) {
     body = flags.body.startsWith('@') ? readFileSync(resolve(flags.body.slice(1)), 'utf8') : flags.body
@@ -494,7 +495,7 @@ switch (command) {
     const run = loadRun()
     if (!flags.file) fail('publish needs --file <index.html>', 'oa-verify publish --file page.html --title "Verify page"')
     const content = readFileSync(resolve(flags.file), 'utf8')
-    const result = await api(run, 'POST', '/api/artifacts', { body: JSON.stringify({ title: flags.title ?? 'Verify page', visibility: flags.visibility ?? 'workspace', files: [{ path: 'index.html', content }] }) })
+    const result = await api(run, 'POST', '/api/artifacts', { client: flags.client, body: JSON.stringify({ title: flags.title ?? 'Verify page', visibility: flags.visibility ?? 'workspace', files: [{ path: 'index.html', content }] }) })
     if (result.status !== 201 && result.status !== 200) fail(`publish answered ${result.status}`, JSON.stringify(result.body))
     out({ artifactId: result.body.artifactId, version: result.body.version, shortId: result.body.shortId, url: result.body.url, path: new URL(result.body.url).pathname, body: result.body }); break
   }

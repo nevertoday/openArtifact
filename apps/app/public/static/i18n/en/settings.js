@@ -2,10 +2,11 @@
 export default /** @satisfies {import('../messages').Messages['settings']} */ ({
   sections: { profile: 'Profile', agents: 'Agent access', members: 'Members', workspace: 'Workspace settings' },
   topBarContext: '/ Settings',
-  sidebar: { label: 'Settings sections', personal: 'Personal' },
+  sidebar: { label: 'Settings sections', personal: 'Personal', back: 'Back to workspace' },
   save: 'Save',
   actions: 'Actions',
   agents: {
+    upcoming: 'Next steps',
     description: "Agents such as Claude Code, Codex, Cursor and Gemini CLI publish and edit artifacts as you. What an agent can do depends on its token's access.",
     naming: {
       title: '1 · Name this agent',

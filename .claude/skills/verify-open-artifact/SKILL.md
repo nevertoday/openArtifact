@@ -52,7 +52,7 @@ This is read-only. For each Worker it checks that the pid is alive, `/health` re
 | --- | --- |
 | Act as the signed-in user over HTTP | `node $V api <METHOD> <path> --as session [--body '<json>'|@file]` (Origin header added, so CSRF checks pass, and `X-Open-Artifact-Workspace` naming the current workspace, as the pages send it; `--workspace <id>` names another, `--workspace none` names none, to see the 409 `workspace_changed`) |
 | Act as an agent over HTTP | `node $V api <METHOD> <path>` (default `--as token`) |
-| Publish a page | `node $V publish --file page.html --title "T" [--visibility workspace\|private\|specified\|public_link]` (prints `path`, the canonical `/a/{slug}-{shortId}`) |
+| Publish a page | `node $V publish --file page.html --title "T" [--client "Claude Code"] [--visibility workspace\|private\|specified\|public_link]` (prints `path`, the canonical `/a/{slug}-{shortId}`) |
 | Act as an agent over MCP | `node $V mcp tools/list`, `node $V mcp <tool> --args '<json>'` |
 | A second person | `node $V sign-in --email member@example.com` (switches the stored session to them; sign in founder again to switch back) |
 | Drive the UI | `node $V browse <path> [--as session\|anon] <steps>` |
@@ -63,6 +63,7 @@ Stable handles in this UI are ids and `data-*` attributes. Use them, not text or
 
 - viewer: `[data-open-report]` and `#report-dialog` (a public link's visitor only; reasons are `#report-reason-<reason>`, fields `#report-details`, `#report-contact`), `#artifact-frame`, `[data-artifact-title]`, `[data-version-label]`, `[data-comment-mode]`, `button.xxd-btn[data-open-share]` (the bare attribute also matches the visibility badge), `[data-comment-count-button]`, `[data-comment-count]`, `[data-version-button]`, `[data-composer]`
 - comment drawer: `[data-comment-filters] [data-value=all]`, `.comment-thread__resolve`, `.comment-thread__more`, `.comment-pin[data-state]`
+- share dialog: `.share-reach` tiles hold the `#visibility-<visibility>` radios; under 工作区内可见 with nobody added, the add-person form (`#grant-email`) is behind `.share-people-reveal`
 - share to X: `[data-share-to-x]` (share dialog footer), `[data-open-share-x]` (author's byline), `.viewer-byline__share` (visitor's byline), `#share-x-dialog`, `[data-share-x-readiness]`, `[data-share-x-count]`, `[data-share-x-open]`
 - home: `a.artifact-card[href$="-<shortId>"]`, `#artifact-search`; in 最近删除 (`/?filter=removed`) `[data-restore-artifact=<id>]` and `[data-purge-artifact=<id>]` (永久删除, behind the kit's confirm dialog)
 - workspace menu: `[data-xxd-menu=workspace-menu]`, `[data-xxd-dialog-open=new-workspace-dialog]`, `#new-workspace-name`, `#new-workspace-form [type=submit]` (its error shows under the name)

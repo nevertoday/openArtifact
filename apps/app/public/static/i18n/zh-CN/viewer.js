@@ -14,6 +14,8 @@ export default {
   },
   full: { back: '返回查看页' },
   bar: {
+    /** @param {string} name */
+    byAuthor: name => `${name} 发布`,
     home: '返回首页',
     commentModeTooltip: '评论模式（C）',
     comment: '评论',

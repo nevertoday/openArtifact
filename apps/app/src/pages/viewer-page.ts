@@ -1,3 +1,4 @@
+import { avatarStyle } from '../../public/static/avatar.js'
 import type { Messages } from '../i18n/messages.ts'
 import { ABUSE_REASONS, ArtifactPath, ArtifactRemoval } from '@open-artifact/core'
 import type { OpenedArtifact } from '../access/artifact-gate.ts'
@@ -87,7 +88,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   static #byline(model: ViewerModel, byline: Byline): SafeHtml {
     const { summary } = model.openedArtifact
     return html`<footer class="viewer-byline">
-  <a class="viewer-byline__avatar" href="${byline.personalPagePath}" aria-label="${model.m.viewer.byline.authorPage(byline.authorName)}">${PageShell.initialOf(byline.authorName)}</a>
+  <a class="viewer-byline__avatar" data-avatar style="${avatarStyle(byline.authorName)}" href="${byline.personalPagePath}" aria-label="${model.m.viewer.byline.authorPage(byline.authorName)}">${PageShell.initialOf(byline.authorName)}</a>
   <p class="viewer-byline__who"><a href="${byline.personalPagePath}">${byline.authorName}</a><span>${model.m.viewer.byline.updated({ version: summary.version, time: PageShell.relativeTime(model.m, summary.currentVersionAt, model.now) })}</span></p>
   ${byline.next ? html`<p class="viewer-byline__next"><span>${model.m.viewer.byline.next}</span><a href="${byline.next.path}">${byline.next.title} ${PageShell.icon('ArrowRight', 14)}</a></p>` : html`<p class="viewer-byline__next"><a href="${byline.personalPagePath}">${model.m.viewer.byline.more} ${PageShell.icon('ArrowRight', 14)}</a></p>`}
   ${ViewerPage.#shareOnX(model, byline)}
@@ -175,19 +176,26 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   static #bar(model: ViewerModel): SafeHtml {
     const { summary, permissions } = model.openedArtifact
     const isVisitor = ViewerPage.isPublicLinkVisitor(model.openedArtifact)
-    const homeLink = html`<a class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" href="/" aria-label="${model.m.viewer.bar.home}" data-tooltip="${model.m.viewer.bar.home}" data-tooltip-placement="bottom-start">${PageShell.icon('House')}</a>`
+    const currentWorkspace = model.identity?.membership.workspace
+    // The way home names the workspace the page lives in, as a breadcrumb, when that is the one the person is in.
+    const workspaceName = currentWorkspace?.workspaceId === summary.workspaceId ? currentWorkspace.name : null
+    const homeLink = workspaceName
+      ? html`<a class="xxd-btn viewer-bar__home" data-variant="ghost" data-size="sm" href="/" aria-label="${model.m.viewer.bar.home}">${PageShell.icon('House')}<span class="viewer-bar__workspace">${workspaceName}</span></a><span class="viewer-bar__crumb" aria-hidden="true">/</span>`
+      : html`<a class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" href="/" aria-label="${model.m.viewer.bar.home}" data-tooltip="${model.m.viewer.bar.home}" data-tooltip-placement="bottom-start">${PageShell.icon('House')}</a>`
+    const brandMark = html`<a class="xxd-btn viewer-bar__brand" data-variant="ghost" data-size="sm" href="/">${PageShell.brandMark(20)}<span class="viewer-bar__label">Open Artifact</span></a><span class="viewer-bar__crumb" aria-hidden="true">/</span>`
     return html`<header class="xxd-topbar viewer-bar">
-  ${isVisitor ? '' : homeLink}
+  ${isVisitor ? brandMark : homeLink}
   <div class="viewer-bar__title">
     <span class="viewer-bar__name" tabindex="0" data-tooltip="${summary.title}" data-tooltip-placement="bottom-start" data-artifact-title>${summary.title}</span>
     ${permissions.canSeeVersions ? ViewerPage.#versionPicker(model) : ''}
+    ${isVisitor && model.authorName ? html`<span class="viewer-bar__author">${model.m.viewer.bar.byAuthor(model.authorName)}</span>` : ''}
   </div>
   <div class="viewer-bar__end">
-    ${isVisitor ? '' : ViewerPage.#visibilityBadge(model)}
-    ${permissions.canReadComments ? ViewerPage.#commentCountButton(model.m) : ''}
-    ${permissions.canComment ? html`<button type="button" class="xxd-btn viewer-comment-mode" data-variant="ghost" data-size="sm" aria-pressed="false" aria-keyshortcuts="C" data-tooltip="${model.m.viewer.bar.commentModeTooltip}" data-comment-mode>${PageShell.icon('Plus')}<span class="viewer-bar__label">${model.m.viewer.bar.comment}</span></button>` : ''}
-    ${permissions.canManageSharing ? html`<button type="button" class="xxd-btn" data-variant="primary" data-size="sm" data-open-share>${model.m.viewer.bar.share}</button>` : ''}
-    ${ViewerPage.#canReport(model) ? html`<button type="button" class="xxd-btn viewer-report" data-variant="ghost" data-size="sm" aria-haspopup="dialog" data-open-report>${PageShell.icon('Flag', 14)}${model.m.viewer.report.open}</button>` : ''}
+    ${isVisitor || permissions.canManageSharing ? '' : ViewerPage.#visibilityBadge(model)}
+    ${permissions.canReadComments ? html`<span class="viewer-comment-group">${ViewerPage.#commentCountButton(model.m)}${permissions.canComment ? ViewerPage.#commentModeButton(model) : ''}</span>` : ''}
+    ${permissions.canComment && !permissions.canReadComments ? ViewerPage.#commentModeButton(model) : ''}
+    ${permissions.canManageSharing ? ViewerPage.#shareButton(model) : ''}
+    ${ViewerPage.#canReport(model) ? html`<button type="button" class="xxd-btn viewer-report" data-variant="ghost" data-size="sm" aria-haspopup="dialog" data-open-report>${PageShell.icon('Flag', 14)}<span class="viewer-bar__label">${model.m.viewer.report.open}</span></button>` : ''}
     ${isVisitor ? '' : ViewerPage.#moreMenu(model)}
     ${model.identity ? PageShell.accountControls(model.m, model.identity) : ViewerPage.#signInLink(model)}
   </div>
@@ -231,7 +239,9 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   }
 
   static #versionPicker(model: ViewerModel): SafeHtml {
-    return html`<button type="button" class="xxd-btn viewer-version" data-variant="ghost" data-size="sm" data-xxd-menu="version-menu" aria-label="${model.m.viewer.version.picker(model.shownVersion)}" data-version-button><span data-version-label>v${model.shownVersion}</span>${PageShell.icon('ChevronDown', 14)}</button>
+    // A first version has no history to open, so its label opens nothing until v2 arrives (versions.js adds the menu then).
+    const menu = model.openedArtifact.summary.version === 1 ? new SafeHtml('data-only-version') : new SafeHtml('data-xxd-menu="version-menu"')
+    return html`<button type="button" class="xxd-btn viewer-version" data-variant="ghost" data-size="sm" ${menu} aria-label="${model.m.viewer.version.picker(model.shownVersion)}" data-version-button><span data-version-label>v${model.shownVersion}</span>${PageShell.icon('ChevronDown', 14)}</button>
 <div class="xxd-menu viewer-version-menu" id="version-menu" role="menu" popover aria-label="${model.m.viewer.version.menu}" data-version-menu></div>`
   }
 
@@ -239,8 +249,20 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
   static #visibilityBadge(model: ViewerModel): SafeHtml {
     const { summary, permissions } = model.openedArtifact
     const label = ArtifactLabels.visibility(model.m, summary.sharing.visibility)
-    if (permissions.canManageSharing) return html`<button type="button" class="xxd-badge viewer-visibility" data-tooltip="${model.m.viewer.visibility.tooltipManage}" data-open-share data-visibility-label>${label}</button>`
-    return html`<span class="xxd-badge viewer-visibility" tabindex="0" data-tooltip="${model.m.viewer.visibility.tooltip}" data-visibility-label>${label}</span>`
+    const visibility = summary.sharing.visibility
+    const content = html`<span class="viewer-visibility__dot" aria-hidden="true"></span><span data-visibility-label>${label}</span>`
+    if (permissions.canManageSharing) return html`<button type="button" class="viewer-visibility" data-visibility="${visibility}" data-tooltip="${model.m.viewer.visibility.tooltipManage}" data-open-share>${content}</button>`
+    return html`<span class="viewer-visibility" data-visibility="${visibility}" tabindex="0" data-tooltip="${model.m.viewer.visibility.tooltip}">${content}</span>`
+  }
+
+  // How far the page reaches rides on the share button as a dot, with the words on hover and in the ⋯ menu.
+  static #shareButton(model: ViewerModel): SafeHtml {
+    const { visibility } = model.openedArtifact.summary.sharing
+    return html`<button type="button" class="xxd-btn viewer-share-button" data-variant="primary" data-size="sm" data-visibility="${visibility}" data-tooltip="${ArtifactLabels.visibility(model.m, visibility)}" data-open-share><span class="viewer-visibility__dot" aria-hidden="true"></span>${model.m.viewer.bar.share}</button>`
+  }
+
+  static #commentModeButton(model: ViewerModel): SafeHtml {
+    return html`<button type="button" class="xxd-btn viewer-comment-mode" data-variant="ghost" data-size="sm" aria-pressed="false" aria-keyshortcuts="C" data-tooltip="${model.m.viewer.bar.commentModeTooltip}" data-comment-mode>${PageShell.icon('Plus')}<span class="viewer-bar__label">${model.m.viewer.bar.comment}</span></button>`
   }
 
   static #commentCountButton(m: Messages): SafeHtml {
@@ -249,7 +271,7 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
 
   static #signInLink(model: ViewerModel): SafeHtml {
     const loginPath = `/login?next=${encodeURIComponent(ViewerPage.#pathOf(model, 'viewer'))}`
-    return html`<a class="xxd-link viewer-sign-in" href="${loginPath}">${model.m.viewer.bar.signInToComment}</a>`
+    return html`<a class="xxd-btn viewer-sign-in" data-size="sm" href="${loginPath}">${model.m.viewer.bar.signInToComment}</a>`
   }
 
   static #removalTakesDown(model: ViewerModel): boolean {
@@ -374,8 +396,8 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     </div>
     <div class="xxd-dialog__body share-dialog__body" data-share-body><p class="viewer-drawer__status"><span class="xxd-spinner" aria-hidden="true"></span>${m.viewer.share.loading}</p></div>
     <div class="xxd-dialog__actions">
-      <span class="xxd-text share-dialog__url" data-variant="mono-secondary" data-share-url></span>
-      <button type="button" class="xxd-btn" data-share-to-x>${PageShell.xLogo(14)}${m.viewer.share.toX}</button>
+      <span class="share-dialog__spacer"></span>
+      <button type="button" class="xxd-btn" data-variant="ghost" data-share-to-x>${PageShell.xLogo(14)}${m.viewer.share.toX}</button>
       <button type="button" class="xxd-btn" data-copy-link data-copy-done="${m.viewer.share.linkCopied}">${PageShell.icon('Copy', 14)}${m.viewer.share.copyLink}</button>
       <button type="submit" class="xxd-btn" data-variant="primary" data-save-sharing disabled>${m.viewer.share.save}</button>
     </div>
