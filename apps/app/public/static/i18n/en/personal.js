@@ -4,6 +4,8 @@ export default /** @satisfies {import('../messages').Messages['personal']} */ ({
   colophon: product => ['Published with ', product],
   ownerBar: {
     text: 'This is your page, exactly as others see it. Turn on “List on my page” in a document\'s “Share” panel and it shows up here.',
+    unlisted: count => `This is your page, exactly as others see it. ${count} of your public pages ${count === 1 ? 'is' : 'are'} not on it yet.`,
+    pick: 'Pick some',
     back: 'Back to workspace',
   },
   shareLead: ({ name, count }) => `${count} ${count === 1 ? 'piece' : 'pieces'} by ${name} on Open Artifact: `,

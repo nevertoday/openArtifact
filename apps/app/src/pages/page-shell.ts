@@ -284,6 +284,22 @@ ${deletedWorkspaces.length > 0 ? PageShell.#deletedWorkspacesDialog(m, deletedWo
     return html`<span class="xxd-avatar" data-avatar style="${avatarStyle(name)}" ${options.size ? new SafeHtml(`data-size="${options.size}"`) : ''} ${options.accountInitial ? new SafeHtml('data-account-initial') : ''} aria-hidden="true">${PageShell.initialOf(name)}</span>`
   }
 
+  /**
+   * An agent's mark: a small square in the agent's own colour, drawn from its name the way a person's avatar is,
+   * so each agent is told apart at a glance without anyone's logo.
+   */
+  static agentMark(agentName: string): SafeHtml {
+    return html`<span class="agent-mark" style="${avatarStyle(agentName)}" aria-hidden="true"></span>`
+  }
+
+  /**
+   * Opens the search palette (common.js; also ⌘K). It looks like a search field on a wide screen and is one icon on
+   * a phone; `searchText` is the search the list is already narrowed by.
+   */
+  static searchButton(m: Messages, searchText = ''): SafeHtml {
+    return html`<button type="button" class="app-search" data-open-search aria-label="${m.shell.search.open}" aria-keyshortcuts="Meta+K Control+K">${PageShell.icon('Search')}<span class="app-search__text" ${searchText.trim() === '' ? '' : new SafeHtml('data-searching')}>${searchText.trim() || m.shell.search.placeholder}</span><kbd class="xxd-kbd app-search__key" data-search-key>K</kbd></button>`
+  }
+
   static initialOf(name: string): string {
     return Array.from(name.trim())[0]?.toUpperCase() ?? '?'
   }

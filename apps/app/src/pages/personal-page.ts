@@ -20,6 +20,8 @@ export interface PersonalPageModel {
   shareCards: Map<string, ShareCard>
   /** The person looking is the page's owner, who may change the line about them, the pin and the summaries. */
   isOwner: boolean
+  /** For the owner: how many of their public pages in the current workspace are not on this page yet. */
+  unlistedPublicCount: number
   pageUrl: string
   /** The page's own share card, naming its latest titles. */
   cardImageUrl: string
@@ -36,7 +38,7 @@ export class PersonalPage {
     const pinned = model.entries.find(entry => entry.artifactId === model.profile.pinnedArtifactId) ?? null
     const listedBelow = model.entries.filter(entry => entry !== pinned)
     const body = html`<div class="personal" data-personal>
-${model.isOwner ? PersonalPage.#ownerBar(model.m) : ''}
+${model.isOwner ? PersonalPage.#ownerBar(model.m, model.unlistedPublicCount) : ''}
 <main class="personal__page" id="main" tabindex="-1">
 <div class="personal-brand">${PageShell.brandLink()}</div>
 ${PersonalPage.#header(model)}
@@ -60,8 +62,12 @@ ${PageShell.jsonData('personal-config', { handle: model.profile.handle, isOwner:
     })
   }
 
-  static #ownerBar(m: Messages): SafeHtml {
-    return html`<div class="personal-owner-bar"><span>${m.personal.ownerBar.text}</span><a class="xxd-link" href="/">${m.personal.ownerBar.back}</a></div>`
+  // With public pages still off the page, the bar says how many and leads to them; otherwise it explains how one gets here.
+  static #ownerBar(m: Messages, unlistedPublicCount: number): SafeHtml {
+    const text = unlistedPublicCount > 0
+      ? html`<span>${m.personal.ownerBar.unlisted(unlistedPublicCount)}</span><a class="xxd-link" href="/?filter=mine&amp;visibility=public_link">${m.personal.ownerBar.pick}</a>`
+      : html`<span>${m.personal.ownerBar.text}</span>`
+    return html`<div class="personal-owner-bar">${text}<a class="xxd-link" href="/">${m.personal.ownerBar.back}</a></div>`
   }
 
   static #header(model: PersonalPageModel): SafeHtml {

@@ -19,6 +19,13 @@ export default /** @satisfies {import('../messages').Messages['messagePages']} *
     text: author => `${author} published it and hasn't shared it with you yet.`,
     requestAccess: 'Ask the author to share it',
   },
+  removed: {
+    pageTitle: 'Page deleted · Open Artifact',
+    title: title => `“${title}” was deleted`,
+    text: purge => `Nobody can open it now. ${purge}; until then it can be restored, with its link, comments and sharing as they were.`,
+    restore: 'Restore page',
+    seeAll: 'See recently deleted',
+  },
   notFound: {
     pageTitle: 'Not found · Open Artifact',
     title: 'This artifact can\'t be found',

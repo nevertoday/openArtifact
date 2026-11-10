@@ -4,6 +4,16 @@ export default {
   signIn: '登录',
   notifications: '通知',
   markAllRead: '全部标为已读',
+  search: {
+    open: '搜索页面',
+    placeholder: '搜索页面…',
+    empty: '没有找到匹配的页面',
+    loading: '正在加载页面…',
+    pages: '页面',
+    goTo: '前往',
+    /** @param {string} search */
+    listAll: search => `在首页列出全部「${search}」的结果`,
+  },
   /** @param {string} name */
   accountMenu: name => `账户菜单：${name}`,
   myPage: '我的主页',
@@ -23,7 +33,7 @@ export default {
   },
   deletedWorkspacesDialog: {
     title: '最近删除的工作区',
-    description: '删除后 30 天内，管理员可以恢复工作区和其中的 页面；之后它们会被彻底删除。',
+    description: '删除后 30 天内，管理员可以恢复工作区和其中的页面；之后它们会被彻底删除。',
     restore: '恢复',
   },
   cancel: '取消',

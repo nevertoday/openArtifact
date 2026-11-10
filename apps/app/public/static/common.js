@@ -256,6 +256,65 @@ class NotificationBell {
   }
 }
 
+const MODIFIER_KEY = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'
+
+/**
+ * Search from anywhere: ⌘K, or the search button in a top bar, opens a palette of the pages the person can see and
+ * the places they can go. Typed words narrow it; Enter opens the first match.
+ */
+class SearchPalette {
+  #pages = null
+  #palette = null
+
+  constructor() {
+    for (const key of document.querySelectorAll('[data-search-key]')) key.textContent = `${MODIFIER_KEY} ${key.textContent}`
+    for (const opener of document.querySelectorAll('[data-open-search]')) opener.addEventListener('click', () => this.open())
+    document.addEventListener('keydown', event => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== 'k') return
+      event.preventDefault()
+      this.open()
+    })
+  }
+
+  async open() {
+    if (this.#palette?.isConnected) return
+    const search = m.shell.search
+    const palette = Xxd.openCommandPalette({ items: this.#items(), placeholder: search.placeholder, empty: search.empty, loading: this.#pages === null, loadingLabel: search.loading })
+    this.#palette = palette
+    const input = palette.querySelector('input')
+    input.addEventListener('input', () => palette.setItems(this.#items(input.value.trim())))
+    if (this.#pages !== null) return
+    try {
+      this.#pages = (await api('/api/artifacts')).artifacts
+    } catch (error) {
+      console.error(new Error('could not list the pages to search', { cause: error }))
+      this.#pages = []
+    }
+    palette.setItems(this.#items(input.value.trim()))
+  }
+
+  #items(searchText = '') {
+    const search = m.shell.search
+    const go = path => () => { location.href = path }
+    const pages = (this.#pages ?? []).map(page => ({
+      id: page.artifactId,
+      label: page.title,
+      hint: [page.author?.name, page.publishedVia].filter(Boolean).join(' · '),
+      group: search.pages,
+      run: go(new URL(page.url).pathname),
+    }))
+    const places = [
+      { label: m.home.filters.all, path: '/' },
+      { label: m.home.filters.waiting_for_me, path: '/?filter=waiting_for_me' },
+      { label: m.shell.myPage, path: '/@me' },
+      ...Object.entries(m.settings.sections).map(([section, label]) => ({ label, path: `/settings/${section}` })),
+    ].map(place => ({ id: place.path, label: place.label, group: search.goTo, run: go(place.path) }))
+    // The whole list on the home page, for a search with more matches than a palette should hold.
+    const listAll = searchText === '' ? [] : [{ id: 'list-all', label: search.listAll(searchText), group: search.goTo, run: go(`/?q=${encodeURIComponent(searchText)}`) }]
+    return [...pages, ...places, ...listAll]
+  }
+}
+
 function wireNotificationBell() {
   const bell = document.querySelector('[data-notification-bell]')
   const panel = document.getElementById('notification-panel')
@@ -266,3 +325,4 @@ renderServerTimes()
 wireSignOut()
 wireWorkspaceMenu()
 wireNotificationBell()
+if (document.querySelector('[data-account-button]')) new SearchPalette()

@@ -218,7 +218,7 @@ describe('asking the author for access', () => {
     const authorHears = await notificationsAbout(linCookie, draft.artifactId)
 
     expect(noAccessPage.status).toBe(403)
-    expect(noAccessMarkup).toContain('你没有这个 artifact 的访问权限')
+    expect(noAccessMarkup).toContain('你没有这个页面的访问权限')
     expect(noAccessMarkup).toContain('它是 lin 发布的')
     expect(noAccessMarkup).toContain('请作者分享给你')
     expect(noAccessMarkup).not.toContain('Private draft')
@@ -236,7 +236,7 @@ describe('asking the author for access', () => {
     const ask = await app.json<{ code: string }>(`/api/artifacts/${elsewhere.artifactId}/access-requests`, { method: 'POST', cookie: zhouCookie })
 
     expect(page.status).toBe(404)
-    expect(await page.text()).toContain('找不到这个 artifact')
+    expect(await page.text()).toContain('找不到这个页面')
     expect(ask).toMatchObject({ status: 404, body: { code: 'not_found' } })
   })
 })

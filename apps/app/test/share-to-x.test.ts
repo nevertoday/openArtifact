@@ -210,7 +210,7 @@ describe('the share buttons', () => {
     const entryPosts = [...markup.matchAll(/class="xxd-btn personal-share__action"[^>]*href="([^"]+)"/g)].map(match => new URL(match[1]!).searchParams.get('text'))
     const copiedLinks = [...markup.matchAll(/data-copy="([^"]+)"/g)].map(match => match[1])
 
-    expect(headerPost.searchParams.get('text')).toBe('share-page 在 Open Artifact 上的 2 篇文章：《第二篇》《第一篇》')
+    expect(headerPost.searchParams.get('text')).toBe('share-page 在 Open Artifact 上的 2 个页面：《第二篇》《第一篇》')
     expect(headerPost.searchParams.get('url')).toBe(`http://app.test${pagePath}`)
     expect(entryPosts).toEqual(['第二篇', '第一篇'])
     expect(copiedLinks).toHaveLength(2)

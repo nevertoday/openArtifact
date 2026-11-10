@@ -32,8 +32,7 @@
 .viewer-visibility[data-visibility="public_link"] .viewer-visibility__dot { background: var(--success, #15803d); }
 .viewer-visibility[data-visibility="private"] .viewer-visibility__dot, .viewer-visibility[data-visibility="specified"] .viewer-visibility__dot { background: var(--ink); }
 .viewer-share-button { gap: 7px; }
-.share-dialog__spacer { flex: 1; }
-.viewer-report { color: var(--muted); }
+.share-dialog__status { flex: 1; min-width: 0; color: var(--muted); font-size: var(--text-xs); }
 .viewer-bar__brand { font-weight: var(--weight-strong); }
 .viewer-share-button .viewer-visibility__dot { display: none; }
 .viewer-share-button:is([data-visibility="public_link"], [data-visibility="private"], [data-visibility="specified"]) .viewer-visibility__dot { display: inline-block; }
@@ -49,7 +48,7 @@ button.viewer-visibility { cursor: pointer; }
 /* No open comments shows the icon alone; the button's label still says the count to a screen reader. */
 .viewer-count:empty, .viewer-count[data-zero] { display: none; }
 .viewer-comment-mode[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
-.viewer-sign-in { white-space: nowrap; }
+.viewer-sign-in, .viewer-bar__cta { white-space: nowrap; }
 .viewer-more-menu__visibility { display: none; }
 .viewer-more-menu__note { display: flex; align-items: flex-start; gap: var(--space-1-5); max-width: 320px; color: var(--muted); font-weight: var(--weight-regular); white-space: normal; }
 
@@ -230,6 +229,9 @@ button.viewer-visibility { cursor: pointer; }
 .share-grant-form__email { flex: 1 1 200px; }
 .share-person { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; }
 .share-person .xxd-list__main { flex: 1 1 8em; min-width: 0; }
+.share-person__role { color: var(--muted); font-size: var(--text-xs); white-space: nowrap; }
+/* Where a person has an avatar, a whole group has an icon on the same footprint. */
+.share-person__reach { display: grid; place-items: center; width: var(--avatar-size, 24px); height: var(--avatar-size, 24px); border-radius: 50%; background: var(--wash); color: var(--muted); }
 
 /* Full view: the artifact alone, filling the tab. */
 .viewer-full { display: flex; flex-direction: column; height: 100dvh; }
@@ -247,6 +249,7 @@ button.viewer-visibility { cursor: pointer; }
   .viewer-bar { gap: 0; padding-inline: var(--space-1); }
   .viewer-bar__label, .viewer-bar__end > .viewer-visibility, .viewer-bar__workspace, .viewer-bar__crumb { display: none; }
   .viewer-bar { height: 52px; }
+  .viewer-bar__cta { display: none; }
   .viewer-bar .viewer-share-button, .viewer-comment-group { height: 34px; min-height: 34px; border-radius: 999px; }
   .viewer-comment-mode { padding-inline: var(--space-2); }
   .viewer-more-menu__visibility { display: block; }
@@ -325,5 +328,8 @@ button.viewer-visibility { cursor: pointer; }
   .share-x__hint { display: none; }
 }
 
-.viewer-report { white-space: nowrap; }
 .comment-reply-prompt__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Beside the version: who published it, with which agent, and when. It gives way first when the bar is short of room. */
+.viewer-bar__published { flex: none; display: inline-flex; align-items: center; gap: 5px; margin-inline-start: var(--space-1); color: var(--muted); font-size: var(--text-xs); white-space: nowrap; }
+.viewer-bar__published:empty { display: none; }
+@media (max-width: 1180px) { .viewer-bar__published { display: none; } }

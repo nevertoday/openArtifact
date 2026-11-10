@@ -40,7 +40,7 @@ export default {
     shared_data_full: '这个页面或它所在工作区的共享数据已到上限，这次没有保存。删掉页面不再需要的数据再试。',
     workspace_limit_reached: '你已经创建了 10 个工作区，除个人工作区外每人最多 10 个，这次没有创建。删除的工作区在 30 天后彻底清除前仍然算在内。',
     publish_limit_reached: '你 24 小时内发布的次数已到上限，这次没有发布。请稍后再试。',
-    workspace_quota_reached: '这个工作区的 页面 数量或存储空间已到上限，这次没有保存。删掉不用的 页面 再试，用量见「工作区设置」。',
+    workspace_quota_reached: '这个工作区的页面数量或存储空间已到上限，这次没有保存。删掉不用的页面再试，用量见「工作区设置」。',
     workspace_deleted: '这个工作区已被删除。',
     personal_workspace: '个人工作区不能离开或删除，它的主人也始终是管理员。',
   }),
@@ -88,7 +88,7 @@ export default {
     /** @param {number} count */
     bellUnread: count => `通知，${count} 条未读`,
     emptyTitle: '还没有通知',
-    emptyText: '有人评论你的 页面、回复或解决你的评论时，会出现在这里。',
+    emptyText: '有人评论你的页面、回复或解决你的评论时，会出现在这里。',
     unreadPrefix: '未读：',
   },
   home: {
@@ -96,7 +96,7 @@ export default {
     /** @param {string} message */
     undoFailed: message => `撤销失败：${message}`,
     /** @param {number} count */
-    artifactCount: count => `${count} 个 artifact`,
+    artifactCount: count => `${count} 个页面`,
   },
   login: {
     errors: {
@@ -169,7 +169,7 @@ export default {
     lifecycle: {
       /** @param {string} name */
       leaveTitle: name => `离开「${name}」？`,
-      leaveMessage: '你会立即看不到这里的 页面，你在这里的 token 也会失效。之后有人邀请你，你还能回来。',
+      leaveMessage: '你会立即看不到这里的页面，你在这里的 token 也会失效。之后有人邀请你，你还能回来。',
       /** @param {string} name */
       deleteTitle: name => `删除「${name}」？`,
       deleteMessage: '所有成员会立即失去访问，页面、公开链接和 token 都停止工作。30 天内你可以在工作区菜单的「最近删除」里恢复。',
@@ -191,7 +191,7 @@ export default {
       roleChangeFailed: message => `修改角色失败：${message}`,
       /** @param {string} name */
       removeTitle: name => `移除 ${name}？`,
-      removeMessage: 'TA 会立即失去访问权限，个人 API token 也会被撤销，再次登录也不会自动加入，除非你用邮箱重新邀请 TA。TA 发布的 页面 会留在工作区里。',
+      removeMessage: 'TA 会立即失去访问权限，个人 API token 也会被撤销，再次登录也不会自动加入，除非你用邮箱重新邀请 TA。TA 发布的页面会留在工作区里。',
       remove: '移除',
       /** @param {string} name */
       removed: name => `已移除 ${name}`,

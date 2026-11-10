@@ -59,15 +59,15 @@ function loadMs(path) {
 // addresses are not interface words.
 function mixedWords() {
   const directory = join(REPO, 'apps/app/public/static/i18n/zh-CN')
-  const notInterfaceWords = /Open Artifact|open-artifact|OPEN_ARTIFACT|`[^`]*`|\/[\w/:.{}-]*artifacts?[\w/:.{}-]*|\bartifacts?[A-Z_.]\w*|\w+[._]artifacts?\b|artifactId|artifact_id|window\.artifact/g
+  const notInterfaceWords = /Open Artifact|open-artifact|OPEN_ARTIFACT|\/[\w/:.{}-]*artifacts?[\w/:.{}-]*|\bartifacts?[A-Z_.]\w*|\w+[._]artifacts?\b|[a-z]+Artifacts?\w*|artifactId|artifact_id|window\.artifact/g
   const offenders = []
   for (const file of readdirSync(directory).filter(name => name.endsWith('.js'))) {
     readFileSync(join(directory, file), 'utf8').split('\n').forEach((line, index) => {
       const quoted = (line.match(/(['"`])(?:\\.|(?!\1).)*\1/g) ?? []).join(' ').replace(notInterfaceWords, '')
-      if (/artifact/i.test(quoted) || /文档/.test(quoted)) offenders.push(`${file}:${index + 1}`)
+      if (/artifact/i.test(quoted) || /文档|文章/.test(quoted)) offenders.push(`${file}:${index + 1}`)
     })
   }
-  return offenders.length > 0 ? [`${offenders.length} lines say artifact or 文档 where the interface says 页面: ${offenders.slice(0, 6).join(', ')}`] : []
+  return offenders.length > 0 ? [`${offenders.length} lines say artifact, 文档 or 文章 where the interface says 页面: ${offenders.slice(0, 6).join(', ')}`] : []
 }
 
 const GATES = [

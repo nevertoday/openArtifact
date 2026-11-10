@@ -9,9 +9,9 @@ export default {
     waiting_for_my_agent: '等我的 agent 处理',
   },
   filterDescriptions: {
-    all: '这个工作区里的人和他们的 agent 发布的 页面。',
+    all: '这个工作区里的人和他们的 agent 发布的页面。',
     mine: '你发布的，和你的 agent 代你发布的。',
-    shared: '作者把你加进分享名单的 页面，不论它在哪个工作区。',
+    shared: '作者把你加进分享名单的页面，不论它在哪个工作区。',
     removed: '删除后所有人都看不到。30 天内可以恢复，之后彻底删除；也可以现在就永久删除，立即释放存储空间。',
     waiting_for_me: '有评论在等你回复。',
     waiting_for_my_agent: '有给 agent 的评论还没解决，等你的 agent 处理。',
@@ -25,10 +25,6 @@ export default {
     action: '去设置',
   },
   headingAll: '全部',
-  /** @param {string} agent */
-  headingByAgent: agent => `${agent} 发布的`,
-  /** @param {string} agent */
-  descriptionByAgent: agent => `来源是 ${agent} 的 artifact。`,
   /** @param {number} count */
   resultCount: count => `${count} 个`,
   /** @param {{ search: string, count: number }} p */
@@ -41,16 +37,27 @@ export default {
     restore: '恢复',
     purge: '永久删除',
   },
-  searchPlaceholder: '搜索标题、作者或 agent',
+  toolbar: {
+    label: '筛选和排序',
+    source: '来源',
+    allSources: '全部来源',
+    visibility: '可见范围',
+    allVisibilities: '全部可见范围',
+    sort: '排序',
+    sorts: { updated: '最近更新', title: '按标题', comments: '待处理评论最多' },
+    /** @param {{ label: string, count: number }} p */
+    withCount: ({ label, count }) => `${label}（${count}）`,
+    /** @param {string} label */
+    clear: label => `清除筛选：${label}`,
+  },
+  /** @param {number} count */
+  loadMore: count => `加载更多（还有 ${count} 个）`,
+  backToFirst: '回到开头',
   sidebar: {
     filter: '筛选',
     waiting: '待处理',
-    sources: '来源',
-    allSources: '全部来源',
-    /** @param {{ agent: string, count: number }} p */
-    sourceOption: ({ agent, count }) => `${agent}（${count}）`,
     /** @param {number} count */
-    countTitle: count => `${count} 个 artifact`,
+    countTitle: count => `${count} 个页面`,
   },
   /** @param {string} workspace */
   fromWorkspace: workspace => `来自工作区「${workspace}」`,
@@ -62,17 +69,16 @@ export default {
     searchTitle: search => `没有找到「${search}」`,
     searchText: '搜索会查标题、作者的名字和发布它的 agent。',
     clearSearch: '清除搜索',
-    /** @param {string} agent */
-    agentTitle: agent => `没有来自 ${agent} 的 artifact`,
+    narrowedTitle: '没有符合这些筛选条件的页面',
     viewAll: '查看全部',
     connectAgent: '连接 agent',
     inviteMembers: '邀请成员',
     filters: {
-      all: { title: '还没有 页面', text: '在「Agent 接入」里连接你的 agent，然后让它把设计稿、报告或看板发布到这里。' },
-      mine: { title: '你还没有发布 页面', text: '连接你的 agent，让它把页面发布到这里。' },
-      shared: { title: '还没有人把 页面 分享给你', text: '作者在分享设置里加上你之后，会出现在这里。' },
-      removed: { title: '没有可以恢复的 页面', text: '你删除的 页面 会在这里留 30 天。' },
-      waiting_for_me: { title: '没有等你回复的评论', text: '有人评论你的 页面，或回复你的评论时，会出现在这里。' },
+      all: { title: '还没有页面', text: '在「Agent 接入」里连接你的 agent，然后让它把设计稿、报告或看板发布到这里。' },
+      mine: { title: '你还没有发布页面', text: '连接你的 agent，让它把页面发布到这里。' },
+      shared: { title: '还没有人把页面分享给你', text: '作者在分享设置里加上你之后，会出现在这里。' },
+      removed: { title: '没有可以恢复的页面', text: '你删除的页面会在这里留 30 天。' },
+      waiting_for_me: { title: '没有等你回复的评论', text: '有人评论你的页面，或回复你的评论时，会出现在这里。' },
       waiting_for_my_agent: { title: '没有给 agent 的评论', text: '有人在评论时选「给 agent」，你的 agent 就会在这里看到要做的事。' },
     },
   },

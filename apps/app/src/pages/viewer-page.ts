@@ -195,9 +195,9 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     ${permissions.canReadComments ? html`<span class="viewer-comment-group">${ViewerPage.#commentCountButton(model.m)}${permissions.canComment ? ViewerPage.#commentModeButton(model) : ''}</span>` : ''}
     ${permissions.canComment && !permissions.canReadComments ? ViewerPage.#commentModeButton(model) : ''}
     ${permissions.canManageSharing ? ViewerPage.#shareButton(model) : ''}
-    ${ViewerPage.#canReport(model) ? html`<button type="button" class="xxd-btn viewer-report" data-variant="ghost" data-size="sm" aria-haspopup="dialog" data-open-report>${PageShell.icon('Flag', 14)}<span class="viewer-bar__label">${model.m.viewer.report.open}</span></button>` : ''}
-    ${isVisitor ? '' : ViewerPage.#moreMenu(model)}
-    ${model.identity ? PageShell.accountControls(model.m, model.identity) : ViewerPage.#signInLink(model)}
+    ${model.identity ? '' : ViewerPage.#signInLink(model)}
+    ${isVisitor ? ViewerPage.#visitorMenu(model) : ViewerPage.#moreMenu(model)}
+    ${model.identity ? PageShell.accountControls(model.m, model.identity) : ''}
   </div>
 </header>`
   }
@@ -242,7 +242,8 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     // A first version has no history to open, so its label opens nothing until v2 arrives (versions.js adds the menu then).
     const menu = model.openedArtifact.summary.version === 1 ? new SafeHtml('data-only-version') : new SafeHtml('data-xxd-menu="version-menu"')
     return html`<button type="button" class="xxd-btn viewer-version" data-variant="ghost" data-size="sm" ${menu} aria-label="${model.m.viewer.version.picker(model.shownVersion)}" data-version-button><span data-version-label>v${model.shownVersion}</span>${PageShell.icon('ChevronDown', 14)}</button>
-<div class="xxd-menu viewer-version-menu" id="version-menu" role="menu" popover aria-label="${model.m.viewer.version.menu}" data-version-menu></div>`
+<div class="xxd-menu viewer-version-menu" id="version-menu" role="menu" popover aria-label="${model.m.viewer.version.menu}" data-version-menu></div>
+<span class="viewer-bar__published" data-version-published></span>`
   }
 
   // Whoever manages sharing opens the share dialog from the badge; everyone else reads it as a fact.
@@ -271,7 +272,19 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
 
   static #signInLink(model: ViewerModel): SafeHtml {
     const loginPath = `/login?next=${encodeURIComponent(ViewerPage.#pathOf(model, 'viewer'))}`
-    return html`<a class="xxd-btn viewer-sign-in" data-size="sm" href="${loginPath}">${model.m.viewer.bar.signInToComment}</a>`
+    const publishYours = ViewerPage.isPublicLinkVisitor(model.openedArtifact) ? html`<a class="xxd-btn viewer-bar__cta" data-variant="primary" data-size="sm" href="/login">${model.m.viewer.bar.publishYours}</a>` : ''
+    return html`<a class="xxd-btn viewer-sign-in" data-variant="ghost" data-size="sm" href="${loginPath}">${model.m.viewer.bar.signInToComment}</a>${publishYours}`
+  }
+
+  // A visitor's menu holds what is rarely needed: the link, where this page comes from, and reporting it.
+  static #visitorMenu(model: ViewerModel): SafeHtml {
+    const { bar, more, report } = model.m.viewer
+    return html`<button type="button" class="xxd-btn" data-variant="ghost" data-icon-only data-size="sm" data-xxd-menu="artifact-menu" aria-label="${more.label}" data-tooltip="${more.label}">${PageShell.icon('Ellipsis')}</button>
+<div class="xxd-menu viewer-more-menu" id="artifact-menu" role="menu" popover aria-label="${more.label}">
+  <button type="button" class="xxd-menu__item" role="menuitem" data-copy-artifact-link>${PageShell.icon('Link', 14)}${more.copyLink}</button>
+  ${model.identity ? '' : html`<a class="xxd-menu__item" role="menuitem" href="/login">${PageShell.icon('Bot', 14)}${bar.publishYoursLong}</a>`}
+  ${ViewerPage.#canReport(model) ? html`<div class="xxd-menu__sep" role="separator"></div><button type="button" class="xxd-menu__item" role="menuitem" aria-haspopup="dialog" data-open-report>${PageShell.icon('Flag', 14)}${report.open}</button>` : ''}
+</div>`
   }
 
   static #removalTakesDown(model: ViewerModel): boolean {
@@ -396,10 +409,10 @@ ${PageShell.jsonData('viewer-config', ViewerPage.#viewerConfig(model))}`
     </div>
     <div class="xxd-dialog__body share-dialog__body" data-share-body><p class="viewer-drawer__status"><span class="xxd-spinner" aria-hidden="true"></span>${m.viewer.share.loading}</p></div>
     <div class="xxd-dialog__actions">
-      <span class="share-dialog__spacer"></span>
+      <span class="share-dialog__status" role="status" data-share-status></span>
       <button type="button" class="xxd-btn" data-variant="ghost" data-share-to-x>${PageShell.xLogo(14)}${m.viewer.share.toX}</button>
       <button type="button" class="xxd-btn" data-copy-link data-copy-done="${m.viewer.share.linkCopied}">${PageShell.icon('Copy', 14)}${m.viewer.share.copyLink}</button>
-      <button type="submit" class="xxd-btn" data-variant="primary" data-save-sharing disabled>${m.viewer.share.save}</button>
+      <button type="button" class="xxd-btn" data-variant="primary" data-close-share>${m.viewer.share.done}</button>
     </div>
   </form>
 </dialog>`

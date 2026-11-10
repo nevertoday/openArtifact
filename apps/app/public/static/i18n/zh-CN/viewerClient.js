@@ -237,9 +237,6 @@ export default {
   },
   share: {
     loading: '正在加载…',
-    discardTitle: '放弃未保存的修改？',
-    discardMessage: '分享设置有修改还没有保存。关闭后，这些修改不会生效。',
-    discardConfirm: '放弃修改',
     whoCanSee: '谁能看到',
     publicLinksOff: '工作区管理员已关闭公开链接',
     visibilityDescriptions: {
@@ -252,15 +249,11 @@ export default {
     emailLabel: '对方的邮箱',
     emailInvalid: '请输入有效的邮箱，比如 name@example.com',
     add: '添加',
-    nobodyYetSpecified: '还没有添加任何人，现在只有你能看到。',
-    nobodyYet: '还没有单独添加任何人。',
     givePersonMore: '给某个人更多权限',
-    peopleTitle: '添加的人',
-    peopleHintSpecified: '保存后，新添加的人会收到邮件。可查看：使用页面；可评论：再加评论；可编辑：还能发布新版本。',
-    peopleHint: '给某个人比其他人更多的权限，比如可编辑：还能发布新版本。保存后，新添加的人会收到邮件。',
+    peopleHintSpecified: '添加后对方会收到邮件。可查看：使用页面；可评论：再加评论；可编辑：还能发布新版本。',
+    peopleHint: '可以给某个人比其他人更多的权限，比如可编辑：还能发布新版本。添加后对方会收到邮件。',
     /** @param {string} name */
     roleOf: name => `${name} 的权限`,
-    addedOnSave: '保存后添加',
     invited: '已邀请',
     remove: '移除',
     role: '权限',
@@ -286,12 +279,32 @@ export default {
     passwordSet: '已设置访问密码',
     changePassword: '更改',
     removePassword: '取消密码',
-    passwordRemovedOnSave: '保存后取消访问密码',
-    keepPassword: '保留密码',
     newPassword: '输入新密码',
     noPassword: '不设置',
     keepOldPassword: '保留原密码',
-    saved: '分享设置已保存',
+    saving: '正在保存…',
+    savedNow: '已保存，立即生效',
+    undo: '撤销',
+    /** @param {string} label */
+    visibilityChanged: label => `可见范围已改为「${label}」`,
+    /** @param {string} name */
+    personRemoved: name => `已移除 ${name}`,
+    /** @param {string} name */
+    removePerson: name => `移除 ${name}`,
+    confirmPublic: {
+      title: '把这个页面设为公开？',
+      message: '任何拿到链接的人不用登录就能打开它。之后可以随时改回来。',
+      confirm: '设为公开',
+    },
+    access: {
+      title: '有权限的人',
+      author: '作者',
+      /** @param {number} count */
+      workspaceEveryone: count => `工作区的 ${count} 位成员`,
+      workspaceRole: '可查看和评论',
+      anyoneWithLink: '任何拿到链接的人',
+      linkRole: '可查看',
+    },
   },
   shareX: {
     readiness: {
@@ -299,10 +312,10 @@ export default {
       /** @param {string} date */
       expires: date => `链接会在 ${date} 过期，过期后推文里的链接就打不开了。`,
       not_listed: '公开了，但没有列在主页上，所以 X 上不会出现卡片图。',
-      not_public: '只有能打开这篇文章的人看得到，X 上的读者打不开。',
+      not_public: '只有能打开这个页面的人看得到，X 上的读者打不开。',
       has_password: '链接设了密码，X 上的读者打不开，也不会出现卡片图。',
       public_links_off: '工作区管理员关闭了公开链接，现在不能分享到 X。',
-      removed: '这篇文章已删除。',
+      removed: '这个页面已删除。',
     },
     fix: {
       expires: '改为永不过期',
@@ -311,7 +324,7 @@ export default {
       has_password: '去掉密码并列在主页',
     },
     fixConfirm: {
-      title: '公开这篇文章？',
+      title: '公开这个页面？',
       message: '任何拿到链接的人都能打开它，它也会出现在你的主页上，链接永不过期。',
       confirm: '公开并列在主页',
     },

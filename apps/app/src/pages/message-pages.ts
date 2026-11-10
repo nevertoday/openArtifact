@@ -1,4 +1,5 @@
 import type { Messages } from '../i18n/messages.ts'
+import { ArtifactLabels } from './artifact-labels.ts'
 import { html, type SafeHtml } from './html.ts'
 import { PageShell } from './page-shell.ts'
 
@@ -41,6 +42,21 @@ export class MessagePages {
   <p class="xxd-text" data-variant="secondary" role="status" data-access-request-status></p>
 </section>`)
     return PageShell.render({ m, title: m.messagePages.noAccess.pageTitle, body, status: 403, scripts: ['common.js', 'access-request.js'] })
+  }
+
+  /** A removed artifact, for someone who may restore it: when it goes for good, and the way back. */
+  static removed(m: Messages, artifactId: string, title: string, purgeAt: number, now: number): Response {
+    const body = MessagePages.#centered(m, html`<section class="xxd-empty">
+  ${PageShell.icon('Trash2', 24)}
+  <h1 class="xxd-empty__title">${m.messagePages.removed.title(title)}</h1>
+  <p class="xxd-empty__text">${m.messagePages.removed.text(ArtifactLabels.purgeIn(m, purgeAt, now))}</p>
+  <div class="xxd-empty__actions xxd-cluster">
+    <button type="button" class="xxd-btn" data-variant="primary" data-restore-removed="${artifactId}">${PageShell.icon('RotateCcw', 14)}${m.messagePages.removed.restore}</button>
+    <a class="xxd-btn" href="/?filter=removed">${m.messagePages.removed.seeAll}</a>
+  </div>
+  <p class="xxd-text" data-variant="secondary" role="status" data-restore-status></p>
+</section>`)
+    return PageShell.render({ m, title: m.messagePages.removed.pageTitle, body, status: 410, scripts: ['common.js', 'restore-removed.js'] })
   }
 
   /** `loginNextPath` is where sign-in should land for a visitor; null for a person already signed in. */

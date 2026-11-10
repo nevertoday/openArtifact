@@ -7,7 +7,7 @@ export default {
   actions: '操作',
   agents: {
     upcoming: '接下来的步骤',
-    description: 'Claude Code、Codex、Cursor、Gemini CLI 等 agent 以你的身份发布和修改 页面。agent 能做什么，由 token 的权限决定。',
+    description: 'Claude Code、Codex、Cursor、Gemini CLI 等 agent 以你的身份发布和修改页面。agent 能做什么，由 token 的权限决定。',
     naming: {
       title: '1 · 给这个 agent 起个名字',
       description: '每个 agent 用自己的 token，丢了或不用了就单独撤销。名字只有你看得到。',
@@ -18,7 +18,7 @@ export default {
       expiry: { 90: '90 天', 30: '30 天', 365: '1 年', never: '永不过期' },
       scopeLabel: '权限',
       scopes: {
-        publish: { label: '仅发布', description: '发布、更新和读取 页面，处理评论和共享数据；不能修改谁能看到它。' },
+        publish: { label: '仅发布', description: '发布、更新和读取页面，处理评论和共享数据；不能修改谁能看到它。' },
         full: { label: '完全权限', description: '和你在网页上能做的一样，也能修改分享设置，比如设为公开链接。' },
       },
       create: '新建 token',
@@ -94,7 +94,7 @@ export default {
   invite: {
     title: '邀请同事',
     /** @param {number} days */
-    description: days => `收到邀请的人登录后就会加入，不受邮箱域名限制。邮件邀请 ${days} 天后失效；邀请链接可以设为 7 天、30 天或永不过期，适合贴在团队群或入职文档里。`,
+    description: days => `收到邀请的人登录后就会加入，不受邮箱域名限制。邮件邀请 ${days} 天后失效；邀请链接可以设为 7 天、30 天或永不过期，适合贴在团队群或入职资料里。`,
     emailsLabel: '用邮箱邀请',
     emailsHelp: '可以一次填多个，用逗号或换行分开。每人会收到一封带链接的邮件。',
     send: '发送邀请',
@@ -108,7 +108,7 @@ export default {
     nameHelp: '成员在侧栏和切换工作区时看到它。最多 40 个字。',
     publicLinks: {
       title: '公开链接',
-      label: '允许成员把 页面 分享为公开链接',
+      label: '允许成员把页面分享为公开链接',
       help: '关闭后，现有的公开链接立即失效；成员仍然可以在工作区内查看。',
       /** @param {boolean} enabled */
       state: enabled => `${enabled ? '已允许' : '已关闭'} · 只有管理员可以修改`,
@@ -125,21 +125,21 @@ export default {
       /** @param {{ usedMb: number, maxMb: number }} size */
       sharedDataSize: ({ usedMb, maxMb }) => `${usedMb.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} MB / ${maxMb} MB`,
       /** @param {{ maxArtifacts: number, maxGb: number, maxSharedDataMb: number }} limits */
-      help: ({ maxArtifacts, maxGb, maxSharedDataMb }) => `每个工作区最多 ${maxArtifacts.toLocaleString('zh-CN')} 个 artifact、${maxGb} GB 文件（每个版本的文件都算）和 ${maxSharedDataMb} MB 共享数据（页面为访客保存的数据）。删除的 artifact 立即不占数量，但它的文件和数据要到 30 天后彻底清除，或在「最近删除」里永久删除后，才释放空间。`,
+      help: ({ maxArtifacts, maxGb, maxSharedDataMb }) => `每个工作区最多 ${maxArtifacts.toLocaleString('zh-CN')} 个页面、${maxGb} GB 文件（每个版本的文件都算）和 ${maxSharedDataMb} MB 共享数据（页面为访客保存的数据）。删除的页面立即不占数量，但它的文件和数据要到 30 天后彻底清除，或在「最近删除」里永久删除后，才释放空间。`,
     },
     lifecycle: {
       title: '离开或删除',
       personalNote: '这是你的个人工作区，不能离开或删除，你一直是它的管理员。可以改名，也可以邀请别人进来一起用。',
       leaveLabel: '离开工作区',
-      leaveHelp: '离开后你看不到这里的 页面，你在这里的 token 也会失效；你发布的 页面 留在工作区里。之后有人邀请你，你还能回来。',
+      leaveHelp: '离开后你看不到这里的页面，你在这里的 token 也会失效；你发布的页面留在工作区里。之后有人邀请你，你还能回来。',
       leave: '离开',
       deleteLabel: '删除工作区',
-      deleteHelp: '所有成员立即失去访问，其中的 页面、公开链接和 token 都停止工作。30 天内管理员可以在工作区菜单的「最近删除」里恢复，之后彻底删除。',
+      deleteHelp: '所有成员立即失去访问，其中的页面、公开链接和 token 都停止工作。30 天内管理员可以在工作区菜单的「最近删除」里恢复，之后彻底删除。',
       delete: '删除工作区',
     },
     content: {
       title: '内容管理',
-      description: '工作区里的全部 页面。下架后所有人都看不到，作者也不能自己恢复；30 天内管理员可以恢复。私有 页面 只显示标题，管理员也不能打开。',
+      description: '工作区里的全部页面。下架后所有人都看不到，作者也不能自己恢复；30 天内管理员可以恢复。私有页面只显示标题，管理员也不能打开。',
       columns: { title: '标题', author: '作者', state: '状态', updated: '更新' },
       /** @param {boolean} takenDown */
       removedBadge: takenDown => `已${takenDown ? '下架' : '删除'}`,
