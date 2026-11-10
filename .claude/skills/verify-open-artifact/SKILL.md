@@ -57,7 +57,7 @@ This is read-only. For each Worker it checks that the pid is alive, `/health` re
 | A second person | `node $V sign-in --email member@example.com` (switches the stored session to them; sign in founder again to switch back) |
 | Drive the UI | `node $V browse <path> [--as session\|anon] <steps>` |
 
-`browse` opens a fresh headless Chrome (system Chrome, or `OA_CHROME`) with the stored session cookie. Its steps run in order: `--wait <css>`, `--click <css>`, `--fill '<css>::<text>'`, `--press <Key>`, `--sleep <ms>`, `--eval '<js>'`, `--frame-text`, `--shot <name>`, `--dom <name>`, `--viewport <W>x<H>` (below 700 px it also emulates a touch phone), `--scheme light|dark`, `--reload`. Each browse is a new browser, so state lives in the server, not in the tab.
+`browse` opens a fresh headless Chrome (system Chrome, or `OA_CHROME`) with the stored session cookie. Its steps run in order: `--wait <css>`, `--click <css>`, `--fill '<css>::<text>'`, `--press <Key>`, `--sleep <ms>`, `--eval '<js>'`, `--frame-text`, `--frame-eval '<js>'` (evaluates inside the artifact frame), `--mouse <X>,<Y>` (a real pointer press at page coordinates; unlike `--click` it fires `pointerdown` and reaches inside the frame), `--shot <name>`, `--dom <name>`, `--viewport <W>x<H>` (below 700 px it also emulates a touch phone), `--scheme light|dark`, `--reload`. Each browse is a new browser, so state lives in the server, not in the tab.
 
 Stable handles in this UI are ids and `data-*` attributes. Use them, not text or position:
 
