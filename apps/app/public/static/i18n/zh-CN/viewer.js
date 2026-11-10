@@ -9,7 +9,7 @@ export default {
     /** @template T @param {{ version: number, time: T }} p @returns {(string | T)[]} */
     updated: ({ version, time }) => [`第 ${version} 版 · `, time, '更新'],
     next: '下一篇',
-    more: '更多文章',
+    more: '更多页面',
     shareOnX: '分享到 X',
   },
   full: { back: '返回查看页' },
@@ -22,6 +22,8 @@ export default {
     share: '分享',
     comments: '评论',
     signInToComment: '登录后评论',
+    publishYours: '发布你的页面',
+    publishYoursLong: '用 Open Artifact 发布你的页面',
   },
   version: {
     /** @param {number} version */
@@ -81,7 +83,7 @@ export default {
     loading: '正在加载…',
     linkCopied: '已复制链接',
     copyLink: '复制链接',
-    save: '保存',
+    done: '完成',
     toX: '发到 X',
   },
   shareX: {

@@ -122,6 +122,23 @@ describe('the owner of a personal page', () => {
     expect(strangersView.markup).toMatch(/class="personal-cover"[\s\S]*封面文章/)
   })
 
+  it('is told how many public pages are not on the page yet, with the way to them, which a stranger never sees', async () => {
+    const unlistedCountOf = (markup: string) => Number(markup.match(/你还有 (\d+) 个公开页面没有放上来/)?.[1] ?? 0)
+    const before = unlistedCountOf((await personalPageOf(linCookie)).markup)
+    const waiting = await publishPublic('还没放上来的一篇')
+
+    const ownersView = await personalPageOf(linCookie)
+    const strangersView = await personalPageOf()
+    await setSharing(waiting.artifactId, { listed: true })
+    const afterListing = await personalPageOf(linCookie)
+
+    expect(unlistedCountOf(ownersView.markup)).toBe(before + 1)
+    expect(ownersView.markup).toContain('href="/?filter=mine&amp;visibility=public_link"')
+    expect(unlistedCountOf(afterListing.markup)).toBe(before)
+    expect(strangersView.markup).not.toContain('公开页面没有放上来')
+    expect(strangersView.markup).not.toContain('visibility=public_link')
+  })
+
   it('writes a summary of their own, and can go back to the page’s opening words', async () => {
     const page = await publishPublic('摘要测试', '<nav><p>首页 · 文档 · 关于我们 · 联系方式 · 加入我们</p></nav><main><p>正文的第一段才是这篇文档真正要说的事情。</p></main>')
     await setSharing(page.artifactId, { listed: true })

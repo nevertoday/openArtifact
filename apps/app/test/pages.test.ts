@@ -69,6 +69,10 @@ describe('login page', () => {
   })
 })
 
+function cardTitlesOf(markup: string): string[] {
+  return [...markup.matchAll(/artifact-card__title" title="([^"]*)"/g)].map(match => match[1] ?? '')
+}
+
 describe('home page', () => {
   it('lists artifacts with author and agent, filters them, and escapes titles', async () => {
     const hostileTitle = '<img src=x onerror=alert(1)>'
@@ -128,7 +132,7 @@ describe('home page', () => {
     expect(reviewerForMeMarkup).not.toContain('Answered me')
   })
 
-  it('finds artifacts by title, author name or agent, and keeps the filter and source while searching', async () => {
+  it('finds artifacts by title, author name or agent, and keeps the search when the filter, source or order changes', async () => {
     await app.request('/api/me', { method: 'PATCH', cookie: reviewerCookie, body: { name: '周晓' } })
     const reviewerToken = await app.createToken(reviewerCookie)
     await app.publish({ token: reviewerToken, agentClient: 'Gemini CLI' }, 'Quarterly numbers')
@@ -140,8 +144,10 @@ describe('home page', () => {
     expect(byAuthor).toContain('Quarterly numbers')
     expect(byAuthor).toMatch(/搜索「周晓」· \d+ 个/)
     expect(byAgent).toContain('Quarterly numbers')
-    expect(withinSource).toContain('<input type="hidden" name="agent" value="Gemini CLI">')
-    expect(withinSource).toContain('placeholder="搜索标题、作者或 agent"')
+    expect(withinSource).toMatch(/<button [^>]*data-open-search/)
+    expect(withinSource).toMatch(/搜索「quarterly」· 1 个/)
+    expect(withinSource).toContain('<option value="/?agent=Gemini+CLI&amp;sort=title&amp;q=quarterly"')
+    expect(withinSource).toMatch(/class="[^"]*home-toolbar__tag"[^>]*href="\/\?q=quarterly"[^>]*aria-label="清除筛选：Gemini CLI"/)
     expect(withinSource).toMatch(/href="\/\?filter=mine&amp;q=quarterly"/)
   })
 
@@ -151,7 +157,7 @@ describe('home page', () => {
 
     expect(noMatch).toContain('没有找到「zzzz-nothing」')
     expect(noMatch).toContain('href="/?filter=mine">清除搜索')
-    expect(nothingShared).toContain('还没有人把 artifact 分享给你')
+    expect(nothingShared).toContain('还没有人把页面分享给你')
     expect(nothingShared).toContain('<h1 class="xxd-page-header__title">分享给我的</h1>')
   })
 
@@ -217,10 +223,50 @@ describe('home page', () => {
     }
 
     expect(cardOf('Team roadmap')).not.toContain('工作区内可见')
-    expect(cardOf('Private notes')).toMatch(/<span class="artifact-chip" data-visibility="private">.*私有<\/span>/)
+    expect(cardOf('Private notes')).toMatch(/<span class="artifact-chip" data-visibility="private"[^>]*>.*私有<\/span>/)
     expect(cardOf('Team roadmap')).not.toContain('>v1</span>')
     expect(cardOf('Revised brief')).toContain('<span class="xxd-mono">v2</span>')
-    expect(newcomerHome).toMatch(/href="\/\?filter=mine"[^>]*>.*?我发布的<\/span><span class="xxd-badge"\s+title="0 个 artifact"><\/span>/)
+    expect(newcomerHome).toMatch(/href="\/\?filter=mine"[^>]*>.*?我发布的<\/span><span class="xxd-badge"\s+title="0 个页面"><\/span>/)
+  })
+
+  it('lists only private pages under ?visibility=private, with a tag that clears it', async () => {
+    const ownerCookie = await app.signIn('visibility-owner@example.com')
+    await app.publish({ cookie: ownerCookie }, 'Open plan', '<h1>x</h1>', 'workspace')
+    await app.publish({ cookie: ownerCookie }, 'Secret plan', '<h1>x</h1>', 'private')
+
+    const everything = await pageText('/?filter=mine', ownerCookie)
+    const privateOnly = await pageText('/?filter=mine&visibility=private', ownerCookie)
+
+    expect(cardTitlesOf(everything).sort()).toEqual(['Open plan', 'Secret plan'])
+    expect(cardTitlesOf(privateOnly)).toEqual(['Secret plan'])
+    expect(privateOnly).toMatch(/class="[^"]*home-toolbar__tag"[^>]*href="\/\?filter=mine"[^>]*aria-label="清除筛选：私有"/)
+    expect(everything).not.toContain('home-toolbar__tag')
+  })
+
+  it('orders the cards by title under ?sort=title', async () => {
+    const ownerCookie = await app.signIn('sort-owner@example.com')
+    for (const title of ['Cherry', 'Apple', 'Banana']) await app.publish({ cookie: ownerCookie }, title)
+
+    const byTitle = await pageText('/?filter=mine&sort=title', ownerCookie)
+
+    expect(cardTitlesOf(byTitle)).toEqual(['Apple', 'Banana', 'Cherry'])
+  })
+
+  it('shows 24 cards a page with the total beside the heading, a link to the rest, and a way back to the start', async () => {
+    const ownerCookie = await app.signIn('paging-owner@example.com')
+    const titles = Array.from({ length: 25 }, (_, index) => `Paged ${String(index + 1).padStart(2, '0')}`)
+    for (const title of titles) await app.publish({ cookie: ownerCookie }, title)
+
+    const firstPage = await pageText('/?filter=mine', ownerCookie)
+    const secondPage = await pageText('/?filter=mine&from=24', ownerCookie)
+
+    expect(cardTitlesOf(firstPage)).toHaveLength(24)
+    expect(firstPage).toContain('<span class="home-count">25</span>')
+    expect(firstPage).toMatch(/<a [^>]*href="\/\?filter=mine&amp;from=24"[^>]*data-load-more/)
+    expect(cardTitlesOf(secondPage)).toHaveLength(1)
+    expect([...cardTitlesOf(firstPage), ...cardTitlesOf(secondPage)].sort()).toEqual(titles)
+    expect(secondPage).not.toContain('data-load-more')
+    expect(secondPage).toMatch(/<a [^>]*href="\/\?filter=mine"[^>]*>.*?回到开头<\/a>/)
   })
 })
 

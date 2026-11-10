@@ -43,6 +43,8 @@ Commands (all print JSON on stdout; errors exit 1 with {"error", "hint"}):
           --sleep <ms>          pause
           --eval '<js>'         evaluate in the top page; result is printed
           --frame-text          print innerText of the #artifact-frame document
+          --frame-eval '<js>'   evaluate inside the #artifact-frame document; result is printed
+          --mouse <X>,<Y>       press and release the pointer at page coordinates (fires pointerdown, reaches the frame)
           --shot <name>         save a PNG to .verify/evidence/<run>/<name>.png
           --dom <name>          save document.body.innerText to .verify/evidence/<run>/<name>.txt
           --viewport <W>x<H>    resize the page; below 700 px wide it also emulates a touch phone
@@ -66,7 +68,7 @@ function parseArgs(argv) {
   const positional = []
   const flags = {}
   const steps = []
-  const stepFlags = new Set(['wait', 'click', 'fill', 'press', 'sleep', 'eval', 'frame-text', 'shot', 'dom', 'viewport', 'scheme', 'reload'])
+  const stepFlags = new Set(['wait', 'click', 'fill', 'press', 'sleep', 'eval', 'frame-text', 'shot', 'dom', 'viewport', 'scheme', 'reload', 'mouse', 'frame-eval'])
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (!arg.startsWith('--')) { positional.push(arg); continue }
@@ -393,6 +395,7 @@ async function browse(run, target, steps, flags) {
     for (let i = 0; i < 100; i++) { if ((await evaluate('document.readyState')) === 'complete') break; await sleep(100) }
     results.push({ step: 'navigate', url, finalUrl: await evaluate('location.href'), title: await evaluate('document.title') })
     const sel = s => JSON.stringify(s)
+    let touchScreen = false
     for (const step of steps) {
       if (step.name === 'wait') {
         let found = false
@@ -415,7 +418,8 @@ async function browse(run, target, steps, flags) {
       } else if (step.name === 'viewport') {
         const [width, height] = step.value.split('x').map(Number)
         await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 700 })
-        await send('Emulation.setTouchEmulationEnabled', { enabled: width < 700, maxTouchPoints: 5 })
+        touchScreen = width < 700
+        await send('Emulation.setTouchEmulationEnabled', { enabled: touchScreen, maxTouchPoints: 5 })
         results.push({ step: 'viewport', width, height })
       } else if (step.name === 'scheme') {
         await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: step.value }] })
@@ -429,6 +433,27 @@ async function browse(run, target, steps, flags) {
         await sleep(Number(step.value)); results.push({ step: 'sleep', ms: Number(step.value) })
       } else if (step.name === 'eval') {
         results.push({ step: 'eval', value: await evaluate(step.value) })
+      } else if (step.name === 'mouse') {
+        // A real pointer press at page coordinates: unlike --click it fires pointerdown and reaches inside the artifact frame.
+        const [x, y] = step.value.split(',').map(Number)
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
+        await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 })
+        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 })
+        results.push({ step: 'mouse', x, y })
+      } else if (step.name === 'frame-eval') {
+        const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()
+        const frameTarget = targets.find(t => t.type === 'iframe' && t.url.startsWith(run.origins.usercontent))
+        if (!frameTarget) throw new Error(`--frame-eval: no iframe target from ${run.origins.usercontent}`)
+        const frameWs = new WebSocket(frameTarget.webSocketDebuggerUrl)
+        await new Promise((ok, no) => { frameWs.onopen = ok; frameWs.onerror = no })
+        // The frame is its own DevTools target, so the phone's touch screen has to be emulated there too.
+        const value = await new Promise(ok => {
+          frameWs.onmessage = event => { const m = JSON.parse(event.data); if (m.id === 1) ok(m.result?.result?.value ?? null) }
+          frameWs.send(JSON.stringify({ id: 0, method: 'Emulation.setTouchEmulationEnabled', params: { enabled: touchScreen, maxTouchPoints: 5 } }))
+          frameWs.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: step.value, returnByValue: true, awaitPromise: true } }))
+        })
+        frameWs.close()
+        results.push({ step: 'frame-eval', value })
       } else if (step.name === 'frame-text') {
         // The artifact iframe is sandboxed without allow-same-origin, so Chrome runs it out of process as its own
         // DevTools target. Find that target and read its document directly.

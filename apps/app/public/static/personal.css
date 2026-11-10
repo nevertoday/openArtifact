@@ -74,12 +74,6 @@
 
 .personal-empty { margin-top: var(--space-8); }
 /* What the page will hold, drawn faintly under the owner's empty state. */
-.personal-ghosts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); width: min(720px, 100%); margin-top: var(--space-8); opacity: .8; }
-.personal-ghost { display: flex; flex-direction: column; gap: 8px; aspect-ratio: 4 / 3; padding: 16px; border-radius: var(--r-md); background: linear-gradient(var(--wash), transparent); }
-.personal-ghost i { height: 10px; width: 60%; border-radius: 5px; background: var(--wash-strong); }
-.personal-ghost i + i { height: 6px; width: 85%; }
-.personal-ghost b { flex: 1; border-radius: 6px; background: var(--wash); }
-@media (max-width: 640px) { .personal-ghosts { grid-template-columns: minmax(0, 1fr); } .personal-ghost:nth-child(n + 2) { display: none; } }
 .personal__colophon { margin-top: auto; padding-top: 72px; font-size: var(--text-xs); color: var(--muted); }
 .personal__colophon a { color: inherit; }
 

@@ -1,7 +1,6 @@
 import { api, m, readJsonData, removalText, renderServerTimes, restoreArtifact, userMessageOf } from './common.js'
 
 const homeConfig = readJsonData('home-config')
-const SEARCH_DELAY_MS = 250
 
 // Arriving from the viewer right after a removal: the address loses ?removed so a reload does not offer it again.
 function offerUndo(justRemoved) {
@@ -70,53 +69,61 @@ function showOneFewerRemoved() {
 }
 
 /**
- * Filters as the person types: the server renders the same page for the new address and its list, count and
- * sidebar links replace the current ones, so matching has one owner. Enter still submits the form as a plain GET.
+ * The rest of a long list arrives as the person nears its end: the server renders the next screenful at the "load
+ * more" link's address, and its cards join the grid. Without scripts the link is plain paging.
  */
-class LiveSearch {
-  #searchInput
-  #timer = null
-  #latestRequest = 0
+class MoreCards {
+  #grid
+  #loading = false
+  #nearEnd = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) this.#load() }, { rootMargin: '600px' })
 
-  constructor(searchForm) {
-    this.#searchInput = searchForm.querySelector('input[name="q"]')
-    this.#searchInput.addEventListener('input', () => this.#schedule())
-    searchForm.addEventListener('submit', () => clearTimeout(this.#timer))
+  constructor(grid) {
+    this.#grid = grid
+    document.addEventListener('click', event => {
+      if (!event.target.closest('[data-load-more]')) return
+      event.preventDefault()
+      this.#load()
+    })
+    this.#watch()
   }
 
-  #schedule() {
-    clearTimeout(this.#timer)
-    this.#timer = setTimeout(() => this.#show(this.#searchInput.value.trim()), SEARCH_DELAY_MS)
+  get #link() {
+    return document.querySelector('[data-load-more]')
   }
 
-  async #show(searchText) {
-    const resultUrl = new URL(location.href)
-    if (searchText === '') resultUrl.searchParams.delete('q')
-    else resultUrl.searchParams.set('q', searchText)
-    const request = ++this.#latestRequest
+  #watch() {
+    this.#nearEnd.disconnect()
+    if (this.#link) this.#nearEnd.observe(this.#link)
+  }
+
+  async #load() {
+    const link = this.#link
+    if (!link || this.#loading) return
+    this.#loading = true
+    link.setAttribute('aria-busy', 'true')
     try {
-      const response = await fetch(resultUrl, { credentials: 'same-origin' })
+      const response = await fetch(link.href, { credentials: 'same-origin' })
       if (!response.ok) throw new Error(`home page answered ${response.status}`)
-      const resultPage = new DOMParser().parseFromString(await response.text(), 'text/html')
-      if (request !== this.#latestRequest) return
-      LiveSearch.#replace('#main', resultPage)
-      LiveSearch.#replace('.home-sidebar', resultPage)
-      renderServerTimes(document.getElementById('main'))
-      history.replaceState(null, '', resultUrl.pathname + resultUrl.search)
+      const nextPage = new DOMParser().parseFromString(await response.text(), 'text/html')
+      const cards = [...nextPage.querySelectorAll('[data-artifact-grid] > *')]
+      this.#grid.append(...cards)
+      renderServerTimes(this.#grid)
+      const nextLink = nextPage.querySelector('[data-load-more]')
+      if (nextLink) link.replaceWith(nextLink)
+      else link.closest('.home-more').remove()
     } catch (error) {
-      console.error(new Error('could not filter the home page while typing', { cause: error }))
+      // The link stays, so pressing it tries again or, failing that, pages the plain way.
+      link.removeAttribute('aria-busy')
+      console.error(new Error('could not load more of the home page', { cause: error }))
+    } finally {
+      this.#loading = false
+      this.#watch()
     }
-  }
-
-  static #replace(selector, resultPage) {
-    const current = document.querySelector(selector)
-    const replacement = resultPage.querySelector(selector)
-    if (current && replacement) current.replaceChildren(...replacement.childNodes)
   }
 }
 
 if (homeConfig?.justRemoved) offerUndo(homeConfig.justRemoved)
-// Delegated, because the live search replaces the list and its buttons.
+// Delegated, because more cards and rows arrive after the page loads.
 document.addEventListener('click', event => {
   const restoreButton = event.target.closest('[data-restore-artifact]')
   if (restoreButton) restoreFromList(restoreButton)
@@ -124,8 +131,8 @@ document.addEventListener('click', event => {
   if (purgeButton) purgeFromList(purgeButton)
 })
 document.addEventListener('change', event => {
-  const sourcePicker = event.target.closest('[data-source-picker]')
-  if (sourcePicker) location.href = sourcePicker.value
+  const navigatingSelect = event.target.closest('select[data-navigate]')
+  if (navigatingSelect) location.href = navigatingSelect.value
 })
-const searchForm = document.querySelector('[data-home-search]')
-if (searchForm) new LiveSearch(searchForm)
+const grid = document.querySelector('[data-artifact-grid]')
+if (grid) new MoreCards(grid)

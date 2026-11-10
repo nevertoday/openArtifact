@@ -18,6 +18,8 @@ export default /** @satisfies {import('../messages').Messages['viewer']} */ ({
     share: 'Share',
     comments: 'Comments',
     signInToComment: 'Sign in to comment',
+    publishYours: 'Publish yours',
+    publishYoursLong: 'Publish your own pages with Open Artifact',
   },
   version: {
     picker: version => `Version ${version}, choose a version`,
@@ -76,7 +78,7 @@ export default /** @satisfies {import('../messages').Messages['viewer']} */ ({
     loading: 'Loading…',
     linkCopied: 'Link copied',
     copyLink: 'Copy link',
-    save: 'Save',
+    done: 'Done',
     toX: 'Post to X',
   },
   shareX: {

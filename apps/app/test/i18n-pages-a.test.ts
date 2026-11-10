@@ -129,7 +129,7 @@ describe('the home page’s source filter', () => {
 
     const chinese = await app.request('/', { cookie: author })
     const english = await app.request('/', { cookie: author, headers: { 'Accept-Language': 'en' } })
-    const webSource = /href="(\/\?[^"]*agent=)"/
+    const webSource = /<option value="(\/\?[^"]*agent=)"/
 
     expect((await chinese.text()).match(webSource)?.[1]).toBe('/?agent=')
     expect((await english.text()).match(webSource)?.[1]).toBe('/?agent=')

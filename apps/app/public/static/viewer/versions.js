@@ -1,3 +1,4 @@
+import { avatarStyle } from '../avatar.js'
 import { api, element, icon, m, timeElement, userMessageOf } from '../common.js'
 import { BlockDiff } from './block-diff.js'
 
@@ -18,16 +19,18 @@ export class VersionHistory extends EventTarget {
   #stage
   #records = new Map()
   #historyLoaded = 'not yet'
+  #published
   #latest
   #missingVersion
 
-  constructor({ config, frame, button, menu, notice, fullViewLink, stage }) {
+  constructor({ config, frame, button, published, menu, notice, fullViewLink, stage }) {
     super()
     this.#artifactPath = `/api/artifacts/${encodeURIComponent(config.artifactId)}`
     this.#config = config
     this.#frame = frame
     this.#stage = stage
     this.#button = button
+    this.#published = published
     this.#menu = menu
     this.#notice = notice
     this.#fullViewLink = fullViewLink
@@ -37,6 +40,8 @@ export class VersionHistory extends EventTarget {
     menu.addEventListener('toggle', event => { if (event.newState === 'open') this.#renderMenu() })
     menu.addEventListener('xxd:change', event => this.show(Number(event.detail.value)).catch(error => this.#showFailure(error)))
     this.#syncShown()
+    // Who published the version on screen is said beside its number, so the history is fetched at once.
+    this.refresh()
   }
 
   get latest() {
@@ -67,6 +72,7 @@ export class VersionHistory extends EventTarget {
     }
     if (this.#historyLoaded !== 'yes') this.#historyLoaded = fetched ? 'yes' : 'failed'
     if (this.#menu.matches(':popover-open')) this.#renderMenu()
+    this.#showPublished()
     return fetched ? this.#latest : null
   }
 
@@ -104,6 +110,15 @@ export class VersionHistory extends EventTarget {
     history.replaceState(history.state, '', `${location.pathname}${versionQuery}${location.hash}`)
     this.#fullViewLink?.setAttribute('href', `${this.#config.fullViewPath}${versionQuery}`)
     this.#renderNotice()
+    this.#showPublished()
+  }
+
+  // Beside the version number: who published the version on screen, with which agent, and when.
+  #showPublished() {
+    const record = this.#records.get(this.shown)
+    if (!record) return this.#published.replaceChildren()
+    const agentMark = record.publishedVia ? element('span', { className: 'agent-mark', style: avatarStyle(record.publishedVia), 'aria-hidden': 'true' }) : null
+    this.#published.replaceChildren(agentMark ?? '', VersionHistory.#howPublished(record), ' · ', timeElement(record.createdAt))
   }
 
   #describe(record) {

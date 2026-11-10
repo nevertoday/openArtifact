@@ -134,7 +134,7 @@ ${SettingsPage.#appearanceSection(m)}`
 ${isAdmin ? SettingsPage.#inviteSection(m) : ''}
 <section class="xxd-stack member-list" aria-labelledby="member-list-title">
   ${isAdmin ? html`<h2 class="xxd-text" data-variant="heading3" id="member-list-title">${m.settings.members.allMembers}</h2>` : html`<h2 class="xxd-sr-only" id="member-list-title">${m.settings.members.allMembers}</h2>`}
-  <div class="xxd-table-wrap"><table class="xxd-table">
+  <div class="xxd-table-wrap"><table class="xxd-table stack-table">
     <thead><tr><th>${m.settings.members.columns.name}</th><th>${m.settings.members.columns.email}</th><th>${m.settings.members.columns.role}</th>${isAdmin ? html`<th class="xxd-table__actions"><span class="xxd-sr-only">${m.settings.actions}</span></th>` : ''}</tr></thead>
     <tbody>${SettingsPage.#adminsFirst(members).map(memberRow)}</tbody>
   </table></div>
@@ -182,7 +182,7 @@ ${isAdmin ? SettingsPage.#inviteSection(m) : ''}
     const roleOption = (role: WorkspaceMember['role']) => html`<option value="${role}" ${member.role === role ? new SafeHtml('selected') : ''}>${ArtifactLabels.role(m, role)}</option>`
     // What cannot change is shown as plain text with its reason on hover, not as a disabled control with a caption.
     const roleCell = roleLocked
-      ? html`<span class="member-role" tabindex="0" data-tooltip="${m.settings.members.lastAdmin}">${ArtifactLabels.role(m, member.role)}</span>`
+      ? html`<span class="member-role">${ArtifactLabels.role(m, member.role)}<span class="xxd-sr-only">${m.settings.members.lastAdmin}</span></span>`
       : html`<label class="xxd-select" data-size="sm"><span class="xxd-sr-only">${m.settings.members.roleOf(name)}</span><select data-member-role="${member.userId}" data-name="${name}">${roleOption('admin')}${roleOption('member')}</select></label>`
     const removeCell = isSelf
       ? html`<span class="xxd-sr-only">${m.settings.members.cannotRemoveSelf}</span>`
@@ -308,7 +308,7 @@ ${SettingsPage.#lifecycleSection(m, identity)}`
     <h2 class="xxd-text" data-variant="heading3" id="content-title">${content.title}</h2>
     <p class="xxd-text" data-variant="secondary">${content.description}</p>
   </div>
-  <div class="xxd-table-wrap"><table class="xxd-table content-table">
+  <div class="xxd-table-wrap"><table class="xxd-table content-table stack-table">
     <thead><tr><th>${content.columns.title}</th><th>${content.columns.author}</th><th>${content.columns.state}</th><th>${content.columns.updated}</th><th class="xxd-table__actions"><span class="xxd-sr-only">${m.settings.actions}</span></th></tr></thead>
     <tbody>${administration.artifacts.map(row)}</tbody>
   </table></div>

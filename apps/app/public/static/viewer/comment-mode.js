@@ -121,8 +121,10 @@ export class Composer extends EventTarget {
     return `${anchor.selector ?? ''}\n${anchor.quote?.exact ?? ''}`
   }
 
+  // The note makes the box taller, so the box finds its place again.
   #showAgentNote() {
     this.#form.querySelector('[data-agent-note]').hidden = !this.#form.elements.forAgent.checked
+    this.#place()
   }
 
   #follow(focusedRect) {
@@ -217,7 +219,6 @@ export class CoachMark {
     }
   }
 
-  // Hangs under the comment-mode button, its arrow pointing at the button, inside the window.
   #place() {
     if (!this.isOpen) return
     // Rests at the bottom centre, clear of the page's title and its pins, where a thumb or a glance finds it.

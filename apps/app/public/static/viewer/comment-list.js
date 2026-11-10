@@ -8,6 +8,43 @@ const COMMENT_LINK_PREFIX = '#comment-'
 const THREAD_CONTROLS = ['.comment-pin', '.comment-thread__resolve', '.comment-thread__reply-toggle', '.comment-thread__more']
 const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)')
 
+/** Replies being written, by thread. Kept for this tab, so a refresh or a slip of the back button does not lose them. */
+class ReplyDrafts {
+  #storageKey
+  #drafts
+
+  constructor(artifactId) {
+    this.#storageKey = `open-artifact.reply-drafts.${artifactId}`
+    try {
+      this.#drafts = new Map(JSON.parse(sessionStorage.getItem(this.#storageKey) ?? '[]'))
+    } catch {
+      this.#drafts = new Map()
+    }
+  }
+
+  get(threadId) {
+    return this.#drafts.get(threadId) ?? ''
+  }
+
+  set(threadId, text) {
+    if (text === '') this.#drafts.delete(threadId)
+    else this.#drafts.set(threadId, text)
+    this.#keep()
+  }
+
+  delete(threadId) {
+    this.set(threadId, '')
+  }
+
+  #keep() {
+    try {
+      sessionStorage.setItem(this.#storageKey, JSON.stringify([...this.#drafts]))
+    } catch {
+      // Storage is blocked in this browser; drafts then last as long as the page stays open.
+    }
+  }
+}
+
 /**
  * The comments view of the drawer: the threads under a filter, one of them active, each with its replies, a reply
  * box and a way to resolve it. Selecting a thread announces "select", so the page can bring its pin into view;
@@ -25,15 +62,16 @@ export class CommentList extends EventTarget {
   #filter = 'open'
   #activeId = null
   #replyingTo = null
-  #replyDrafts = new Map()
+  #replyDrafts
   #arrivedIds = new Set()
   #freshId = null
   #orphanedIds = new Set()
   #renderWhenIdle = false
 
   /** `handoff` is null for people who cannot edit: an agent acting for them could not change the page. */
-  constructor({ element: listElement, threads, drawer, stage, canComment, byTouch, handoff }) {
+  constructor({ element: listElement, artifactId, threads, drawer, stage, canComment, byTouch, handoff }) {
     super()
+    this.#replyDrafts = new ReplyDrafts(artifactId)
     this.#element = listElement
     this.#threads = threads
     this.#drawer = drawer
@@ -343,7 +381,7 @@ export class CommentList extends EventTarget {
     if (this.#replyingTo === thread.id) return this.#replyForm(thread)
     if (!isActive) return null
     return element('button', { type: 'button', className: 'comment-thread__reply-toggle comment-reply-prompt', 'aria-label': m.viewerClient.comments.replyTo(thread.number), onClick: () => this.#openReply(thread.id) },
-      icon('Reply', 14), element('span', {}, m.viewerClient.comments.replyPlaceholder))
+      icon('Reply', 14), element('span', { className: 'comment-reply-prompt__text' }, this.#replyDrafts.get(thread.id) || m.viewerClient.comments.replyPlaceholder))
   }
 
   // Quiet until its reply is pointed at, at the end of the reply's own line.
@@ -446,7 +484,7 @@ export class CommentList extends EventTarget {
   }
 
   #replyForm(thread) {
-    const replyBody = element('textarea', { className: 'xxd-textarea', rows: '2', required: true, placeholder: m.viewerClient.comments.replyPlaceholder, 'aria-label': m.viewerClient.comments.replyTo(thread.number), onInput: event => this.#replyDrafts.set(thread.id, event.target.value) }, this.#replyDrafts.get(thread.id) ?? '')
+    const replyBody = element('textarea', { className: 'xxd-textarea', rows: '2', required: true, placeholder: m.viewerClient.comments.replyPlaceholder, 'aria-label': m.viewerClient.comments.replyTo(thread.number), onInput: event => this.#replyDrafts.set(thread.id, event.target.value) }, this.#replyDrafts.get(thread.id))
     const replyForm = element('form', { className: 'comment-reply-form', 'data-reply-form': thread.id },
       replyBody,
       element('div', { className: 'comment-reply-form__row' },

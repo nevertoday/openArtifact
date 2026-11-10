@@ -47,7 +47,7 @@ const versionButton = viewer.querySelector('[data-version-button]')
 const versionMenu = viewer.querySelector('[data-version-menu]')
 const versionNotice = viewer.querySelector('[data-version-notice]')
 const versions = permissions.canSeeVersions
-  ? new VersionHistory({ config, frame, button: versionButton, menu: versionMenu, notice: versionNotice, fullViewLink: viewer.querySelector('[data-full-view-link]'), stage })
+  ? new VersionHistory({ config, frame, button: versionButton, published: viewer.querySelector('[data-version-published]'), menu: versionMenu, notice: versionNotice, fullViewLink: viewer.querySelector('[data-full-view-link]'), stage })
   : null
 const compare = versions ? new VersionCompare({ bar: viewer.querySelector('[data-compare-bar]'), frame, versions, menu: versionMenu, stage }) : null
 if (versions) new VersionOverwrite({ config, versions, notice: versionNotice, stage })
@@ -56,7 +56,7 @@ const threads = permissions.canReadComments ? new CommentThreads(config.artifact
 const handoff = permissions.canEdit
   ? new AgentHandoff(m.viewerClient.agentPrompt, { artifactId: config.artifactId, title: config.title, version: config.currentVersion, url: `${location.origin}${config.path}`, guideUrl: `${location.origin}/llms.txt` })
   : null
-const list = threads ? new CommentList({ element: drawerElement.querySelector('[data-drawer-view="comments"]'), threads, drawer, stage, canComment: permissions.canComment, byTouch: writesByTouch, handoff }) : null
+const list = threads ? new CommentList({ element: drawerElement.querySelector('[data-drawer-view="comments"]'), artifactId: config.artifactId, threads, drawer, stage, canComment: permissions.canComment, byTouch: writesByTouch, handoff }) : null
 const pins = threads ? new CommentPins({ frame, threads, list, isShowingLatest: () => versions?.isShowingLatest ?? true }) : null
 
 if (threads) {
@@ -98,7 +98,7 @@ if (commentMode) {
 }
 
 const shareDialogElement = document.getElementById('share-dialog')
-const shareDialog = shareDialogElement ? new ShareDialog(shareDialogElement, config, stage) : null
+const shareDialog = shareDialogElement ? new ShareDialog(shareDialogElement, config) : null
 const reportButton = viewer.querySelector('[data-open-report]')
 if (reportButton) new ReportDialog({ button: reportButton, dialog: document.getElementById('report-dialog'), artifactId: config.artifactId })
 const shareXElement = document.getElementById('share-x-dialog')

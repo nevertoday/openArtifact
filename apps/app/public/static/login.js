@@ -15,6 +15,8 @@ const emailStepIntro = loginCard.querySelector('[data-email-step-intro]')
 const SEND_CODE_PATH = '/api/auth/sign-in/send-code'
 const CHECK_CODE_PATH = '/api/auth/sign-in/email-otp'
 const RESEND_COOLDOWN_SECONDS = 60
+const CODE_LIFETIME_MS = 10 * 60 * 1000
+const PENDING_CODE_KEY = 'open-artifact.login.pending-code'
 // The server refuses an address it may not admit with this code; the refusal belongs under the email field.
 const EMAIL_NOT_ADMITTED = 'EMAIL_NOT_ADMITTED'
 const SIGN_IN_ERRORS = {
@@ -57,9 +59,9 @@ async function postAuth(path, body) {
 class ResendCooldown {
   #timer = null
 
-  start() {
+  start(secondsLeft = RESEND_COOLDOWN_SECONDS) {
     this.stop()
-    this.#tick(RESEND_COOLDOWN_SECONDS)
+    this.#tick(secondsLeft)
   }
 
   stop() {
@@ -72,6 +74,36 @@ class ResendCooldown {
     resendButton.textContent = waiting ? m.client.login.resendIn(secondsLeft) : m.client.login.resend
     if (waiting) this.#timer = setTimeout(() => this.#tick(secondsLeft - 1), 1000)
   }
+}
+
+/**
+ * The code a person is waiting for, kept for this tab while the code lives, so a refresh on the code step (or coming
+ * back from the mail app) returns to the code step instead of asking for the address again.
+ */
+const pendingCode = {
+  remember(email, sentAt) {
+    try {
+      sessionStorage.setItem(PENDING_CODE_KEY, JSON.stringify({ email, sentAt }))
+    } catch {
+      // Storage is blocked in this browser; a refresh then starts over at the email step.
+    }
+  },
+  forget() {
+    try {
+      sessionStorage.removeItem(PENDING_CODE_KEY)
+    } catch {
+      // Nothing was stored.
+    }
+  },
+  /** The address and send time of a code that is still alive, or null. */
+  read() {
+    try {
+      const { email, sentAt } = JSON.parse(sessionStorage.getItem(PENDING_CODE_KEY) ?? 'null') ?? {}
+      return typeof email === 'string' && Date.now() - sentAt < CODE_LIFETIME_MS ? { email, sentAt } : null
+    } catch {
+      return null
+    }
+  },
 }
 
 const resendCooldown = new ResendCooldown()
@@ -87,8 +119,9 @@ function paintCode() {
   })
 }
 
-function showCodeStep(email) {
+function showCodeStep(email, sentAt = Date.now()) {
   codeSentTo = email
+  pendingCode.remember(email, sentAt)
   codeStep.querySelector('[data-sent-to]').textContent = email
   emailStep.hidden = true
   if (emailStepIntro) emailStepIntro.hidden = true
@@ -96,11 +129,12 @@ function showCodeStep(email) {
   codeInput.value = ''
   codeInput.focus()
   paintCode()
-  resendCooldown.start()
+  resendCooldown.start(Math.max(0, RESEND_COOLDOWN_SECONDS - Math.floor((Date.now() - sentAt) / 1000)))
 }
 
 function showEmailStep() {
   codeSentTo = null
+  pendingCode.forget()
   resendCooldown.stop()
   clearErrors()
   codeStep.hidden = true
@@ -115,6 +149,7 @@ async function checkCode() {
   codeBox.setAttribute('aria-busy', 'true')
   try {
     await postAuth(CHECK_CODE_PATH, { email: codeSentTo, otp: codeInput.value })
+    pendingCode.forget()
     location.assign(nextPath)
   } catch (error) {
     codeBox.dataset.invalid = ''
@@ -163,6 +198,7 @@ resendButton.addEventListener('click', async () => {
     codeInput.value = ''
     codeInput.focus()
     paintCode()
+    pendingCode.remember(codeSentTo, Date.now())
     resendCooldown.start()
   } catch (error) {
     resendButton.disabled = false
@@ -186,4 +222,6 @@ for (const providerButton of document.querySelectorAll('[data-provider-id]')) {
 
 // Only the error code is taken from the address, so a crafted link cannot put its own words on this page.
 const signInError = new URLSearchParams(location.search).get('error')
+const waitingFor = pendingCode.read()
+if (waitingFor) showCodeStep(waitingFor.email, waitingFor.sentAt)
 if (signInError) showError(signInError)

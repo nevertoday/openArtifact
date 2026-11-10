@@ -367,6 +367,8 @@ export class ArtifactSdk {
     '.chip[data-on] { opacity: 1; }',
     '.pin { position: absolute; display: grid; min-width: ' + PIN_SIZE + 'px; height: ' + PIN_SIZE + 'px; padding: 0; border: 0; border-radius: 0; background: none; cursor: pointer; pointer-events: auto; opacity: 0; transform: translateY(4px); transition: opacity 220ms cubic-bezier(.25, 1, .5, 1), transform 220ms cubic-bezier(.25, 1, .5, 1); }',
     '.pin[data-shown] { opacity: 1; transform: none; }',
+    // A finger needs more than the 22px a pin is drawn at.
+    '@media (pointer: coarse) { .pin::after { content: ""; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); } }',
     '.pin > span { grid-area: 1 / 1; display: grid; place-items: center; min-width: ' + PIN_SIZE + 'px; height: ' + PIN_SIZE + 'px; padding: 0 4px; border-radius: 999px; box-shadow: 0 2px 6px rgba(0, 0, 0, .18); font: 600 12px/1 var(--font-body); font-variant-numeric: tabular-nums; transition: opacity 220ms ease, transform 220ms cubic-bezier(.25, 1, .5, 1); }',
     '.number { background: var(--ink); color: var(--paper); }',
     '.pin[data-state="agent"] .number { background: var(--warning-solid); color: var(--warning-on-solid); }',

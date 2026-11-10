@@ -1,4 +1,4 @@
-import { ArtifactPath, CommentThread, parseLocale, PublicLinkPassword, WorkspaceDeletion, type ArtifactPage, type Invite } from '@open-artifact/core'
+import { ArtifactPath, CommentThread, parseLocale, PublicLinkPassword, WorkspaceDeletion, type ArtifactPage, type ArtifactSummary, type Invite } from '@open-artifact/core'
 import { ArtifactGate, type OpenedArtifact } from '../access/artifact-gate.ts'
 import type { ApiContext } from '../api/api-context.ts'
 import { INVITE_COOKIE } from '../auth/admission.ts'
@@ -9,7 +9,7 @@ import { SenderNetwork } from '../sender-network.ts'
 import { HttpCookies } from '../http-cookies.ts'
 import { HttpError } from '../http-error.ts'
 import { LOCALE_COOKIE } from '../i18n/resolve-locale.ts'
-import { HOME_FILTERS, HomeListing, HomePage, type HomeFilter } from './home-page.ts'
+import { HOME_FILTERS, HOME_SORTS, HOME_VISIBILITIES, HomeListing, HomePage, type HomeQuery } from './home-page.ts'
 import { LoginPage } from './login-page.ts'
 import { MessagePages, type PasswordPrompt } from './message-pages.ts'
 import { PersonalPage } from './personal-page.ts'
@@ -19,7 +19,6 @@ import { SETTINGS_SECTIONS, type SettingsSection } from './settings-sections.ts'
 import { ViewerPage, type Byline, type OlderVersion, type ViewerModel } from './viewer-page.ts'
 
 const UNLOCK_COOKIE_SECONDS = 30 * 24 * 60 * 60
-const MAX_LIVE_PREVIEWS = 12
 const AUDIT_EVENTS_SHOWN = 50
 const DAY_SECONDS = 24 * 60 * 60
 const YEAR_SECONDS = 365 * 24 * 60 * 60
@@ -117,16 +116,26 @@ export class PageRoutes {
       this.#workspaceNames(listing.otherWorkspaceIds()),
       this.#context.repositories.workspaces.listRestorable(identity.userId, WorkspaceDeletion.purgeCutoff(Date.now())),
     ])
-    const requestedFilter = searchParams.get('filter')
-    const query = {
-      filter: HOME_FILTERS.find(filter => filter === requestedFilter) ?? ('all' as HomeFilter),
-      agent: searchParams.get('agent'),
-      search: searchParams.get('q') ?? '',
-    }
+    const query = PageRoutes.#homeQuery(searchParams)
     const [authorNames, m] = await Promise.all([this.#context.people.namesOf(listing.peopleIds()), this.#context.messages()])
-    const previewUrls = await this.#previewUrls(listing.matching(m, query, authorNames))
+    const page = listing.page(m, query, authorNames)
+    const previewUrls = await this.#previewUrls(page.artifacts)
     const justRemoved = listing.restorable(searchParams.get('removed'))
-    return HomePage.render({ m, identity, listing, query, authorNames, workspaceNames, deletedWorkspaces, previewUrls, justRemoved, usercontentOrigin: this.#settings.usercontentOrigin, now: Date.now() })
+    return HomePage.render({ m, identity, listing, query, page, authorNames, workspaceNames, deletedWorkspaces, previewUrls, justRemoved, usercontentOrigin: this.#settings.usercontentOrigin, now: Date.now() })
+  }
+
+  // The address is typed by people too, so anything it does not recognise falls back to the default.
+  static #homeQuery(searchParams: URLSearchParams): HomeQuery {
+    const requested = (name: string) => searchParams.get(name)
+    const from = Number(requested('from'))
+    return {
+      filter: HOME_FILTERS.find(filter => filter === requested('filter')) ?? 'all',
+      agent: requested('agent'),
+      visibility: HOME_VISIBILITIES.find(visibility => visibility === requested('visibility')) ?? null,
+      sort: HOME_SORTS.find(sort => sort === requested('sort')) ?? 'updated',
+      search: requested('q') ?? '',
+      from: Number.isSafeInteger(from) && from > 0 ? from : 0,
+    }
   }
 
   async #workspaceNames(workspaceIds: string[]): Promise<Map<string, string>> {
@@ -141,7 +150,15 @@ export class PageRoutes {
     const profile = await this.#context.personalPages.findByHandle(handle)
     if (!profile) return MessagePages.unknownAddress(await this.#context.messages(), 404)
     const now = Date.now()
-    const [entries, names] = await Promise.all([this.#context.personalPages.entriesOf(profile.userId, now), this.#context.people.namesOf([profile.userId])])
+    const isOwner = identity?.userId === profile.userId
+    const [entries, names, ownArtifacts] = await Promise.all([
+      this.#context.personalPages.entriesOf(profile.userId, now),
+      this.#context.people.namesOf([profile.userId]),
+      isOwner ? this.#context.gate.listWorkspace(identity) : [],
+    ])
+    // Only pages that could go on the personal page count: public, open without a password, and not expired.
+    const couldBeListed = ({ sharing }: ArtifactSummary) => sharing.visibility === 'public_link' && sharing.publicLinkPasswordHash === null && (sharing.publicLinkExpiresAt === null || sharing.publicLinkExpiresAt > now)
+    const unlistedPublicCount = ownArtifacts.filter(({ summary }) => summary.authorId === profile.userId && summary.removal === null && !summary.sharing.listed && couldBeListed(summary)).length
     const previewUrls = new Map(
       await Promise.all(entries.map(async entry => [entry.artifactId, `${await this.#context.artifactPages.entryPageUrl(entry.artifactId, entry.version, now)}?preview`] as const)),
     )
@@ -155,7 +172,8 @@ export class PageRoutes {
       entries,
       previewUrls,
       shareCards: new Map(entries.map(entry => [entry.artifactId, this.#context.personalPages.shareCardOf(entry, now)])),
-      isOwner: identity?.userId === profile.userId,
+      isOwner,
+      unlistedPublicCount,
       pageUrl,
       cardImageUrl: `${pageUrl}/card.png?v=${cardVariant}`,
       usercontentOrigin: this.#settings.usercontentOrigin,
@@ -184,7 +202,7 @@ export class PageRoutes {
     const identity = await this.#context.identity()
     const reference = ArtifactPath.parse(segment)
     const openedArtifact = reference ? await this.#context.gate.openReferenced(reference, identity, request) : null
-    if (!openedArtifact) return MessagePages.notFound(await this.#context.messages(), identity ? null : PageRoutes.#pathOf(request))
+    if (!openedArtifact) return MessagePages.notFound(await this.#context.messages(), identity ? null : PageRoutes.#pathOf(request), identity)
     if (!openedArtifact.permissions.canView) return this.#refusal(request, segment, openedArtifact, identity)
     // The redirect spells out the artifact's words, so it comes only after the same check that shows its title.
     if (segment !== ArtifactPath.segmentOf(openedArtifact.summary)) return PageRoutes.#movedTo(`${ArtifactPath.of(openedArtifact.summary, page)}${new URL(request.url).search}`)
@@ -278,10 +296,10 @@ export class PageRoutes {
     return this.#settingsPage(identity, section)
   }
 
-  // Live previews of the first cards stand in for screenshots; the rest keep their colour cover.
+  // A live preview of each card on the page stands in for a screenshot; the browser loads it as the card nears the screen.
   async #previewUrls(shownArtifacts: OpenedArtifact[]): Promise<Map<string, string>> {
     const now = Date.now()
-    const previewedArtifacts = shownArtifacts.filter(openedArtifact => openedArtifact.permissions.canView).slice(0, MAX_LIVE_PREVIEWS)
+    const previewedArtifacts = shownArtifacts.filter(openedArtifact => openedArtifact.permissions.canView)
     const previewUrls = await Promise.all(
       previewedArtifacts.map(async ({ summary }) => {
         const entryPageUrl = await this.#context.artifactPages.entryPageUrl(summary.artifactId, summary.version, now)
@@ -328,7 +346,9 @@ export class PageRoutes {
     const { summary, permissions } = openedArtifact
     if (permissions.needsPublicLinkPassword) return MessagePages.publicLinkPassword(await this.#context.messages(), ArtifactPath.atSegment(segment, 'unlock'), PageRoutes.#passwordPromptOf(request))
     if (!identity) return this.#redirectToLogin(request)
-    if (!ArtifactGate.mayAskForAccess(openedArtifact, identity)) return MessagePages.notFound(await this.#context.messages(), null)
+    // Whoever can bring a removed page back is told it was removed, not that it never existed.
+    if (summary.removal !== null && permissions.canRestore) return MessagePages.removed(await this.#context.messages(), identity, summary.artifactId, summary.title, summary.removal.purgeAt, Date.now())
+    if (!ArtifactGate.mayAskForAccess(openedArtifact, identity)) return MessagePages.notFound(await this.#context.messages(), null, identity)
     const authorNames = await this.#context.people.namesOf([summary.authorId])
     return MessagePages.noAccess(await this.#context.messages(), summary.artifactId, authorNames.get(summary.authorId) ?? '')
   }

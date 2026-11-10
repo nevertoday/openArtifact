@@ -273,7 +273,7 @@ ${deletedWorkspaces.length > 0 ? PageShell.#deletedWorkspacesDialog(m, deletedWo
     const choice = (locale: Locale) => {
       const current = locale === m.meta.lang
       return role === 'menu'
-        ? html`<button type="submit" class="xxd-menu__item" role="menuitemradio" aria-checked="${String(current)}" name="locale" value="${locale}" lang="${locale}">${PageShell.icon(current ? 'Check' : 'Globe', 14)}${messagesFor(locale).meta.name}</button>`
+        ? html`<button type="submit" class="xxd-menu__item" role="menuitemradio" aria-checked="${String(current)}" name="locale" value="${locale}" lang="${locale}">${PageShell.icon('Globe', 14)}${messagesFor(locale).meta.name}</button>`
         : html`<button type="submit" class="xxd-btn" data-variant="ghost" data-size="xs" name="locale" value="${locale}" lang="${locale}" aria-pressed="${String(current)}">${messagesFor(locale).meta.name}</button>`
     }
     return html`<form method="post" action="/locale" class="${role === 'bar' ? 'xxd-btn-group app-locale-switch' : 'app-locale-switch'}" aria-label="${m.shell.language}">${LOCALES.map(choice)}</form>`
@@ -282,6 +282,22 @@ ${deletedWorkspaces.length > 0 ? PageShell.#deletedWorkspacesDialog(m, deletedWo
   /** A person's initial on their own tint; `accountInitial` marks the one the profile page renames live. */
   static avatar(name: string, options: { size?: 'sm' | 'lg'; accountInitial?: boolean } = {}): SafeHtml {
     return html`<span class="xxd-avatar" data-avatar style="${avatarStyle(name)}" ${options.size ? new SafeHtml(`data-size="${options.size}"`) : ''} ${options.accountInitial ? new SafeHtml('data-account-initial') : ''} aria-hidden="true">${PageShell.initialOf(name)}</span>`
+  }
+
+  /**
+   * An agent's mark: a small square in the agent's own colour, drawn from its name the way a person's avatar is,
+   * so each agent is told apart at a glance without anyone's logo.
+   */
+  static agentMark(agentName: string): SafeHtml {
+    return html`<span class="agent-mark" style="${avatarStyle(agentName)}" aria-hidden="true"></span>`
+  }
+
+  /**
+   * Opens the search palette (common.js; also ⌘K). It looks like a search field on a wide screen and is one icon on
+   * a phone; `searchText` is the search the list is already narrowed by.
+   */
+  static searchButton(m: Messages, searchText = ''): SafeHtml {
+    return html`<button type="button" class="app-search" data-open-search aria-label="${m.shell.search.open}" aria-keyshortcuts="Meta+K Control+K">${PageShell.icon('Search')}<span class="app-search__text" ${searchText.trim() === '' ? '' : new SafeHtml('data-searching')}>${searchText.trim() || m.shell.search.placeholder}</span><kbd class="xxd-kbd app-search__key" data-search-key>K</kbd></button>`
   }
 
   static initialOf(name: string): string {
